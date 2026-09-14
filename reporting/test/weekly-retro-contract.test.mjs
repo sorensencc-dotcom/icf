@@ -22,6 +22,8 @@ test('freezes current report field shape and deterministic source values', async
   assert.equal(validateWeeklyRetroReport(report).ok, true);
   assert.equal(report.date, '2026-09-13');
   assert.equal(report.window, '7d');
+  assert.equal(report.base_branch, 'main');
+  assert.deepEqual(report.session_focus.incidents, []);
   assert.equal(report.metrics.commits, 37);
   assert.deepEqual(report.version_range, ['2.64.0', '2.66.2']);
 });
@@ -46,6 +48,16 @@ test('preserves empty category state and launch category ordering', async () => 
   assert.deepEqual(validateCategoryFixture(category), { ok: true, errors: [] });
 });
 
+test('preserves non-empty category record ordering', async () => {
+  const category = await loadJson('ordered-records.json');
+  assert.deepEqual(category.records.map(record => record.record_id), [
+    'delivery-001',
+    'delivery-002',
+    'delivery-003'
+  ]);
+  assert.deepEqual(validateCategoryFixture(category), { ok: true, errors: [] });
+});
+
 test('freezes SUCCESS and UNAVAILABLE API response shapes', async () => {
   const report = await loadJson('valid-report.json');
   const failure = await loadJson('routing-failure.json');
@@ -53,6 +65,30 @@ test('freezes SUCCESS and UNAVAILABLE API response shapes', async () => {
   assert.deepEqual(validateApiResponse(failure), { ok: true, errors: [] });
   assert.equal(validateApiResponse({ status: 'SUCCESS' }).ok, false);
   assert.equal(validateApiResponse({ status: 'UNAVAILABLE' }).ok, false);
+});
+
+test('rejects missing, unknown, and incorrectly typed metrics', async () => {
+  const report = await loadJson('valid-report.json');
+  delete report.metrics.commits;
+  report.metrics.unexpected_metric = 1;
+  report.metrics.test_ratio = '20%';
+  report.extra_field = true;
+  const result = validateWeeklyRetroReport(report);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('metrics.commits: is required'));
+  assert.ok(result.errors.includes('metrics.unexpected_metric: is not part of the frozen metric contract'));
+  assert.ok(result.errors.includes('metrics.test_ratio: must be a number from 0 to 1'));
+  assert.ok(result.errors.includes('extra_field: is not part of the frozen current report contract'));
+});
+
+test('requires canonical validated report provenance fields', async () => {
+  const report = await loadJson('valid-report.json');
+  delete report.base_branch;
+  delete report.session_focus;
+  const result = validateWeeklyRetroReport(report);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('base_branch: is required'));
+  assert.ok(result.errors.includes('session_focus: is required'));
 });
 
 test('rejects malformed report JSON without weakening boundary validation', async () => {
@@ -67,11 +103,12 @@ test('manifest fixes week keys, category IDs, and record order for downstream ta
   assert.deepEqual(manifest.week_keys, ['2026-W36', '2026-W37']);
   assert.deepEqual(manifest.launch_category_ids, LAUNCH_CATEGORY_IDS);
   assert.deepEqual(manifest.category_record_order, LAUNCH_CATEGORY_IDS);
-  assert.equal(manifest.cases.length, 5);
+  assert.equal(manifest.cases.length, 6);
   assert.deepEqual(manifest.cases.map(item => item.id), [
     'valid-report',
     'partial-report',
     'empty-category',
+    'ordered-records',
     'malformed-json',
     'routing-failure'
   ]);

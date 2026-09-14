@@ -1,0 +1,10 @@
+{
+  "week_key": "2026-W37",
+  "category_id": "delivery",
+  "state": "success",
+  "records": [
+    { "record_id": "delivery-001", "label": "37 commits", "value": 37 },
+    { "record_id": "delivery-002", "label": "2 contributors", "value": 2 },
+    { "record_id": "delivery-003", "label": "5 referenced PRs", "value": 5 }
+  ]
+}

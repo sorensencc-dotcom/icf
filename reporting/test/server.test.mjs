@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createReportingServer, DEFAULT_REPORT_PATH } from '../src/server.mjs';
+
+const FIXTURES = dirname(fileURLToPath(import.meta.url));
 
 async function request(server) {
   const address = server.address();
@@ -23,10 +25,8 @@ test('GET /api/reporting/weekly-retro preserves current success response', async
   assert.equal(result.payload.data.metrics.commits, 37);
 });
 
-test('GET /api/reporting/weekly-retro returns bounded unavailable shape for malformed input', async t => {
-  const root = await mkdtemp(join(tmpdir(), 'icf-reporting-'));
-  const malformedPath = join(root, 'malformed.json');
-  await writeFile(malformedPath, '{"date":', 'utf8');
+test('GET /api/reporting/weekly-retro routes committed malformed fixture to UNAVAILABLE', async t => {
+  const malformedPath = join(FIXTURES, 'fixtures', 'malformed-report.json');
   const server = createReportingServer({ reportPath: malformedPath });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => server.close());
@@ -35,5 +35,19 @@ test('GET /api/reporting/weekly-retro returns bounded unavailable shape for malf
   assert.equal(result.status, 503);
   assert.equal(result.payload.status, 'UNAVAILABLE');
   assert.match(result.payload.error, /missing or unreadable/);
-  assert.match(result.payload.error, /malformed\.json/);
+  assert.match(result.payload.error, /malformed-report\.json/);
+});
+
+test('GET /api/reporting/weekly-retro routes committed unavailable fixture for missing artifact', async t => {
+  const expected = JSON.parse(await readFile(join(FIXTURES, 'fixtures', 'routing-failure.json'), 'utf8'));
+  const missingPath = join(FIXTURES, 'fixtures', 'missing-weekly-retro.json');
+  const server = createReportingServer({ reportPath: missingPath });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const result = await request(server);
+  assert.equal(result.status, 503);
+  assert.equal(result.payload.status, expected.status);
+  assert.match(result.payload.error, /Weekly retro artifact missing or unreadable/);
+  assert.match(result.payload.error, /missing-weekly-retro\.json/);
 });

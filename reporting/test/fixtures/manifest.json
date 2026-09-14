@@ -3,11 +3,12 @@
   "week_keys": ["2026-W36", "2026-W37"],
   "launch_category_ids": ["delivery", "quality", "reliability", "governance"],
   "category_record_order": ["delivery", "quality", "reliability", "governance"],
-  "report_field_order": ["date", "window", "metrics", "authors", "automation", "version_range", "release_commits", "streak_days", "user_streak_days", "streak_anchor", "tweetable", "test_health", "backlog", "shortcut_debt", "note"],
+  "report_field_order": ["date", "window", "since", "until", "base_branch", "metrics", "authors", "automation", "version_range", "release_commits", "streak_days", "user_streak_days", "streak_anchor", "tweetable", "test_health", "backlog", "shortcut_debt", "note", "session_focus"],
   "cases": [
     { "id": "valid-report", "path": "valid-report.json", "kind": "report", "week_key": "2026-W37", "state": "success" },
     { "id": "partial-report", "path": "partial-report.json", "kind": "report", "week_key": "2026-W36", "state": "partial" },
     { "id": "empty-category", "path": "empty-category.json", "kind": "category", "week_key": "2026-W36", "category_id": "quality", "state": "empty" },
+    { "id": "ordered-records", "path": "ordered-records.json", "kind": "category", "week_key": "2026-W37", "category_id": "delivery", "state": "success" },
     { "id": "malformed-json", "path": "malformed-report.json", "kind": "report", "week_key": "2026-W37", "state": "malformed" },
     { "id": "routing-failure", "path": "routing-failure.json", "kind": "api", "week_key": "2026-W37", "state": "unavailable" }
   ]

@@ -22,6 +22,9 @@ export const LAUNCH_CATEGORY_IDS = Object.freeze([
 export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'date',
   'window',
+  'since',
+  'until',
+  'base_branch',
   'metrics',
   'authors',
   'automation',
@@ -34,7 +37,8 @@ export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'test_health',
   'backlog',
   'shortcut_debt',
-  'note'
+  'note',
+  'session_focus'
 ]);
 
 export const CURRENT_METRIC_FIELDS = Object.freeze([
@@ -65,7 +69,35 @@ export const CURRENT_METRIC_FIELDS = Object.freeze([
   'focus_area'
 ]);
 
-export const CATEGORY_FIXTURE_STATES = Object.freeze(['empty']);
+export const CATEGORY_FIXTURE_STATES = Object.freeze(['empty', 'success']);
+
+const METRIC_RULES = Object.freeze({
+  commits: 'nonNegativeInteger',
+  contributors: 'nonNegativeInteger',
+  prs_merged: 'nullableNonNegativeInteger',
+  prs_referenced: 'nonNegativeInteger',
+  insertions: 'integer',
+  deletions: 'integer',
+  net_loc: 'integer',
+  logical_sloc_added: 'integer',
+  test_loc: 'nonNegativeInteger',
+  test_ratio: 'ratio',
+  active_days: 'nonNegativeInteger',
+  sessions: 'nonNegativeInteger',
+  deep_sessions: 'nonNegativeInteger',
+  medium_sessions: 'nonNegativeInteger',
+  micro_sessions: 'nonNegativeInteger',
+  avg_session_minutes: 'nonNegativeInteger',
+  loc_per_session_hour: 'nonNegativeInteger',
+  feat_pct: 'ratio',
+  fix_pct: 'ratio',
+  docs_pct: 'ratio',
+  chore_pct: 'ratio',
+  peak_hour: 'hour',
+  ai_assisted_commits: 'nonNegativeInteger',
+  focus_score: 'ratio',
+  focus_area: 'string'
+});
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -81,6 +113,56 @@ function validateDate(value, errors) {
   }
 }
 
+function validateMetricValue(field, value, errors) {
+  const rule = METRIC_RULES[field];
+  const validInteger = Number.isInteger(value);
+  const validNumber = typeof value === 'number' && Number.isFinite(value);
+  if (rule === 'string') {
+    if (typeof value !== 'string') addError(errors, `metrics.${field}`, 'must be a string');
+  } else if (rule === 'nullableNonNegativeInteger') {
+    if (value !== null && (!validInteger || value < 0)) {
+      addError(errors, `metrics.${field}`, 'must be a non-negative integer or null');
+    }
+  } else if (rule === 'nonNegativeInteger') {
+    if (!validInteger || value < 0) addError(errors, `metrics.${field}`, 'must be a non-negative integer');
+  } else if (rule === 'integer') {
+    if (!validInteger) addError(errors, `metrics.${field}`, 'must be an integer');
+  } else if (rule === 'ratio') {
+    if (!validNumber || value < 0 || value > 1) addError(errors, `metrics.${field}`, 'must be a number from 0 to 1');
+  } else if (rule === 'hour') {
+    if (!validInteger || value < 0 || value > 23) addError(errors, `metrics.${field}`, 'must be an integer from 0 to 23');
+  }
+}
+
+function validateMetricShape(metrics, { allowPartial }) {
+  const errors = [];
+  const missing = CURRENT_METRIC_FIELDS.filter(field => !(field in metrics));
+  const unknown = Object.keys(metrics).filter(field => !CURRENT_METRIC_FIELDS.includes(field));
+  for (const field of unknown) addError(errors, `metrics.${field}`, 'is not part of the frozen metric contract');
+  if (!allowPartial) {
+    for (const field of missing) addError(errors, `metrics.${field}`, 'is required');
+  }
+  for (const field of Object.keys(metrics)) {
+    if (METRIC_RULES[field]) validateMetricValue(field, metrics[field], errors);
+  }
+  return { errors, missing };
+}
+
+function validateSessionFocus(value, errors) {
+  if (!isRecord(value)) {
+    addError(errors, 'session_focus', 'must be an object');
+    return;
+  }
+  for (const field of ['summary']) {
+    if (typeof value[field] !== 'string') addError(errors, `session_focus.${field}`, 'must be a string');
+  }
+  for (const field of ['incidents', 'process_learnings']) {
+    if (!Array.isArray(value[field]) || value[field].some(item => typeof item !== 'string')) {
+      addError(errors, `session_focus.${field}`, 'must be an array of strings');
+    }
+  }
+}
+
 function validateReportShape(report, { allowPartial }) {
   const errors = [];
   if (!isRecord(report)) return { errors: ['report: must be an object'], missing: [] };
@@ -91,12 +173,27 @@ function validateReportShape(report, { allowPartial }) {
   }
   if (!isRecord(report.metrics)) addError(errors, 'metrics', 'must be an object');
 
-  const missing = CURRENT_REPORT_TOP_LEVEL_FIELDS.filter(field => !(field in report));
+  const missingTopLevel = CURRENT_REPORT_TOP_LEVEL_FIELDS.filter(field => !(field in report));
   const unknown = Object.keys(report).filter(field => !CURRENT_REPORT_TOP_LEVEL_FIELDS.includes(field));
   for (const field of unknown) addError(errors, field, 'is not part of the frozen current report contract');
   if (!allowPartial) {
-    for (const field of missing) addError(errors, field, 'is required');
+    for (const field of missingTopLevel) addError(errors, field, 'is required');
   }
+
+  const metricResult = isRecord(report.metrics)
+    ? validateMetricShape(report.metrics, { allowPartial })
+    : { errors: [], missing: [] };
+  errors.push(...metricResult.errors);
+
+  for (const field of ['since', 'until']) {
+    if (field in report && (typeof report[field] !== 'string' || Number.isNaN(Date.parse(report[field])))) {
+      addError(errors, field, 'must be an ISO timestamp');
+    }
+  }
+  if ('base_branch' in report && (typeof report.base_branch !== 'string' || report.base_branch.length === 0)) {
+    addError(errors, 'base_branch', 'must be a non-empty string');
+  }
+  if ('session_focus' in report) validateSessionFocus(report.session_focus, errors);
 
   if ('version_range' in report &&
       (!Array.isArray(report.version_range) ||
@@ -119,7 +216,7 @@ function validateReportShape(report, { allowPartial }) {
     addError(errors, 'note', 'must be a string or null');
   }
 
-  return { errors, missing };
+  return { errors, missing: [...missingTopLevel, ...metricResult.missing.map(field => `metrics.${field}`)] };
 }
 
 export function validateCategoryFixture(category) {
@@ -135,6 +232,16 @@ export function validateCategoryFixture(category) {
     addError(errors, 'state', 'must be an accepted category fixture state');
   }
   if (!Array.isArray(category.records)) addError(errors, 'records', 'must be an array');
+  if (category.state === 'success' && Array.isArray(category.records) && category.records.length === 0) {
+    addError(errors, 'records', 'must contain at least one record for success');
+  }
+  if (Array.isArray(category.records)) {
+    for (const [index, record] of category.records.entries()) {
+      if (!isRecord(record) || typeof record.record_id !== 'string' || record.record_id.length === 0) {
+        addError(errors, `records[${index}].record_id`, 'must be a non-empty string');
+      }
+    }
+  }
   return { ok: errors.length === 0, errors };
 }
 

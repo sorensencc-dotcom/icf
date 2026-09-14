@@ -1,27 +1,106 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  DASHBOARD_ELEMENT_NAME,
-  DASHBOARD_SRC_ATTRIBUTE,
-  WeeklyReportingDashboard,
-  dashboardErrorMessage,
-  dashboardPayloadError,
-  dashboardRequest
-} from '../weekly-reporting-dashboard.mjs';
 
-test('freezes dashboard entrypoint and request semantics', () => {
-  assert.equal(DASHBOARD_ELEMENT_NAME, 'weekly-reporting-dashboard');
-  assert.equal(DASHBOARD_SRC_ATTRIBUTE, 'src');
-  assert.deepEqual(dashboardRequest('/api/reporting/weekly-retro'), {
-    url: '/api/reporting/weekly-retro',
-    init: { method: 'GET', headers: { Accept: 'application/json' } }
-  });
-  assert.deepEqual(WeeklyReportingDashboard.observedAttributes, ['src']);
-  assert.equal(dashboardPayloadError({ ok: true, status: 200 }, { status: 'SUCCESS' }), null);
-  assert.equal(dashboardPayloadError({ ok: false, status: 503 }, { status: 'UNAVAILABLE', error: 'offline' }), 'offline');
+function installFakeDom() {
+  const previous = {
+    HTMLElement: globalThis.HTMLElement,
+    customElements: globalThis.customElements,
+    fetch: globalThis.fetch
+  };
+  class FakeHTMLElement {
+    constructor() {
+      this.attributes = new Map();
+      this.isConnected = false;
+      this.shadowRoot = null;
+    }
+
+    attachShadow() {
+      this.shadowRoot = { innerHTML: '' };
+      return this.shadowRoot;
+    }
+
+    getAttribute(name) {
+      return this.attributes.get(name) ?? null;
+    }
+
+    setAttribute(name, value) {
+      const oldValue = this.getAttribute(name);
+      this.attributes.set(name, String(value));
+      this.attributeChangedCallback?.(name, oldValue, String(value));
+    }
+  }
+  const definitions = new Map();
+  globalThis.HTMLElement = FakeHTMLElement;
+  globalThis.customElements = {
+    define(name, constructor) { definitions.set(name, constructor); },
+    get(name) { return definitions.get(name); }
+  };
+  return { FakeHTMLElement, definitions, previous };
+}
+
+function restoreFakeDom(previous) {
+  for (const [name, value] of Object.entries(previous)) {
+    if (value === undefined) delete globalThis[name];
+    else globalThis[name] = value;
+  }
+}
+
+test('imports as a browser-valid custom element and renders fetched data', async () => {
+  const { FakeHTMLElement, definitions, previous } = installFakeDom();
+  try {
+    const dashboard = await import(`../weekly-reporting-dashboard.mjs?browser-test=${Date.now()}`);
+    assert.equal(dashboard.WeeklyReportingDashboard.prototype instanceof FakeHTMLElement, true);
+    assert.equal(definitions.get('weekly-reporting-dashboard'), dashboard.WeeklyReportingDashboard);
+    assert.deepEqual(dashboard.WeeklyReportingDashboard.observedAttributes, ['src']);
+
+    const requests = [];
+    globalThis.fetch = async (url, init) => {
+      requests.push({ url, init });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { status: 'SUCCESS', data: { date: '2026-09-13', window: '7d', metrics: { commits: 37, contributors: 2, net_loc: 2948, test_ratio: 0.2 } } };
+        }
+      };
+    };
+
+    const element = new dashboard.WeeklyReportingDashboard();
+    element.setAttribute('src', '/api/reporting/weekly-retro');
+    await element.load();
+    assert.deepEqual(requests, [{
+      url: '/api/reporting/weekly-retro',
+      init: { method: 'GET', headers: { Accept: 'application/json' } }
+    }]);
+    assert.match(element.shadowRoot.innerHTML, /Weekly Retro Reporting/);
+    assert.match(element.shadowRoot.innerHTML, />37<\/div>/);
+    assert.match(element.shadowRoot.innerHTML, /2026-09-13/);
+  } finally {
+    restoreFakeDom(previous);
+  }
 });
 
-test('dashboard reports missing endpoint and transport failures with current copy', () => {
-  assert.throws(() => dashboardRequest(''), /No reporting endpoint configured/);
-  assert.equal(dashboardErrorMessage(new Error('offline')), 'Weekly telemetry unavailable: offline');
+test('runs connected lifecycle and renders endpoint, transport, and payload errors', async () => {
+  const { previous } = installFakeDom();
+  try {
+    const dashboard = await import(`../weekly-reporting-dashboard.mjs?lifecycle-test=${Date.now()}`);
+    const missing = new dashboard.WeeklyReportingDashboard();
+    await missing.load();
+    assert.match(missing.shadowRoot.innerHTML, /No reporting endpoint configured/);
+
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 503,
+      async json() { return { status: 'UNAVAILABLE', error: 'offline' }; }
+    });
+    const failed = new dashboard.WeeklyReportingDashboard();
+    failed.setAttribute('src', '/api/reporting/weekly-retro');
+    failed.isConnected = true;
+    failed.connectedCallback();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(failed.shadowRoot.innerHTML, /Weekly telemetry unavailable: offline/);
+    assert.match(failed.shadowRoot.innerHTML, /role="alert"/);
+  } finally {
+    restoreFakeDom(previous);
+  }
 });
