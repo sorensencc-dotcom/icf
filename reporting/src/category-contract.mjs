@@ -53,6 +53,16 @@ const METRIC_KEYS = new Set([
 ]);
 const EVIDENCE_KEYS = new Set(['drilldown', 'source_fields']);
 const REQUIRED_ROLLING_WINDOWS = Object.freeze([4, 8, 12]);
+const SUPPORTED_QUALITY_REQUIREMENTS = new Set([
+  'source fields must be present in the validated report',
+  'metric values must use the declared numeric type',
+  'ratio values must be bounded from 0 to 1',
+  'test health must identify the total test-file count',
+  'activity counts must be non-negative integers',
+  'streak fields must be present even when their value is zero',
+  'participation and debt counts must be non-negative integers',
+  'documentation share must be bounded from 0 to 1'
+]);
 
 const CATEGORY_DEFINITIONS = [
   {
@@ -355,6 +365,13 @@ function validateCategory(category, index, errors) {
   }
   if (!Array.isArray(category.quality_requirements) || category.quality_requirements.length === 0) {
     addError(errors, `${path}.quality_requirements`, 'must be a non-empty array');
+  } else {
+    for (const [requirementIndex, requirement] of category.quality_requirements.entries()) {
+      validateString(requirement, `${path}.quality_requirements[${requirementIndex}]`, errors);
+      if (typeof requirement === 'string' && !SUPPORTED_QUALITY_REQUIREMENTS.has(requirement)) {
+        addError(errors, `${path}.quality_requirements[${requirementIndex}]`, 'is not a supported runtime quality requirement');
+      }
+    }
   }
   if (typeof category.supports_wow !== 'boolean') addError(errors, `${path}.supports_wow`, 'must be a boolean');
   if (!Array.isArray(category.rolling_windows) ||
@@ -475,6 +492,86 @@ function valueError(valueType) {
   return 'must be a non-negative integer';
 }
 
+function enforceRequiredSourceFields(source, category, categoryIndex, { allowPartial }) {
+  for (const [fieldIndex, field] of category.required_source_fields.entries()) {
+    if (getPath(source, field) === undefined && !allowPartial) {
+      throw new TypeError(
+        `categories[${categoryIndex}] (${category.id}).required_source_fields[${fieldIndex}] (${field}): required source field is missing`
+      );
+    }
+  }
+}
+
+function enforceQualityRequirement(source, category, categoryIndex, requirementIndex, requirement, { allowPartial }) {
+  const context = `categories[${categoryIndex}] (${category.id}).quality_requirements[${requirementIndex}] (${requirement})`;
+  const fail = message => { throw new TypeError(`${context}: ${message}`); };
+  const definitions = category.metrics;
+  const values = definitions.map(definition => ({
+    definition,
+    value: getPath(source, definition.source_field)
+  }));
+  const presentValues = values.filter(({ value }) => value !== undefined || !allowPartial);
+
+  if (requirement === 'source fields must be present in the validated report') return;
+
+  if (requirement === 'metric values must use the declared numeric type') {
+    for (const { definition, value } of presentValues) {
+      if (!valueIsValid(value, definition.value_type)) {
+        fail(`${definition.source_field}: ${valueError(definition.value_type)}`);
+      }
+    }
+    return;
+  }
+
+  if (requirement === 'ratio values must be bounded from 0 to 1') {
+    for (const { definition, value } of presentValues.filter(({ definition }) => definition.value_type === 'ratio')) {
+      if (!valueIsValid(value, 'ratio')) fail(`${definition.source_field}: must be a number from 0 to 1`);
+    }
+    return;
+  }
+
+  if (requirement === 'test health must identify the total test-file count') {
+    const value = getPath(source, 'test_health.total_test_files');
+    if (value === undefined && allowPartial) return;
+    if (!valueIsValid(value, 'non_negative_integer')) {
+      fail('test_health.total_test_files: must be a non-negative integer');
+    }
+    return;
+  }
+
+  if (requirement === 'activity counts must be non-negative integers' ||
+      requirement === 'participation and debt counts must be non-negative integers') {
+    const countValues = requirement === 'participation and debt counts must be non-negative integers'
+      ? presentValues.filter(({ definition }) => ['contributors', 'shortcut_debt.markers_found'].includes(definition.id))
+      : presentValues;
+    for (const { definition, value } of countValues) {
+      if (!valueIsValid(value, 'non_negative_integer')) {
+        fail(`${definition.source_field}: must be a non-negative integer`);
+      }
+    }
+    return;
+  }
+
+  if (requirement === 'streak fields must be present even when their value is zero') {
+    for (const field of ['streak_days', 'user_streak_days']) {
+      if (getPath(source, field) === undefined && !allowPartial) fail(`${field}: required source field is missing`);
+    }
+    return;
+  }
+
+  if (requirement === 'documentation share must be bounded from 0 to 1') {
+    const value = getPath(source, 'metrics.docs_pct');
+    if (value === undefined && allowPartial) return;
+    if (!valueIsValid(value, 'ratio')) fail('metrics.docs_pct: must be a number from 0 to 1');
+  }
+}
+
+function enforceQualityRequirements(source, category, categoryIndex, { allowPartial }) {
+  for (const [requirementIndex, requirement] of category.quality_requirements.entries()) {
+    enforceQualityRequirement(source, category, categoryIndex, requirementIndex, requirement, { allowPartial });
+  }
+}
+
 export function normalizeCategoryMetrics(source, { registry = CATEGORY_REGISTRY, allowPartial = false } = {}) {
   const registryValidation = validateCategoryRegistry(registry);
   if (!registryValidation.ok) {
@@ -482,22 +579,26 @@ export function normalizeCategoryMetrics(source, { registry = CATEGORY_REGISTRY,
   }
   if (!isRecord(source)) throw new TypeError('Report source must be an object');
 
-  return registryValidation.categories.map(category => ({
-    category_id: category.id,
-    metrics: category.metrics.map(definition => {
-      const value = getPath(source, definition.source_field);
-      if (value === undefined && allowPartial) {
+  return registryValidation.categories.map((category, categoryIndex) => {
+    enforceRequiredSourceFields(source, category, categoryIndex, { allowPartial });
+    enforceQualityRequirements(source, category, categoryIndex, { allowPartial });
+    return {
+      category_id: category.id,
+      metrics: category.metrics.map(definition => {
+        const value = getPath(source, definition.source_field);
+        if (value === undefined && allowPartial) {
+          return normalizeMetric(
+            { id: definition.id },
+            { category_id: category.id, state: 'partial', source, registry }
+          );
+        }
         return normalizeMetric(
-          { id: definition.id },
-          { category_id: category.id, state: 'partial', source, registry }
+          { id: definition.id, value },
+          { category_id: category.id, source, registry }
         );
-      }
-      return normalizeMetric(
-        { id: definition.id, value },
-        { category_id: category.id, source, registry }
-      );
-    })
-  }));
+      })
+    };
+  });
 }
 
 function findCategory(categoryId, registry) {

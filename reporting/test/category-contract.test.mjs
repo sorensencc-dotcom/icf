@@ -237,6 +237,37 @@ test('validated report entry point rejects malformed nested registry source valu
   assert.ok(result.errors.some(error => error.includes('test_health.total_test_files')));
 });
 
+test('validated report entry point rejects an extra required nested source field', async () => {
+  const report = JSON.parse(await readFile(new URL('./fixtures/valid-report.json', import.meta.url), 'utf8'));
+  const registry = cloneRegistry();
+  registry.categories[0].required_source_fields.push('test_health.missing_total_test_files');
+  const result = validateWeeklyRetroReport(report, { categoryRegistry: registry });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some(error => error.includes('categories[0] (delivery).required_source_fields[4]')));
+  assert.ok(result.errors.some(error => error.includes('test_health.missing_total_test_files')));
+});
+
+test('validated report entry point rejects an unmet runtime quality requirement', async () => {
+  const report = JSON.parse(await readFile(new URL('./fixtures/valid-report.json', import.meta.url), 'utf8'));
+  const registry = cloneRegistry();
+  registry.categories[0].metrics[0].value_type = 'ratio';
+  registry.categories[0].quality_requirements = ['metric values must use the declared numeric type'];
+  const result = validateWeeklyRetroReport(report, { categoryRegistry: registry });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some(error => error.includes('categories[0] (delivery).quality_requirements[0]')));
+  assert.ok(result.errors.some(error => error.includes('metrics.commits: must be a number from 0 to 1')));
+});
+
+test('validated report entry point rejects unsupported arbitrary quality requirements', async () => {
+  const report = JSON.parse(await readFile(new URL('./fixtures/valid-report.json', import.meta.url), 'utf8'));
+  const registry = cloneRegistry();
+  registry.categories[0].quality_requirements.push('quality gate must pass');
+  const result = validateWeeklyRetroReport(report, { categoryRegistry: registry });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some(error => error.includes('category_registry.categories[0].quality_requirements[2]')));
+  assert.ok(result.errors.some(error => error.includes('supported runtime quality requirement')));
+});
+
 test('applies state semantics and copy across all launch categories', () => {
   for (const category of CATEGORY_REGISTRY.categories) {
     for (const state of ['empty', 'partial', 'unavailable', 'zero_activity']) {

@@ -230,3 +230,149 @@ Output: no output; both commands exited `0`.
 
 - Validation is now enforced through the standalone server's existing `readWeeklyRetro`/serialization path, but the parent report generator remains outside this checkout and was not executed.
 - Local evidence remains focused/full package evidence only; no real browser engine, live service, remote, or production evidence is claimed.
+
+## Fix round 2 — enforce category-level source and quality requirements
+
+### Status
+
+DONE_WITH_CONCERNS
+
+### Findings and fixes
+
+1. `normalizeCategoryMetrics` now checks every declared `required_source_fields` path before metric normalization. Strict validation rejects missing extra nested paths with category and registry-index context; explicit partial mode preserves the existing missing-field tolerance.
+2. Declared quality requirement strings are now closed over supported runtime checks. Supported requirements run with category and requirement-index context; arbitrary unsupported entries now invalidate the registry instead of being accepted and ignored.
+3. Runtime quality checks cover source presence, declared metric value types, bounded ratios, test-health count typing, activity/count typing, streak presence, and documentation ratio bounds. Existing report, API, and Task 1 field shapes remain unchanged.
+
+### Fix-round 2 changed paths
+
+- `reporting/src/category-contract.mjs`
+- `reporting/test/category-contract.test.mjs`
+
+### Exact covering test commands and outputs
+
+Focused command:
+
+```text
+npm --prefix reporting test -- --test-name-pattern='category|metric|registry|state|source|quality|report entry'
+```
+
+Output:
+
+```text
+> test
+> node --test test/*.test.mjs --test-name-pattern=category|metric|registry|state|source|quality|report entry
+
+✔ launch registry is versioned and carries required category metadata (2.379ms)
+✔ every metric declares supported directionality and a source field (0.232ms)
+✔ rejects missing metadata, directionality, and source-field requirements (0.543ms)
+✔ rejects duplicate, unknown, and incorrectly versioned registry entries (1.293ms)
+✔ normalizes a measured metric with direction, unit, and source provenance (0.404ms)
+✔ normalizes empty, partial, unavailable, and zero-activity states distinctly (0.378ms)
+✔ rejects source mismatches, unknown metrics, invalid values, and invalid states (0.737ms)
+✔ validates evidence drill-down shape, uniqueness, and source linkage (0.415ms)
+✔ requires exact ordered unique rolling windows (0.4509ms)
+✔ validated report entry point rejects an invalid category registry without changing report shape (6.781ms)
+✔ validated report entry point rejects malformed nested registry source values (1.8262ms)
+✔ validated report entry point rejects an extra required nested source field (1.0958ms)
+✔ validated report entry point rejects an unmet runtime quality requirement (1.1393ms)
+✔ validated report entry point rejects unsupported arbitrary quality requirements (1.0145ms)
+✔ applies state semantics and copy across all launch categories (1.1509ms)
+✔ normalizes every launch metric from the current validated report fixture (1.9841ms)
+✔ imports as a browser-valid custom element and renders fetched data (10.6841ms)
+✔ runs connected lifecycle and renders endpoint, transport, and payload errors (2.2979ms)
+✔ GET /api/reporting/weekly-retro preserves current success response (35.1053ms)
+✔ GET /api/reporting/weekly-retro routes committed malformed fixture to UNAVAILABLE (8.0343ms)
+✔ GET /api/reporting/weekly-retro routes committed unavailable fixture for missing artifact (5.6404ms)
+✔ GET /api/reporting/weekly-retro rejects malformed nested category source data (5.3438ms)
+✔ freezes current report field shape and deterministic source values (6.9272ms)
+✔ accepts partial report fixture only through explicit partial mode (1.7311ms)
+✔ preserves empty category state and launch category ordering (0.9099ms)
+✔ preserves non-empty category record ordering (1.1441ms)
+✔ freezes SUCCESS and UNAVAILABLE API response shapes (1.4309ms)
+✔ rejects missing, unknown, and incorrectly typed metrics (0.7588ms)
+✔ preserves and validates optional canonical provenance fields when present (2.5837ms)
+✔ rejects malformed report JSON without weakening boundary validation (1.1736ms)
+✔ manifest fixes week keys, category IDs, and record order for downstream tasks (0.6768ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 185.8402
+```
+
+Full command:
+
+```text
+npm --prefix reporting test
+```
+
+Output:
+
+```text
+> test
+> node --test test/*.test.mjs
+
+✔ launch registry is versioned and carries required category metadata (2.7906ms)
+✔ every metric declares supported directionality and a source field (0.3146ms)
+✔ rejects missing metadata, directionality, and source-field requirements (0.7772ms)
+✔ rejects duplicate, unknown, and incorrectly versioned registry entries (1.9485ms)
+✔ normalizes a measured metric with direction, unit, and source provenance (0.5967ms)
+✔ normalizes empty, partial, unavailable, and zero-activity states distinctly (1.0045ms)
+✔ rejects source mismatches, unknown metrics, invalid values, and invalid states (1.2054ms)
+✔ validates evidence drill-down shape, uniqueness, and source linkage (0.7476ms)
+✔ requires exact ordered unique rolling windows (0.8151ms)
+✔ validated report entry point rejects an invalid category registry without changing report shape (9.0645ms)
+✔ validated report entry point rejects malformed nested registry source values (1.747ms)
+✔ validated report entry point rejects an extra required nested source field (1.1992ms)
+✔ validated report entry point rejects an unmet runtime quality requirement (0.9292ms)
+✔ validated report entry point rejects unsupported arbitrary quality requirements (0.9376ms)
+✔ applies state semantics and copy across all launch categories (1.1546ms)
+✔ normalizes every launch metric from the current validated report fixture (2.0422ms)
+✔ imports as a browser-valid custom element and renders fetched data (13.9231ms)
+✔ runs connected lifecycle and renders endpoint, transport, and payload errors (2.5444ms)
+✔ GET /api/reporting/weekly-retro preserves current success response (35.9014ms)
+✔ GET /api/reporting/weekly-retro routes committed malformed fixture to UNAVAILABLE (8.2217ms)
+✔ GET /api/reporting/weekly-retro routes committed unavailable fixture for missing artifact (5.9897ms)
+✔ GET /api/reporting/weekly-retro rejects malformed nested category source data (7.5073ms)
+✔ freezes current report field shape and deterministic source values (7.9978ms)
+✔ accepts partial report fixture only through explicit partial mode (1.6453ms)
+✔ preserves empty category state and launch category ordering (1.1169ms)
+✔ preserves non-empty category record ordering (1.2859ms)
+✔ freezes SUCCESS and UNAVAILABLE API response shapes (1.5452ms)
+✔ rejects missing, unknown, and incorrectly typed metrics (0.9462ms)
+✔ preserves and validates optional canonical provenance fields when present (2.5601ms)
+✔ rejects malformed report JSON without weakening boundary validation (1.9551ms)
+✔ manifest fixes week keys, category IDs, and record order for downstream tasks (0.7172ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 206.2171
+```
+
+Syntax command:
+
+```text
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+```
+
+Output: no output; exit code `0`.
+
+Whitespace command:
+
+```text
+git diff --check
+```
+
+Output: no output; exit code `0`.
+
+### Fix-round 2 concerns
+
+- The standalone reporting package has no parent generator, live service, remote, or production environment in this checkout; those evidence classes remain unclaimed.
+- Quality requirements retain the existing string-shaped registry contract. New requirements must be added with an explicit runtime implementation before registry validation accepts them.
