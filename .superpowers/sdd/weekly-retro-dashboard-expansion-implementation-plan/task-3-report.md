@@ -131,3 +131,97 @@ The report was committed separately after the implementation hash was known.
 - No derived summary calculation exists in Task 3. Consumers must treat `summaryStale: true` as requiring rebuild; this task only persists the signal.
 - The fixed 100-row list bound is intentionally safe but has no pagination interface yet; later history consumers must use narrower windows or add an approved pagination contract.
 - The repository-level `AGENTS.md`, `CLAUDE.md`, governance documents, and `memory/` paths named in supplied governance instructions were absent from this checkout. The supplied task brief, existing Task 1/Task 2 artifacts, and `progress.md` were used instead.
+
+## Fix round 1 — close snapshot persistence review findings
+
+### Status
+
+DONE_WITH_CONCERNS
+
+### Findings and fixes
+
+1. Snapshot identity is now `sourceSystem + sourceId + weekKey + categoryId`. `sourceSystem` accepts the canonical and snake_case boundary aliases, is checked against embedded envelope identity, participates in the raw and summary primary/foreign keys, and is present in every join, lookup, redaction lookup, filter result, and deterministic ordering clause. Same source IDs from different systems remain distinct.
+2. Redaction stores a sanitized `redactedAggregate` projection in the standalone tombstone. Known numeric report aggregates and explicitly declared aggregate counts/summaries survive; raw envelope JSON is nulled; derived summary state is stale with `snapshot_redacted`. Sensitive arbitrary fields are not copied into the projection.
+3. `onBeforeCommit` is a narrow transaction fault-injection seam. The rollback regression test throws after upsert mutations and before `COMMIT`, then proves the prior record remains unchanged and no partial record appears.
+4. `reporting/package.json` declares Node `>=22.5.0`; the store uses a contextual dynamic-import guard for missing `node:sqlite`/`DatabaseSync` support.
+5. Tombstones have no foreign key to deletable raw rows, carry their aggregate projection, and are queried from a union of raw and tombstone identities. A raw-row deletion test proves the tombstone and aggregate remain readable.
+6. Envelope JSON is recursively canonicalized before persistence/comparison, so equivalent property order is idempotent without timestamp changes.
+7. Serialization failures and non-object `toJSON` results become contextual `envelope.toJSON output validation failed` errors.
+
+### Fix-round changed paths
+
+- `reporting/package.json`
+- `reporting/schema/001_snapshot_store.sql`
+- `reporting/src/snapshot-store.mjs`
+- `reporting/test/snapshot-store.test.mjs`
+- `.superpowers/sdd/weekly-retro-dashboard-expansion-implementation-plan/task-3-report.md`
+
+### Exact focused verification
+
+Command:
+
+```text
+npm --prefix reporting test -- --test-name-pattern='snapshot|redaction|publication|runtime|JSON'
+```
+
+Output:
+
+```text
+ℹ tests 45
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+### Exact full verification
+
+Command:
+
+```text
+npm --prefix reporting test
+```
+
+Output:
+
+```text
+ℹ tests 45
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+The 45 passing tests include the existing Task 1/2 contract and server tests plus source-system collision/separation and ordering, runtime declaration, canonical JSON idempotency, post-write rollback, aggregate-preserving redaction, durable tombstones after raw deletion, contextual `toJSON` validation, bounded queries, and publication coverage.
+
+### Exact syntax, whitespace, and runtime evidence
+
+Commands:
+
+```text
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+git diff --check
+node --version
+node -p "process.versions.sqlite"
+```
+
+Output:
+
+```text
+node v24.18.0
+3.53.1
+```
+
+Syntax and whitespace commands produced no output and exited `0`. Runtime is above the declared minimum and exposes `node:sqlite`.
+
+### Fix-round implementation commit
+
+`0a55ba1` — `fix: harden weekly retro snapshot persistence`
+
+### Fix-round concerns
+
+- The parent report generator/application server wiring remains outside this standalone checkout. The explicit local `createReportingServer` publication option is covered, but no parent integration, live service, remote, or production evidence is claimed.
+- Task 4 summary calculation/rebuild remains future work. Redaction preserves only the safe aggregate projection and marks derived summary state stale; it does not rebuild summaries.
+- The fixed 100-row list bound remains intentionally unpaginated; later history consumers need narrower windows or an approved pagination contract.
