@@ -175,3 +175,72 @@ The report was written after the implementation hash was known and is committed 
 - `rebuildSummaries` accepts exact 4-, 8-, or 12-week ranges. A later contract can add other ranges only with a versioned interface and migration decision.
 - The existing snapshot list cap remains 100 rows. The history adapter narrows reads to one explicit source, source ID, category, and rolling window, so trend reads stay within the bounded path.
 - The report is separate from the feature commit so the feature hash remains stable and the report records the exact implementation commit.
+
+## Fix round 1 — review findings
+
+Status: COMPLETE_WITH_CONCERNS
+
+Addressed all five review findings:
+
+1. Added `getLatestSnapshotWeek` with source/category bounds, descending week order, and `LIMIT 1`. `listSnapshots` also accepts an optional descending order and limit for compatible adapter stores; its default remains the Task 3 ascending 100-row cap.
+2. Moved materialized-summary invalidation outside the raw-envelope branch. Every new redaction now invalidates overlapping summaries, including an identity with no raw envelope; repeated redactions remain idempotent.
+3. `getTrend` now retains top-level `insufficient_history` state/status from a materialized summary while preserving `ready` for materialized complete/partial summaries and `TrendRecalculating` for stale/missing summaries.
+4. Empty trend windows now return explicit `partial`/`incomplete` state, visible missing week slots when `toWeek` is supplied, `complete: false`, and null metric values.
+5. Expanded 8/12-week tests to assert metric values and aggregates, states, status, missing/partial weeks, zero activity, and insufficient-history behavior. Added regression tests for the latest-week cap, unknown-identity redaction, and history status projection.
+
+Implementation commit:
+
+`e8b85d21c37234902c37c4c90bee5fe967669f36` — `fix: harden weekly retro trend history`
+
+## Exact fix-round verification commands and outputs
+
+Regression and full package test command:
+
+```text
+npm --prefix reporting test
+```
+
+Output summary:
+
+```text
+ℹ tests 58
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+Syntax and whitespace checks:
+
+```text
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+git diff --check
+```
+
+Output: no output; both commands exited `0`.
+
+Implementation commit inspection:
+
+```text
+git show --stat --oneline e8b85d2
+```
+
+Output:
+
+```text
+e8b85d2 fix: harden weekly retro trend history
+ reporting/src/history-adapter.mjs       | 19 +++++++--
+ reporting/src/snapshot-store.mjs        | 36 +++++++++++++----
+ reporting/src/trend-summary.mjs         | 30 +++++++++-----
+ reporting/test/history-adapter.test.mjs | 71 +++++++++++++++++++++++++++++++++
+ reporting/test/trend-summary.test.mjs   | 69 +++++++++++++++++++++++++++++---
+ 5 files changed, 198 insertions(+), 27 deletions(-)
+```
+
+## Fix-round concerns
+
+- No remote, browser, scheduled-writer, production, or owner-approval evidence exists in this standalone local reporting checkout.
+- Node `>=22.5.0` with `node:sqlite` remains required.
+- The adapter still requires an explicitly supplied local source system and source ID.
