@@ -215,3 +215,83 @@ Output: no output; all commands exited `0` before commit.
 - Browser coverage uses a deterministic DOM API shim rather than launching a real browser engine; it proves browser-valid class inheritance, registration, lifecycle, fetch, render, and error behavior without adding an unapproved external dependency.
 - The parent `C:\dev\kb-sync` application and `C:\dev\scripts\run-weekly-retro.ps1` remain reference-only and were not modified or executed.
 - No full parent suite, live service, remote, or production evidence is claimed.
+
+## Fix round 2 — important findings addressed
+
+### A. Restore current artifact compatibility
+
+`C:\dev\.icf-retros\weekly\latest-weekly-retro.json` is the authoritative current artifact and omits `since`, `until`, `base_branch`, and `session_focus`. `reporting/test/fixtures/valid-report.json` now preserves that exact required top-level shape. The validator separates `CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS` from known `OPTIONAL_PROVENANCE_FIELDS`; absent provenance fields are accepted, while present values are still validated for ISO timestamps, non-empty branch names, and the required session-focus object/array types. Strict metric presence, unknown-metric rejection, and metric type/range checks remain enabled. Tests cover both the absent current-artifact shape and valid/invalid present provenance fields.
+
+### B. Reject malformed successful dashboard payloads
+
+`dashboardPayloadError` now requires a successful payload to contain `data` and to pass `validateWeeklyRetroReport` before `load()` calls `render`. A status-only success returns `Weekly retro response missing data.`; invalid data returns a bounded invalid-data error. Focused dashboard coverage verifies the alert state and asserts that the success dashboard is not rendered for status-only success.
+
+### Fix-round changed paths
+
+- `reporting/src/weekly-retro-contract.mjs`
+- `reporting/weekly-reporting-dashboard.mjs`
+- `reporting/test/weekly-retro-contract.test.mjs`
+- `reporting/test/dashboard-entrypoint.test.mjs`
+- `reporting/test/fixtures/valid-report.json`
+- `reporting/test/fixtures/manifest.json`
+
+### Exact covering-test commands and outputs
+
+Command:
+
+```text
+cd C:\dev\icf
+npm --prefix reporting test
+```
+
+Output:
+
+```text
+> test
+> node --test test/*.test.mjs
+
+✔ imports as a browser-valid custom element and renders fetched data (8.4787ms)
+✔ runs connected lifecycle and renders endpoint, transport, and payload errors (2.692ms)
+✔ GET /api/reporting/weekly-retro preserves current success response (55.0708ms)
+✔ GET /api/reporting/weekly-retro routes committed malformed fixture to UNAVAILABLE (12.4628ms)
+✔ GET /api/reporting/weekly-retro routes committed unavailable fixture for missing artifact (10.0967ms)
+✔ freezes current report field shape and deterministic source values (6.8586ms)
+✔ accepts partial report fixture only through explicit partial mode (2.172ms)
+✔ preserves empty category state and launch category ordering (2.0551ms)
+✔ preserves non-empty category record ordering (1.2711ms)
+✔ freezes SUCCESS and UNAVAILABLE API response shapes (2.0418ms)
+✔ rejects missing, unknown, and incorrectly typed metrics (1.2138ms)
+✔ preserves and validates optional canonical provenance fields when present (1.081ms)
+✔ rejects malformed report JSON without weakening boundary validation (1.4219ms)
+✔ manifest fixes week keys, category IDs, and record order for downstream tasks (1.226ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 247.611
+```
+
+Exit code: `0`.
+
+Command:
+
+```text
+cd C:\dev\icf
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+git diff --check
+```
+
+Output: no output; both commands exited `0`.
+
+### Fix-round commit
+
+`7f704044e6154f270547c56e78ac8b5290c4027f` — `fix: restore report compatibility and validate dashboard data`
+
+### Fix-round concerns
+
+- Dashboard tests use a deterministic DOM API shim rather than a real browser engine; no browser dependency or browser launch was added to this standalone package.
+- Parent application paths remain reference-only; no parent source or scheduled generator was modified or executed.
+- No full parent suite, live service, remote, or production evidence is claimed.
