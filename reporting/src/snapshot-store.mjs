@@ -1,7 +1,19 @@
 import { readFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { LAUNCH_CATEGORY_IDS } from './category-contract.mjs';
+
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = await import('node:sqlite'));
+} catch (error) {
+  throw new Error(
+    'icf-weekly-retro-reporting requires Node.js >=22.5.0 with node:sqlite support',
+    { cause: error }
+  );
+}
+if (typeof DatabaseSync !== 'function') {
+  throw new Error('icf-weekly-retro-reporting requires DatabaseSync from node:sqlite');
+}
 
 const DEFAULT_SCHEMA_PATH = fileURLToPath(new URL('../schema/001_snapshot_store.sql', import.meta.url));
 const DEFAULT_SCHEMA_VERSION = '1.0';
@@ -36,7 +48,7 @@ function isRecord(value) {
 }
 
 function formatIdentity(identity) {
-  return `${identity.sourceId}/${identity.weekKey}/${identity.categoryId}`;
+  return `${identity.sourceSystem}/${identity.sourceId}/${identity.weekKey}/${identity.categoryId}`;
 }
 
 function normalizeString(value, field) {
@@ -64,14 +76,28 @@ function normalizeCategoryId(value) {
 
 function normalizeIdentity(value) {
   if (!isRecord(value)) throw new TypeError('identity must be an object');
+  const sourceSystem = value.sourceSystem ?? value.source_system;
   const sourceId = value.sourceId ?? value.source_id ?? value.sourceIdentity ?? value.source_identity;
   const weekKey = value.weekKey ?? value.week_key;
   const categoryId = value.categoryId ?? value.category_id;
   return Object.freeze({
+    sourceSystem: normalizeString(sourceSystem, 'sourceSystem'),
     sourceId: normalizeString(sourceId, 'sourceId'),
     weekKey: normalizeWeekKey(weekKey),
     categoryId: normalizeCategoryId(categoryId)
   });
+}
+
+function canonicalizeJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalizeJson);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.keys(value).sort().map(key => [key, canonicalizeJson(value[key])])
+  );
+}
+
+function canonicalJson(value) {
+  return JSON.stringify(canonicalizeJson(value));
 }
 
 function identityFromEnvelope(envelope) {
@@ -87,19 +113,41 @@ function normalizeEnvelope(value) {
   try {
     serialized = JSON.stringify(value);
   } catch (error) {
-    throw new TypeError(`envelope must be JSON serializable: ${error instanceof Error ? error.message : String(error)}`);
+    throw new TypeError(
+      `envelope.toJSON output validation failed: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
-  if (serialized === undefined) throw new TypeError('envelope must be JSON serializable');
-  const parsed = JSON.parse(serialized);
-  const embeddedIdentity = identityFromEnvelope(parsed);
-  const schemaVersion = parsed.schemaVersion ?? parsed.schema_version ?? DEFAULT_SCHEMA_VERSION;
+  if (serialized === undefined) {
+    throw new TypeError('envelope.toJSON output validation failed: must produce a JSON object');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch (error) {
+    throw new TypeError(
+      `envelope.toJSON output validation failed: invalid JSON (${error instanceof Error ? error.message : String(error)})`
+    );
+  }
+  if (!isRecord(parsed)) {
+    throw new TypeError('envelope.toJSON output validation failed: must produce a JSON object');
+  }
+
+  const canonicalParsed = canonicalizeJson(parsed);
+  const embeddedIdentity = identityFromEnvelope(canonicalParsed);
+  const schemaVersion = canonicalParsed.schemaVersion ?? canonicalParsed.schema_version ?? DEFAULT_SCHEMA_VERSION;
   normalizeString(schemaVersion, 'envelope schemaVersion');
-  return { parsed, serialized, embeddedIdentity, schemaVersion };
+  return {
+    parsed: canonicalParsed,
+    serialized: canonicalJson(canonicalParsed),
+    embeddedIdentity,
+    schemaVersion
+  };
 }
 
 function assertIdentityMatches(identity, embeddedIdentity) {
   if (!embeddedIdentity) return;
-  for (const field of ['sourceId', 'weekKey', 'categoryId']) {
+  for (const field of ['sourceSystem', 'sourceId', 'weekKey', 'categoryId']) {
     if (identity[field] !== embeddedIdentity[field]) {
       throw new SnapshotIdentityCollisionError(
         `Envelope identity ${formatIdentity(embeddedIdentity)} does not match key ${formatIdentity(identity)}`
@@ -113,12 +161,55 @@ function now() {
 }
 
 function rowParams(identity) {
-  return [identity.sourceId, identity.weekKey, identity.categoryId];
+  return [identity.sourceSystem, identity.sourceId, identity.weekKey, identity.categoryId];
+}
+
+function projectNumericRecord(value) {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(
+    Object.keys(value).sort()
+      .filter(key => value[key] === null || (typeof value[key] === 'number' && Number.isFinite(value[key])))
+      .map(key => [key, value[key]])
+  );
+}
+
+function projectStringRecord(value) {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(
+    Object.keys(value).sort()
+      .filter(key => typeof value[key] === 'string' && value[key].trim().length > 0)
+      .map(key => [key, value[key]])
+  );
+}
+
+function redactedAggregateProjection(envelope) {
+  const report = isRecord(envelope.report) ? envelope.report : envelope;
+  const declared = isRecord(envelope.aggregate)
+    ? envelope.aggregate
+    : isRecord(report.aggregate) ? report.aggregate : null;
+  const counts = {
+    ...projectNumericRecord(report.metrics),
+    ...projectNumericRecord(report.test_health),
+    ...projectNumericRecord(report.backlog),
+    ...projectNumericRecord(report.shortcut_debt)
+  };
+  for (const key of ['release_commits', 'streak_days', 'user_streak_days']) {
+    if (report[key] === null || (typeof report[key] === 'number' && Number.isFinite(report[key]))) {
+      counts[key] = report[key];
+    }
+  }
+  if (declared) Object.assign(counts, projectNumericRecord(declared.counts));
+  const summaries = declared ? projectStringRecord(declared.summaries) : {};
+  const projection = {};
+  if (Object.keys(counts).length > 0) projection.counts = counts;
+  if (Object.keys(summaries).length > 0) projection.summaries = summaries;
+  return Object.keys(projection).length > 0 ? canonicalizeJson(projection) : null;
 }
 
 function toRedaction(row) {
-  if (!row.redaction_reason) return null;
+  if (row.redaction_reason === null || row.redaction_reason === undefined) return null;
   return {
+    sourceSystem: row.source_system,
     sourceId: row.source_id,
     weekKey: row.week_key,
     categoryId: row.category_id,
@@ -128,62 +219,92 @@ function toRedaction(row) {
   };
 }
 
+function parseAggregate(row) {
+  return row.aggregate_json === null || row.aggregate_json === undefined
+    ? null
+    : JSON.parse(row.aggregate_json);
+}
+
 function toRecord(row) {
+  const redacted = row.redaction_reason !== null && row.redaction_reason !== undefined;
   return {
+    sourceSystem: row.source_system,
     sourceId: row.source_id,
     weekKey: row.week_key,
     categoryId: row.category_id,
-    schemaVersion: row.schema_version,
-    envelope: row.envelope_json === null ? null : JSON.parse(row.envelope_json),
-    redacted: row.redaction_reason !== null,
+    schemaVersion: row.schema_version ?? DEFAULT_SCHEMA_VERSION,
+    envelope: row.envelope_json === null || row.envelope_json === undefined ? null : JSON.parse(row.envelope_json),
+    redactedAggregate: parseAggregate(row),
+    redacted,
     redaction: toRedaction(row),
-    summaryStale: row.is_stale === 1,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    summaryStale: redacted || row.is_stale === 1,
+    createdAt: row.created_at ?? row.redacted_at,
+    updatedAt: row.updated_at ?? row.redacted_at
   };
 }
 
 function toRedactionRecord(row) {
   return {
+    sourceSystem: row.source_system,
     sourceId: row.source_id,
     weekKey: row.week_key,
     categoryId: row.category_id,
     reason: row.reason,
     redactedAt: row.redacted_at,
+    redactedAggregate: parseAggregate(row),
     summaryStale: true
   };
 }
 
+const IDENTITY_QUERY = `
+  WITH identities AS (
+    SELECT source_system, source_id, week_key, category_id
+    FROM snapshot_envelopes
+    UNION
+    SELECT source_system, source_id, week_key, category_id
+    FROM snapshot_redactions
+  )
+  SELECT
+    i.source_system,
+    i.source_id,
+    i.week_key,
+    i.category_id,
+    e.schema_version,
+    e.envelope_json,
+    e.created_at,
+    e.updated_at,
+    s.is_stale,
+    r.reason AS redaction_reason,
+    r.aggregate_json,
+    r.redacted_at
+  FROM identities i
+  LEFT JOIN snapshot_envelopes e
+    ON e.source_system = i.source_system
+   AND e.source_id = i.source_id
+   AND e.week_key = i.week_key
+   AND e.category_id = i.category_id
+  LEFT JOIN snapshot_summary_state s
+    ON s.source_system = i.source_system
+   AND s.source_id = i.source_id
+   AND s.week_key = i.week_key
+   AND s.category_id = i.category_id
+  LEFT JOIN snapshot_redactions r
+    ON r.source_system = i.source_system
+   AND r.source_id = i.source_id
+   AND r.week_key = i.week_key
+   AND r.category_id = i.category_id
+`;
+
 function queryRecord(db, identity) {
-  return db.prepare(`
-    SELECT
-      e.source_id,
-      e.week_key,
-      e.category_id,
-      e.schema_version,
-      e.envelope_json,
-      e.created_at,
-      e.updated_at,
-      s.is_stale,
-      r.reason AS redaction_reason,
-      r.redacted_at
-    FROM snapshot_envelopes e
-    JOIN snapshot_summary_state s
-      ON s.source_id = e.source_id
-     AND s.week_key = e.week_key
-     AND s.category_id = e.category_id
-    LEFT JOIN snapshot_redactions r
-      ON r.source_id = e.source_id
-     AND r.week_key = e.week_key
-     AND r.category_id = e.category_id
-    WHERE e.source_id = ? AND e.week_key = ? AND e.category_id = ?
-  `).get(...rowParams(identity));
+  return db.prepare(`${IDENTITY_QUERY} WHERE i.source_system = ? AND i.source_id = ? AND i.week_key = ? AND i.category_id = ?`)
+    .get(...rowParams(identity));
 }
 
-function withTransaction(db, callback) {
+function withTransaction(db, operation, callback, beforeCommit) {
   db.exec('BEGIN IMMEDIATE');
   try {
     const result = callback();
+    beforeCommit?.({ operation, phase: 'before_commit' });
     db.exec('COMMIT');
     return result;
   } catch (error) {
@@ -196,9 +317,16 @@ function withTransaction(db, callback) {
   }
 }
 
-export function createSnapshotStore({ databasePath = ':memory:', schemaPath = DEFAULT_SCHEMA_PATH } = {}) {
+export function createSnapshotStore({
+  databasePath = ':memory:',
+  schemaPath = DEFAULT_SCHEMA_PATH,
+  onBeforeCommit = null
+} = {}) {
   if (typeof databasePath !== 'string' || databasePath.length === 0) {
     throw new TypeError('databasePath must be a non-empty string');
+  }
+  if (onBeforeCommit !== null && typeof onBeforeCommit !== 'function') {
+    throw new TypeError('onBeforeCommit must be a function when provided');
   }
   const db = new DatabaseSync(databasePath);
   db.exec(readFileSync(schemaPath, 'utf8'));
@@ -215,9 +343,11 @@ export function createSnapshotStore({ databasePath = ':memory:', schemaPath = DE
       const normalizedEnvelope = normalizeEnvelope(envelopeValue);
       assertIdentityMatches(identity, normalizedEnvelope.embeddedIdentity);
       const timestamp = now();
-      return withTransaction(db, () => {
+      return withTransaction(db, 'upsertSnapshot', () => {
         const existing = queryRecord(db, identity);
-        if (existing && existing.redaction_reason !== null) throw new SnapshotRedactedError(identity);
+        if (existing && existing.redaction_reason !== null && existing.redaction_reason !== undefined) {
+          throw new SnapshotRedactedError(identity);
+        }
         if (existing && existing.envelope_json === normalizedEnvelope.serialized &&
             existing.schema_version === normalizedEnvelope.schemaVersion) {
           return toRecord(existing);
@@ -227,27 +357,27 @@ export function createSnapshotStore({ databasePath = ':memory:', schemaPath = DE
           db.prepare(`
             UPDATE snapshot_envelopes
             SET schema_version = ?, envelope_json = ?, updated_at = ?
-            WHERE source_id = ? AND week_key = ? AND category_id = ?
+            WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
           `).run(normalizedEnvelope.schemaVersion, normalizedEnvelope.serialized, timestamp, ...rowParams(identity));
           db.prepare(`
             UPDATE snapshot_summary_state
             SET is_stale = 1, stale_reason = 'snapshot_changed', updated_at = ?
-            WHERE source_id = ? AND week_key = ? AND category_id = ?
+            WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
           `).run(timestamp, ...rowParams(identity));
         } else {
           db.prepare(`
             INSERT INTO snapshot_envelopes
-              (source_id, week_key, category_id, schema_version, envelope_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+              (source_system, source_id, week_key, category_id, schema_version, envelope_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `).run(...rowParams(identity), normalizedEnvelope.schemaVersion, normalizedEnvelope.serialized, timestamp, timestamp);
           db.prepare(`
             INSERT INTO snapshot_summary_state
-              (source_id, week_key, category_id, is_stale, stale_reason, updated_at)
-            VALUES (?, ?, ?, 0, NULL, ?)
+              (source_system, source_id, week_key, category_id, is_stale, stale_reason, updated_at)
+            VALUES (?, ?, ?, ?, 0, NULL, ?)
           `).run(...rowParams(identity), timestamp);
         }
         return toRecord(queryRecord(db, identity));
-      });
+      }, onBeforeCommit);
     },
 
     getSnapshot(identityValue) {
@@ -267,29 +397,10 @@ export function createSnapshotStore({ databasePath = ':memory:', schemaPath = DE
       if (from > to) throw new RangeError('fromWeek must be less than or equal to toWeek');
       const category = categoryId === undefined ? null : normalizeCategoryId(categoryId);
       const rows = db.prepare(`
-        SELECT
-          e.source_id,
-          e.week_key,
-          e.category_id,
-          e.schema_version,
-          e.envelope_json,
-          e.created_at,
-          e.updated_at,
-          s.is_stale,
-          r.reason AS redaction_reason,
-          r.redacted_at
-        FROM snapshot_envelopes e
-        JOIN snapshot_summary_state s
-          ON s.source_id = e.source_id
-         AND s.week_key = e.week_key
-         AND s.category_id = e.category_id
-        LEFT JOIN snapshot_redactions r
-          ON r.source_id = e.source_id
-         AND r.week_key = e.week_key
-         AND r.category_id = e.category_id
-        WHERE e.week_key >= ? AND e.week_key <= ?
-          AND (? IS NULL OR e.category_id = ?)
-        ORDER BY e.week_key ASC, e.source_id ASC, e.category_id ASC
+        ${IDENTITY_QUERY}
+        WHERE i.week_key >= ? AND i.week_key <= ?
+          AND (? IS NULL OR i.category_id = ?)
+        ORDER BY i.week_key ASC, i.source_system ASC, i.source_id ASC, i.category_id ASC
         LIMIT ${MAX_LIST_RESULTS}
       `).all(from, to, category, category);
       return rows.map(toRecord);
@@ -300,51 +411,53 @@ export function createSnapshotStore({ databasePath = ':memory:', schemaPath = DE
       const identity = normalizeIdentity(identityValue);
       const reason = normalizeString(reasonValue, 'reason');
       const timestamp = now();
-      return withTransaction(db, () => {
+      return withTransaction(db, 'redactSnapshot', () => {
         const existingRedaction = db.prepare(`
-          SELECT source_id, week_key, category_id, reason, redacted_at
+          SELECT source_system, source_id, week_key, category_id, reason, aggregate_json, redacted_at
           FROM snapshot_redactions
-          WHERE source_id = ? AND week_key = ? AND category_id = ?
+          WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
         `).get(...rowParams(identity));
         if (existingRedaction) return toRedactionRecord(existingRedaction);
 
         const existing = queryRecord(db, identity);
-        if (existing) {
+        const aggregate = existing?.envelope_json === null || existing?.envelope_json === undefined
+          ? null
+          : redactedAggregateProjection(JSON.parse(existing.envelope_json));
+        if (existing?.envelope_json !== null && existing?.envelope_json !== undefined) {
           db.prepare(`
             UPDATE snapshot_envelopes
             SET envelope_json = NULL, updated_at = ?
-            WHERE source_id = ? AND week_key = ? AND category_id = ?
+            WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
           `).run(timestamp, ...rowParams(identity));
-        } else {
-          db.prepare(`
-            INSERT INTO snapshot_envelopes
-              (source_id, week_key, category_id, schema_version, envelope_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, NULL, ?, ?)
-          `).run(...rowParams(identity), DEFAULT_SCHEMA_VERSION, timestamp, timestamp);
-          db.prepare(`
-            INSERT INTO snapshot_summary_state
-              (source_id, week_key, category_id, is_stale, stale_reason, updated_at)
-            VALUES (?, ?, ?, 1, 'snapshot_redacted', ?)
-          `).run(...rowParams(identity), timestamp);
+          const summaryUpdate = db.prepare(`
+            UPDATE snapshot_summary_state
+            SET is_stale = 1, stale_reason = 'snapshot_redacted', updated_at = ?
+            WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
+          `).run(timestamp, ...rowParams(identity));
+          if (summaryUpdate.changes === 0) {
+            db.prepare(`
+              INSERT INTO snapshot_summary_state
+                (source_system, source_id, week_key, category_id, is_stale, stale_reason, updated_at)
+              VALUES (?, ?, ?, ?, 1, 'snapshot_redacted', ?)
+            `).run(...rowParams(identity), timestamp);
+          }
         }
+        const aggregateJson = aggregate === null ? null : canonicalJson(aggregate);
         db.prepare(`
           INSERT INTO snapshot_redactions
-            (source_id, week_key, category_id, reason, redacted_at)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(...rowParams(identity), reason, timestamp);
-        db.prepare(`
-          UPDATE snapshot_summary_state
-          SET is_stale = 1, stale_reason = 'snapshot_redacted', updated_at = ?
-          WHERE source_id = ? AND week_key = ? AND category_id = ?
-        `).run(timestamp, ...rowParams(identity));
+            (source_system, source_id, week_key, category_id, reason, aggregate_json, redacted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(...rowParams(identity), reason, aggregateJson, timestamp);
         return toRedactionRecord({
+          source_system: identity.sourceSystem,
           source_id: identity.sourceId,
           week_key: identity.weekKey,
           category_id: identity.categoryId,
           reason,
+          aggregate_json: aggregateJson,
           redacted_at: timestamp
         });
-      });
+      }, onBeforeCommit);
     },
 
     close() {
