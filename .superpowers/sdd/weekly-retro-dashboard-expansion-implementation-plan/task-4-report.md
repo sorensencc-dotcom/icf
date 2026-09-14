@@ -244,3 +244,82 @@ e8b85d2 fix: harden weekly retro trend history
 - No remote, browser, scheduled-writer, production, or owner-approval evidence exists in this standalone local reporting checkout.
 - Node `>=22.5.0` with `node:sqlite` remains required.
 - The adapter still requires an explicitly supplied local source system and source ID.
+
+## Fix round 2 — review regressions
+
+Status: COMPLETE_WITH_CONCERNS
+
+Addressed both review regressions:
+
+1. `listSnapshots` now clamps every valid caller-provided limit to `MAX_LIST_RESULTS` (100) before SQL interpolation. Valid smaller limits remain supported. The snapshot-store regression test covers an oversized limit returning 100 rows and a bounded limit of 2 returning 2 rows.
+2. `createHistoryAdapter` keeps the explicit `getLatestSnapshotWeek` capability as the optimized current-store path. The legacy `listSnapshots` fallback now requests a bounded 100-row fetch and selects the maximum returned ISO week client-side, so stores that ignore `order` or `limit` cannot silently treat `rows[0]` as latest. The compatibility regression test uses unsorted rows from a store that ignores both options and verifies `2026-W37` is selected.
+
+Changed paths:
+
+- `reporting/src/snapshot-store.mjs`
+- `reporting/src/history-adapter.mjs`
+- `reporting/test/snapshot-store.test.mjs`
+- `reporting/test/history-adapter.test.mjs`
+
+## Exact fix-round 2 verification commands and outputs
+
+Full reporting package:
+
+```text
+npm --prefix reporting test
+```
+
+Output summary:
+
+```text
+ℹ tests 59
+ℹ suites 0
+ℹ pass 59
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+The passing suite includes:
+
+```text
+✔ legacy listSnapshots fallback selects the newest week when order and limit are ignored
+✔ listSnapshots requires week bounds, filters category, and caps results
+```
+
+Syntax and whitespace checks:
+
+```text
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+git diff --check
+```
+
+Output:
+
+```text
+test_exit=0 syntax_exit=0 diff_check_exit=0
+```
+
+Implementation commit inspection:
+
+```text
+git show --stat --oneline 32118ee
+```
+
+Output:
+
+```text
+32118ee fix: close task 4 review regressions
+ reporting/src/history-adapter.mjs       | 13 +++++++++++--
+ reporting/src/snapshot-store.mjs        |  3 ++-
+ reporting/test/history-adapter.test.mjs | 25 +++++++++++++++++++++++++
+ reporting/test/snapshot-store.test.mjs  | 13 +++++++++++++
+ 4 files changed, 51 insertions(+), 3 deletions(-)
+```
+
+Implementation commit:
+
+`32118eeea73c4b7ca17fb2d6548deb308a17e375` — `fix: close task 4 review regressions`
+
+The report is committed separately after the implementation hash and verification output were known.
