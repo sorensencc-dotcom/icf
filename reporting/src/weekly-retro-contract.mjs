@@ -6,18 +6,31 @@
  * it without inventing an integration boundary.
  */
 
+import {
+  CATEGORY_REGISTRY,
+  CATEGORY_REGISTRY_VERSION,
+  CATEGORY_STATES,
+  LAUNCH_CATEGORY_IDS,
+  METRIC_DIRECTIONALITIES,
+  normalizeMetric,
+  validateCategoryRegistry
+} from './category-contract.mjs';
+
+export {
+  CATEGORY_REGISTRY,
+  CATEGORY_REGISTRY_VERSION,
+  CATEGORY_STATES,
+  LAUNCH_CATEGORY_IDS,
+  METRIC_DIRECTIONALITIES,
+  normalizeMetric,
+  validateCategoryRegistry
+};
+
 export const API_ROUTE = '/api/reporting/weekly-retro';
 export const API_SUCCESS_STATUS = 'SUCCESS';
 export const API_UNAVAILABLE_STATUS = 'UNAVAILABLE';
 export const DASHBOARD_ELEMENT_NAME = 'weekly-reporting-dashboard';
 export const DASHBOARD_SRC_ATTRIBUTE = 'src';
-
-export const LAUNCH_CATEGORY_IDS = Object.freeze([
-  'delivery',
-  'quality',
-  'reliability',
-  'governance'
-]);
 
 export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'date',
@@ -268,6 +281,11 @@ export function validateCategoryFixture(category) {
 export function validateWeeklyRetroReport(report, options = {}) {
   const allowPartial = options.allowPartial === true;
   const { errors, missing } = validateReportShape(report, { allowPartial });
+  const registry = options.categoryRegistry ?? CATEGORY_REGISTRY;
+  const registryValidation = validateCategoryRegistry(registry);
+  if (!registryValidation.ok) {
+    errors.push(...registryValidation.errors.map(error => `category_registry.${error}`));
+  }
   return {
     ok: errors.length === 0,
     partial: allowPartial && missing.length > 0,
