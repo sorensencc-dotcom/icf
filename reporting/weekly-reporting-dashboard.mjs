@@ -1,7 +1,8 @@
 import {
   API_SUCCESS_STATUS,
   DASHBOARD_ELEMENT_NAME,
-  DASHBOARD_SRC_ATTRIBUTE
+  DASHBOARD_SRC_ATTRIBUTE,
+  validateWeeklyRetroReport
 } from './src/weekly-retro-contract.mjs';
 
 export { DASHBOARD_ELEMENT_NAME, DASHBOARD_SRC_ATTRIBUTE };
@@ -19,6 +20,11 @@ export function dashboardRequest(src) {
 export function dashboardPayloadError(response, payload) {
   if (!response.ok || payload?.status !== API_SUCCESS_STATUS) {
     return payload?.error || `HTTP ${response.status}`;
+  }
+  if (!payload || !('data' in payload)) return 'Weekly retro response missing data.';
+  const validation = validateWeeklyRetroReport(payload.data);
+  if (!validation.ok) {
+    return `Weekly retro response contains invalid data: ${validation.errors.join('; ')}`;
   }
   return null;
 }

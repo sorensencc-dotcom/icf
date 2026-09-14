@@ -22,9 +22,6 @@ export const LAUNCH_CATEGORY_IDS = Object.freeze([
 export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'date',
   'window',
-  'since',
-  'until',
-  'base_branch',
   'metrics',
   'authors',
   'automation',
@@ -38,8 +35,31 @@ export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'backlog',
   'shortcut_debt',
   'note',
+  'since',
+  'until',
+  'base_branch',
   'session_focus'
 ]);
+
+export const CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
+  'date',
+  'window',
+  'metrics',
+  'authors',
+  'automation',
+  'version_range',
+  'release_commits',
+  'streak_days',
+  'user_streak_days',
+  'streak_anchor',
+  'tweetable',
+  'test_health',
+  'backlog',
+  'shortcut_debt',
+  'note'
+]);
+
+export const OPTIONAL_PROVENANCE_FIELDS = Object.freeze(['since', 'until', 'base_branch', 'session_focus']);
 
 export const CURRENT_METRIC_FIELDS = Object.freeze([
   'commits',
@@ -173,7 +193,7 @@ function validateReportShape(report, { allowPartial }) {
   }
   if (!isRecord(report.metrics)) addError(errors, 'metrics', 'must be an object');
 
-  const missingTopLevel = CURRENT_REPORT_TOP_LEVEL_FIELDS.filter(field => !(field in report));
+  const missingTopLevel = CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS.filter(field => !(field in report));
   const unknown = Object.keys(report).filter(field => !CURRENT_REPORT_TOP_LEVEL_FIELDS.includes(field));
   for (const field of unknown) addError(errors, field, 'is not part of the frozen current report contract');
   if (!allowPartial) {

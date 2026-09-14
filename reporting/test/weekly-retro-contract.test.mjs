@@ -5,8 +5,9 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import {
   CURRENT_METRIC_FIELDS,
-  CURRENT_REPORT_TOP_LEVEL_FIELDS,
+  CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS,
   LAUNCH_CATEGORY_IDS,
+  OPTIONAL_PROVENANCE_FIELDS,
   validateApiResponse,
   validateCategoryFixture,
   validateWeeklyRetroReport
@@ -17,13 +18,14 @@ const loadJson = async name => JSON.parse(await readFile(join(FIXTURES, 'fixture
 
 test('freezes current report field shape and deterministic source values', async () => {
   const report = await loadJson('valid-report.json');
-  assert.deepEqual(Object.keys(report), CURRENT_REPORT_TOP_LEVEL_FIELDS);
+  assert.deepEqual(Object.keys(report), CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS);
+  assert.deepEqual(OPTIONAL_PROVENANCE_FIELDS, ['since', 'until', 'base_branch', 'session_focus']);
   assert.deepEqual(Object.keys(report.metrics), CURRENT_METRIC_FIELDS);
   assert.equal(validateWeeklyRetroReport(report).ok, true);
   assert.equal(report.date, '2026-09-13');
   assert.equal(report.window, '7d');
-  assert.equal(report.base_branch, 'main');
-  assert.deepEqual(report.session_focus.incidents, []);
+  assert.equal('base_branch' in report, false);
+  assert.equal('session_focus' in report, false);
   assert.equal(report.metrics.commits, 37);
   assert.deepEqual(report.version_range, ['2.64.0', '2.66.2']);
 });
@@ -81,14 +83,22 @@ test('rejects missing, unknown, and incorrectly typed metrics', async () => {
   assert.ok(result.errors.includes('extra_field: is not part of the frozen current report contract'));
 });
 
-test('requires canonical validated report provenance fields', async () => {
+test('preserves and validates optional canonical provenance fields when present', async () => {
   const report = await loadJson('valid-report.json');
-  delete report.base_branch;
-  delete report.session_focus;
+  report.since = '2026-09-06T00:00:00.000Z';
+  report.until = '2026-09-13T23:59:59.999Z';
+  report.base_branch = 'main';
+  report.session_focus = { summary: 'Summary', incidents: [], process_learnings: [] };
+  assert.equal(validateWeeklyRetroReport(report).ok, true);
+
+  report.since = 'not-a-timestamp';
+  report.base_branch = 42;
+  report.session_focus.incidents = ['valid', 9];
   const result = validateWeeklyRetroReport(report);
   assert.equal(result.ok, false);
-  assert.ok(result.errors.includes('base_branch: is required'));
-  assert.ok(result.errors.includes('session_focus: is required'));
+  assert.ok(result.errors.includes('since: must be an ISO timestamp'));
+  assert.ok(result.errors.includes('base_branch: must be a non-empty string'));
+  assert.ok(result.errors.includes('session_focus.incidents: must be an array of strings'));
 });
 
 test('rejects malformed report JSON without weakening boundary validation', async () => {
@@ -103,6 +113,7 @@ test('manifest fixes week keys, category IDs, and record order for downstream ta
   assert.deepEqual(manifest.week_keys, ['2026-W36', '2026-W37']);
   assert.deepEqual(manifest.launch_category_ids, LAUNCH_CATEGORY_IDS);
   assert.deepEqual(manifest.category_record_order, LAUNCH_CATEGORY_IDS);
+  assert.deepEqual(manifest.optional_provenance_fields, ['since', 'until', 'base_branch', 'session_focus']);
   assert.equal(manifest.cases.length, 6);
   assert.deepEqual(manifest.cases.map(item => item.id), [
     'valid-report',

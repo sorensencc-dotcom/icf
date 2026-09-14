@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+
+const FIXTURES = dirname(fileURLToPath(import.meta.url));
 
 function installFakeDom() {
   const previous = {
@@ -53,6 +58,7 @@ test('imports as a browser-valid custom element and renders fetched data', async
     assert.equal(definitions.get('weekly-reporting-dashboard'), dashboard.WeeklyReportingDashboard);
     assert.deepEqual(dashboard.WeeklyReportingDashboard.observedAttributes, ['src']);
 
+    const validReport = JSON.parse(await readFile(join(FIXTURES, 'fixtures', 'valid-report.json'), 'utf8'));
     const requests = [];
     globalThis.fetch = async (url, init) => {
       requests.push({ url, init });
@@ -60,7 +66,7 @@ test('imports as a browser-valid custom element and renders fetched data', async
         ok: true,
         status: 200,
         async json() {
-          return { status: 'SUCCESS', data: { date: '2026-09-13', window: '7d', metrics: { commits: 37, contributors: 2, net_loc: 2948, test_ratio: 0.2 } } };
+          return { status: 'SUCCESS', data: validReport };
         }
       };
     };
@@ -87,6 +93,17 @@ test('runs connected lifecycle and renders endpoint, transport, and payload erro
     const missing = new dashboard.WeeklyReportingDashboard();
     await missing.load();
     assert.match(missing.shadowRoot.innerHTML, /No reporting endpoint configured/);
+
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      async json() { return { status: 'SUCCESS' }; }
+    });
+    const missingData = new dashboard.WeeklyReportingDashboard();
+    missingData.setAttribute('src', '/api/reporting/weekly-retro');
+    await missingData.load();
+    assert.match(missingData.shadowRoot.innerHTML, /Weekly retro response missing data/);
+    assert.doesNotMatch(missingData.shadowRoot.innerHTML, /Weekly Retro Reporting/);
 
     globalThis.fetch = async () => ({
       ok: false,
