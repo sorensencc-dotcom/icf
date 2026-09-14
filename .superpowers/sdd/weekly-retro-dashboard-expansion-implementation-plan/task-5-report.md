@@ -160,3 +160,27 @@ git diff --check
 Output: no output; both commands exited `0`.
 
 Concerns remain unchanged: this checkout is a standalone local reporting repository with no parent report generator, scheduled writer, action HTTP endpoint, remote integration, or production approval. Node `v24.18.0` with built-in `node:sqlite` was used for verification. No push was requested or performed.
+
+Final post-commit verification:
+
+```text
+node --test test/action-continuity.test.mjs
+```
+
+```text
+ℹ tests 15
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+```text
+git diff --check
+Get-ChildItem . -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+```
+
+Output: no output; both commands exited `0`.
+
+Follow-up commit: `548a1f2` — `fix: tighten action provenance boundary`.
