@@ -34,8 +34,9 @@ export function createReportingServer({ reportPath = DEFAULT_REPORT_PATH, readRe
     response.setHeader('Content-Type', 'application/json; charset=UTF-8');
     try {
       const report = await readReport(reportPath);
+      const payload = serializeApiSuccess(report);
       response.writeHead(200);
-      response.end(JSON.stringify(serializeApiSuccess(report)));
+      response.end(JSON.stringify(payload));
     } catch (error) {
       response.writeHead(503);
       response.end(JSON.stringify(serializeApiUnavailable(reportPath, error)));

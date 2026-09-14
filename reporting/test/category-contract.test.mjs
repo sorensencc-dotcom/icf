@@ -75,8 +75,28 @@ test('rejects missing metadata, directionality, and source-field requirements', 
 
 test('rejects duplicate, unknown, and incorrectly versioned registry entries', () => {
   const duplicate = cloneRegistry();
-  duplicate.categories.push(structuredClone(duplicate.categories[0]));
-  assert.equal(validateCategoryRegistry(duplicate).ok, false);
+  duplicate.categories[3].id = duplicate.categories[0].id;
+  const duplicateCategoryResult = validateCategoryRegistry(duplicate);
+  assert.equal(duplicateCategoryResult.ok, false);
+  assert.ok(duplicateCategoryResult.errors.some(error => error.includes('category IDs must be unique')));
+
+  const duplicateMetric = cloneRegistry();
+  duplicateMetric.categories[0].metrics.push(structuredClone(duplicateMetric.categories[0].metrics[0]));
+  const duplicateMetricResult = validateCategoryRegistry(duplicateMetric);
+  assert.equal(duplicateMetricResult.ok, false);
+  assert.ok(duplicateMetricResult.errors.some(error => error.includes('must be unique within its category')));
+
+  const duplicateSource = cloneRegistry();
+  duplicateSource.categories[0].required_source_fields.push(duplicateSource.categories[0].required_source_fields[0]);
+  const duplicateSourceResult = validateCategoryRegistry(duplicateSource);
+  assert.equal(duplicateSourceResult.ok, false);
+  assert.ok(duplicateSourceResult.errors.some(error => error.includes('required_source_fields') && error.includes('duplicates')));
+
+  const duplicateMetricSource = cloneRegistry();
+  duplicateMetricSource.categories[0].metrics[1].source_field = duplicateMetricSource.categories[0].metrics[0].source_field;
+  const duplicateMetricSourceResult = validateCategoryRegistry(duplicateMetricSource);
+  assert.equal(duplicateMetricSourceResult.ok, false);
+  assert.ok(duplicateMetricSourceResult.errors.some(error => error.includes('source_field') && error.includes('unique')));
 
   const unknown = cloneRegistry();
   unknown.categories[0].id = 'security';
@@ -157,6 +177,46 @@ test('rejects source mismatches, unknown metrics, invalid values, and invalid st
     () => normalizeMetric({ id: 'commits', value: 2 }, { category_id: 'delivery', state: 'zero_activity' }),
     /zero_activity state requires a zero value/
   );
+  assert.throws(
+    () => normalizeMetric({ id: 'commits', value: null }, { category_id: 'delivery' }),
+    /non-negative integer/
+  );
+  assert.throws(
+    () => normalizeMetric({ id: 'commits', value: 3 }, { category_id: 'delivery', source: { metrics: { commits: 2 } } }),
+    /does not match source value/
+  );
+});
+
+test('validates evidence drill-down shape, uniqueness, and source linkage', () => {
+  const missingEvidence = cloneRegistry();
+  missingEvidence.categories[0].evidence = {};
+  const missingResult = validateCategoryRegistry(missingEvidence);
+  assert.equal(missingResult.ok, false);
+
+  const duplicateEvidenceSource = cloneRegistry();
+  duplicateEvidenceSource.categories[0].evidence.source_fields.push(
+    duplicateEvidenceSource.categories[0].evidence.source_fields[0]
+  );
+  const duplicateResult = validateCategoryRegistry(duplicateEvidenceSource);
+  assert.equal(duplicateResult.ok, false);
+
+  const unlinkedEvidenceSource = cloneRegistry();
+  unlinkedEvidenceSource.categories[0].evidence.source_fields = ['metrics.unknown'];
+  const unlinkedResult = validateCategoryRegistry(unlinkedEvidenceSource);
+  assert.equal(unlinkedResult.ok, false);
+
+  const invalidDrilldown = cloneRegistry();
+  invalidDrilldown.categories[0].evidence.drilldown = 'true';
+  const drilldownResult = validateCategoryRegistry(invalidDrilldown);
+  assert.equal(drilldownResult.ok, false);
+});
+
+test('requires exact ordered unique rolling windows', () => {
+  for (const windows of [[4, 8, 12, 16], [4, 4, 12], [12, 8, 4], ['4', 8, 12]]) {
+    const registry = cloneRegistry();
+    registry.categories[0].rolling_windows = windows;
+    assert.equal(validateCategoryRegistry(registry).ok, false);
+  }
 });
 
 test('validated report entry point rejects an invalid category registry without changing report shape', async () => {
@@ -167,6 +227,32 @@ test('validated report entry point rejects an invalid category registry without 
   assert.equal(result.ok, false);
   assert.ok(result.errors.some(error => error.startsWith('category_registry.categories[1].metrics[0].directionality')));
   assert.equal(result.missing.length, 0);
+});
+
+test('validated report entry point rejects malformed nested registry source values', async () => {
+  const report = JSON.parse(await readFile(new URL('./fixtures/valid-report.json', import.meta.url), 'utf8'));
+  report.test_health.total_test_files = '184';
+  const result = validateWeeklyRetroReport(report);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some(error => error.includes('test_health.total_test_files')));
+});
+
+test('applies state semantics and copy across all launch categories', () => {
+  for (const category of CATEGORY_REGISTRY.categories) {
+    for (const state of ['empty', 'partial', 'unavailable', 'zero_activity']) {
+      assert.equal(typeof category.state_copy[state], 'string');
+      assert.ok(category.state_copy[state].length > 0);
+    }
+    const metric = category.metrics[0];
+    const empty = normalizeMetric({ id: metric.id }, { category_id: category.id, state: 'empty' });
+    const partial = normalizeMetric({ id: metric.id }, { category_id: category.id, state: 'partial' });
+    const unavailable = normalizeMetric({ id: metric.id }, { category_id: category.id, state: 'unavailable' });
+    const zero = normalizeMetric({ id: metric.id, value: 0 }, { category_id: category.id, state: 'zero_activity' });
+    assert.equal(empty.state, 'empty');
+    assert.equal(partial.state, 'partial');
+    assert.equal(unavailable.state, 'unavailable');
+    assert.equal(zero.state, 'zero_activity');
+  }
 });
 
 test('normalizes every launch metric from the current validated report fixture', async () => {

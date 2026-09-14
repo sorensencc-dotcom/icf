@@ -51,6 +51,8 @@ const METRIC_KEYS = new Set([
   'source_field',
   'value_type'
 ]);
+const EVIDENCE_KEYS = new Set(['drilldown', 'source_fields']);
+const REQUIRED_ROLLING_WINDOWS = Object.freeze([4, 8, 12]);
 
 const CATEGORY_DEFINITIONS = [
   {
@@ -356,11 +358,31 @@ function validateCategory(category, index, errors) {
   }
   if (typeof category.supports_wow !== 'boolean') addError(errors, `${path}.supports_wow`, 'must be a boolean');
   if (!Array.isArray(category.rolling_windows) ||
-      category.rolling_windows.length !== 3 ||
-      category.rolling_windows.some(window => !Number.isInteger(window) || window <= 0)) {
-    addError(errors, `${path}.rolling_windows`, 'must contain three positive integer windows');
+      category.rolling_windows.length !== REQUIRED_ROLLING_WINDOWS.length ||
+      category.rolling_windows.some((window, index) => window !== REQUIRED_ROLLING_WINDOWS[index])) {
+    addError(errors, `${path}.rolling_windows`, 'must equal [4, 8, 12] in ascending order');
   }
-  if (!isRecord(category.evidence)) addError(errors, `${path}.evidence`, 'must be an object');
+  if (!isRecord(category.evidence)) {
+    addError(errors, `${path}.evidence`, 'must be an object');
+  } else {
+    validateKeys(category.evidence, EVIDENCE_KEYS, `${path}.evidence`, errors);
+    if (typeof category.evidence.drilldown !== 'boolean') {
+      addError(errors, `${path}.evidence.drilldown`, 'must be a boolean');
+    }
+    if (!Array.isArray(category.evidence.source_fields) || category.evidence.source_fields.length === 0) {
+      addError(errors, `${path}.evidence.source_fields`, 'must be a non-empty array');
+    } else {
+      for (const [fieldIndex, field] of category.evidence.source_fields.entries()) {
+        validateString(field, `${path}.evidence.source_fields[${fieldIndex}]`, errors);
+        if (Array.isArray(category.required_source_fields) && !category.required_source_fields.includes(field)) {
+          addError(errors, `${path}.evidence.source_fields[${fieldIndex}]`, 'must link to a required source field');
+        }
+      }
+      if (new Set(category.evidence.source_fields).size !== category.evidence.source_fields.length) {
+        addError(errors, `${path}.evidence.source_fields`, 'must not contain duplicates');
+      }
+    }
+  }
   if (!isRecord(category.state_copy)) {
     addError(errors, `${path}.state_copy`, 'must be an object');
   } else {
@@ -371,6 +393,7 @@ function validateCategory(category, index, errors) {
 
   if (Array.isArray(category.metrics)) {
     const metricIds = new Set();
+    const metricSourceFields = new Set();
     for (const [metricIndex, metric] of category.metrics.entries()) {
       const metricPath = `${path}.metrics[${metricIndex}]`;
       if (!isRecord(metric)) {
@@ -388,6 +411,10 @@ function validateCategory(category, index, errors) {
       }
       validateString(metric.calculation_rule, `${metricPath}.calculation_rule`, errors);
       validateString(metric.source_field, `${metricPath}.source_field`, errors);
+      if (metricSourceFields.has(metric.source_field)) {
+        addError(errors, `${metricPath}.source_field`, 'must be unique within its category');
+      }
+      metricSourceFields.add(metric.source_field);
       if (Array.isArray(category.required_source_fields) && !category.required_source_fields.includes(metric.source_field)) {
         addError(errors, `${metricPath}.source_field`, 'must be listed in required_source_fields');
       }
@@ -448,6 +475,31 @@ function valueError(valueType) {
   return 'must be a non-negative integer';
 }
 
+export function normalizeCategoryMetrics(source, { registry = CATEGORY_REGISTRY, allowPartial = false } = {}) {
+  const registryValidation = validateCategoryRegistry(registry);
+  if (!registryValidation.ok) {
+    throw new TypeError(`Cannot normalize categories with invalid registry: ${registryValidation.errors.join('; ')}`);
+  }
+  if (!isRecord(source)) throw new TypeError('Report source must be an object');
+
+  return registryValidation.categories.map(category => ({
+    category_id: category.id,
+    metrics: category.metrics.map(definition => {
+      const value = getPath(source, definition.source_field);
+      if (value === undefined && allowPartial) {
+        return normalizeMetric(
+          { id: definition.id },
+          { category_id: category.id, state: 'partial', source, registry }
+        );
+      }
+      return normalizeMetric(
+        { id: definition.id, value },
+        { category_id: category.id, source, registry }
+      );
+    })
+  }));
+}
+
 function findCategory(categoryId, registry) {
   const result = validateCategoryRegistry(registry);
   if (!result.ok) throw new TypeError(`Cannot normalize metric with invalid registry: ${result.errors.join('; ')}`);
@@ -480,7 +532,8 @@ export function normalizeMetric(metric, context = {}) {
   if ((state === 'success' || state === 'zero_activity') && !hasValue) {
     throw new TypeError(`${metricId}: ${state} state requires a value`);
   }
-  if (hasValue && value !== null && !valueIsValid(value, definition.value_type)) {
+  const nullAllowedByState = ['empty', 'partial', 'unavailable'].includes(state);
+  if (hasValue && !(value === null && nullAllowedByState) && !valueIsValid(value, definition.value_type)) {
     throw new TypeError(`${metricId}: ${valueError(definition.value_type)}`);
   }
   if (state === 'zero_activity' && value !== 0) {
@@ -488,8 +541,14 @@ export function normalizeMetric(metric, context = {}) {
   }
 
   const source = context.source ?? context.report;
-  if (source !== undefined && (state === 'success' || state === 'zero_activity') && getPath(source, definition.source_field) === undefined) {
-    throw new TypeError(`${definition.source_field}: required source field is missing`);
+  if (source !== undefined) {
+    const sourceValue = getPath(source, definition.source_field);
+    if ((state === 'success' || state === 'zero_activity') && sourceValue === undefined) {
+      throw new TypeError(`${definition.source_field}: required source field is missing`);
+    }
+    if (hasValue && sourceValue !== undefined && !Object.is(value, sourceValue)) {
+      throw new TypeError(`${metricId}: value does not match source value at ${definition.source_field}`);
+    }
   }
 
   return {

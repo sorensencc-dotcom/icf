@@ -12,6 +12,7 @@ import {
   CATEGORY_STATES,
   LAUNCH_CATEGORY_IDS,
   METRIC_DIRECTIONALITIES,
+  normalizeCategoryMetrics,
   normalizeMetric,
   validateCategoryRegistry
 } from './category-contract.mjs';
@@ -22,6 +23,7 @@ export {
   CATEGORY_STATES,
   LAUNCH_CATEGORY_IDS,
   METRIC_DIRECTIONALITIES,
+  normalizeCategoryMetrics,
   normalizeMetric,
   validateCategoryRegistry
 };
@@ -285,6 +287,13 @@ export function validateWeeklyRetroReport(report, options = {}) {
   const registryValidation = validateCategoryRegistry(registry);
   if (!registryValidation.ok) {
     errors.push(...registryValidation.errors.map(error => `category_registry.${error}`));
+  }
+  if (isRecord(report) && isRecord(report.metrics) && registryValidation.ok) {
+    try {
+      normalizeCategoryMetrics(report, { registry, allowPartial });
+    } catch (error) {
+      addError(errors, 'category_metrics', error instanceof Error ? error.message : String(error));
+    }
   }
   return {
     ok: errors.length === 0,

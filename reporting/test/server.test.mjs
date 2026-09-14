@@ -51,3 +51,16 @@ test('GET /api/reporting/weekly-retro routes committed unavailable fixture for m
   assert.match(result.payload.error, /Weekly retro artifact missing or unreadable/);
   assert.match(result.payload.error, /missing-weekly-retro\.json/);
 });
+
+test('GET /api/reporting/weekly-retro rejects malformed nested category source data', async t => {
+  const malformedReport = JSON.parse(await readFile(join(FIXTURES, 'fixtures', 'valid-report.json'), 'utf8'));
+  malformedReport.test_health.total_test_files = '184';
+  const server = createReportingServer({ readReport: async () => malformedReport });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const result = await request(server);
+  assert.equal(result.status, 503);
+  assert.equal(result.payload.status, 'UNAVAILABLE');
+  assert.match(result.payload.error, /test_health\.total_test_files/);
+});
