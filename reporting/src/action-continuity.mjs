@@ -48,7 +48,8 @@ export function normalizeWeekKey(value, field = 'weekKey') {
 }
 
 function weeksInIsoYear(year) {
-  const januaryFirst = new Date(Date.UTC(year, 0, 1));
+  const januaryFirst = new Date(Date.UTC(0, 0, 1));
+  januaryFirst.setUTCFullYear(year, 0, 1);
   const day = januaryFirst.getUTCDay();
   const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   return day === 4 || (day === 3 && leapYear) ? 53 : 52;
@@ -108,7 +109,7 @@ function safeUrl(value, field) {
 
 function safeRelativePath(value, field) {
   const path = requiredString(value, field);
-  if (path.includes('\\') || path.startsWith('/') || path.startsWith('\\') || /^[A-Za-z]:/.test(path) || path.split('/').includes('..')) {
+  if (path.includes('\\') || /[\u0000-\u001f]/.test(path) || path.startsWith('/') || path.startsWith('\\') || /^[A-Za-z]:/.test(path) || path.split('/').includes('..')) {
     throw new TypeError(`${field} must be a safe relative path`);
   }
   return path;
@@ -132,7 +133,9 @@ function sameSnapshot(left, right) {
 }
 
 function normalizeEvidenceRecord(value, origin, field) {
-  const record = isRecord(value) ? value : {};
+  if (!isRecord(value)) throw new TypeError(`${field} must be an object`);
+  if (Object.keys(value).length === 0) throw new TypeError(`${field} must identify an evidence record`);
+  const record = value;
   const candidate = {
     sourceSystem: firstDefined(record.sourceSystem, record.source_system, origin?.sourceSystem),
     sourceId: firstDefined(record.sourceId, record.source_id, origin?.sourceId),
@@ -156,6 +159,7 @@ function normalizeProvenance(action, origin) {
     throw new TypeError('provenanceLinks must contain at least one originating evidence record link');
   }
   const links = Array.isArray(value) ? value : [value];
+  if (links.length === 0) throw new TypeError('provenanceLinks must contain at least one originating evidence record link');
   return links.map((link, index) => {
     const field = `provenanceLinks[${index}]`;
     if (typeof link === 'string') {
