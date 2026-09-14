@@ -553,7 +553,7 @@ export function createSnapshotStore({
       return row ? toRecord(row) : null;
     },
 
-    listSnapshots({ fromWeek, toWeek, categoryId, sourceSystem, sourceId } = {}) {
+    listSnapshots({ fromWeek, toWeek, categoryId, sourceSystem, sourceId, order = 'asc', limit = MAX_LIST_RESULTS } = {}) {
       ensureOpen();
       if (fromWeek === undefined || toWeek === undefined) {
         throw new TypeError('fromWeek and toWeek are required for bounded snapshot queries');
@@ -564,16 +564,36 @@ export function createSnapshotStore({
       const category = categoryId === undefined ? null : normalizeCategoryId(categoryId);
       const system = sourceSystem === undefined ? null : normalizeString(sourceSystem, 'sourceSystem');
       const source = sourceId === undefined ? null : normalizeString(sourceId, 'sourceId');
+      if (!['asc', 'desc'].includes(order)) throw new TypeError('order must be asc or desc');
+      if (!Number.isInteger(limit) || limit < 1) throw new RangeError('limit must be a positive integer');
+      const sortDirection = order === 'desc' ? 'DESC' : 'ASC';
       const rows = db.prepare(`
         ${IDENTITY_QUERY}
         WHERE i.week_key >= ? AND i.week_key <= ?
           AND (? IS NULL OR i.category_id = ?)
           AND (? IS NULL OR i.source_system = ?)
           AND (? IS NULL OR i.source_id = ?)
-        ORDER BY i.week_key ASC, i.source_system ASC, i.source_id ASC, i.category_id ASC
-        LIMIT ${MAX_LIST_RESULTS}
+        ORDER BY i.week_key ${sortDirection}, i.source_system ${sortDirection}, i.source_id ${sortDirection}, i.category_id ${sortDirection}
+        LIMIT ${limit}
       `).all(from, to, category, category, system, system, source, source);
       return rows.map(toRecord);
+    },
+
+    getLatestSnapshotWeek({ categoryId, sourceSystem, sourceId } = {}) {
+      ensureOpen();
+      const category = normalizeCategoryId(categoryId);
+      const system = normalizeString(sourceSystem, 'sourceSystem');
+      const source = normalizeString(sourceId, 'sourceId');
+      const row = db.prepare(`
+        ${IDENTITY_QUERY}
+        WHERE i.week_key >= '0001-W01' AND i.week_key <= '9999-W53'
+          AND i.category_id = ?
+          AND i.source_system = ?
+          AND i.source_id = ?
+        ORDER BY i.week_key DESC
+        LIMIT 1
+      `).get(category, system, source);
+      return row?.week_key ?? null;
     },
 
     invalidateSummaries(filter = {}) {
@@ -669,12 +689,12 @@ export function createSnapshotStore({
               VALUES (?, ?, ?, ?, 1, 'snapshot_redacted', ?)
             `).run(...rowParams(identity), timestamp);
           }
-          invalidateSummaryRows(db, {
-            ...identity,
-            weekKey: identity.weekKey,
-            reason: 'snapshot_redacted'
-          });
         }
+        invalidateSummaryRows(db, {
+          ...identity,
+          weekKey: identity.weekKey,
+          reason: 'snapshot_redacted'
+        });
         const aggregateJson = aggregate === null ? null : canonicalJson(aggregate);
         db.prepare(`
           INSERT INTO snapshot_redactions

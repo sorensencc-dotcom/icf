@@ -55,14 +55,23 @@ export function createHistoryAdapter({ store, sourceSystem, sourceId, toWeek = n
   }
 
   function latestWeek(categoryId) {
+    if (typeof store.getLatestSnapshotWeek === 'function') {
+      return store.getLatestSnapshotWeek({
+        categoryId,
+        sourceSystem: configuredSourceSystem,
+        sourceId: configuredSourceId
+      });
+    }
     const rows = store.listSnapshots({
       fromWeek: '0001-W01',
       toWeek: '9999-W53',
       categoryId,
       sourceSystem: configuredSourceSystem,
-      sourceId: configuredSourceId
+      sourceId: configuredSourceId,
+      order: 'desc',
+      limit: 1
     });
-    return rows.reduce((latest, row) => !latest || row.weekKey > latest ? row.weekKey : latest, null);
+    return rows[0]?.weekKey ?? null;
   }
 
   return {
@@ -90,10 +99,12 @@ export function createHistoryAdapter({ store, sourceSystem, sourceId, toWeek = n
           reason: persisted?.staleReason ?? 'summary_missing'
         });
       }
+      const insufficient = persisted.summary?.status === 'insufficient_history'
+        || persisted.summary?.state === 'insufficient_history';
       return {
         ...persisted.summary,
-        state: 'ready',
-        status: 'ready',
+        state: insufficient ? 'insufficient_history' : 'ready',
+        status: insufficient ? 'insufficient_history' : 'ready',
         categoryId,
         window,
         summary: persisted.summary

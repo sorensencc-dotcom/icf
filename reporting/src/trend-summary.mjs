@@ -98,23 +98,35 @@ export function computeTrend(snapshots, windowOrOptions) {
     throw new RangeError(`window must be one of: ${SUPPORTED_TREND_WINDOWS.join(', ')}`);
   }
   const normalized = normalizedInput(snapshots);
+  const categoryId = options.categoryId ?? normalized[0]?.categoryId ?? null;
   if (normalized.length === 0) {
+    const toWeek = options.toWeek ?? null;
+    const weeks = toWeek ? weekRange(toWeek, window) : [];
+    const weekRecords = weeks.map(weekKey => ({
+      weekKey,
+      state: 'missing',
+      snapshot: null,
+      metrics: []
+    }));
     return {
-      categoryId: options.categoryId ?? null,
+      categoryId,
       window,
-      fromWeek: null,
-      toWeek: null,
-      status: 'insufficient_history',
-      state: 'insufficient_history',
-      missingWeeks: [],
+      fromWeek: weeks[0] ?? null,
+      toWeek,
+      status: 'partial',
+      state: 'partial',
+      complete: false,
+      incomplete: true,
+      missingWeeks: weeks,
       partialWeeks: [],
       unavailableWeeks: [],
       completeWeeks: 0,
-      weeks: [],
-      metrics: []
+      weeks: weekRecords,
+      metrics: categoryId
+        ? metricDefinitions(categoryId).map(definition => metricSummary(definition, weeks, new Map()))
+        : []
     };
   }
-  const categoryId = options.categoryId ?? normalized[0].categoryId;
   if (normalized.some(snapshot => snapshot.categoryId !== categoryId)) {
     throw new TypeError('trend snapshots must share one categoryId');
   }
