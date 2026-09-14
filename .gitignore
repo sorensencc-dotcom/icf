@@ -1,0 +1,7 @@
+.superpowers/
+reporting/data/*.sqlite
+reporting/data/*.sqlite-*
+reporting/data/*.db
+node_modules/
+coverage/
+dist/
