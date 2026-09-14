@@ -225,3 +225,84 @@ Syntax and whitespace commands produced no output and exited `0`. Runtime is abo
 - The parent report generator/application server wiring remains outside this standalone checkout. The explicit local `createReportingServer` publication option is covered, but no parent integration, live service, remote, or production evidence is claimed.
 - Task 4 summary calculation/rebuild remains future work. Redaction preserves only the safe aggregate projection and marks derived summary state stale; it does not rebuild summaries.
 - The fixed 100-row list bound remains intentionally unpaginated; later history consumers need narrower windows or an approved pagination contract.
+
+## Fix round 2 — migrate pre-fix SQLite databases
+
+### Status
+
+DONE_WITH_CONCERNS
+
+### Finding addressed
+
+Existing databases created by the original version-1 schema were not readable after fix round 1: `001_snapshot_store.sql` had been edited in place to add `source_system` and `aggregate_json`, while `CREATE TABLE IF NOT EXISTS` left existing tables unchanged. Reopening those files then failed on missing columns.
+
+### Fix
+
+- Added `reporting/schema/002_snapshot_store_source_system.sql`, a transactional table-rebuild migration for the pre-fix three-part schema. It preserves raw envelope rows, summary state, redaction reasons, and redaction timestamps; legacy rows receive the stable `sourceSystem: 'legacy'` sentinel. Pre-fix tombstones receive `redactedAggregate: null` because that schema did not retain an aggregate projection.
+- Changed store initialization to inspect the physical schema before executing the current fresh-store schema. Existing version-1 legacy tables run migration 002; current round-1 tables receive the version-2 migration record without a rebuild. `PRAGMA user_version` is set to `2` in both paths.
+- Added regression coverage that creates a real pre-fix database with raw and tombstone data, reopens it through the current store, verifies source-system projection, raw/tombstone readability, aggregate projection behavior after migration, version metadata, and a second idempotent reopen.
+
+### Changed paths
+
+- `reporting/schema/002_snapshot_store_source_system.sql`
+- `reporting/src/snapshot-store.mjs`
+- `reporting/test/snapshot-store.test.mjs`
+- `.superpowers/sdd/weekly-retro-dashboard-expansion-implementation-plan/task-3-report.md`
+
+### Exact verification commands and outputs
+
+Focused migration and persistence tests:
+
+```text
+npm --prefix reporting test -- --test-name-pattern='migration|snapshot|redaction|publication|runtime|JSON'
+```
+
+Output:
+
+```text
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1023.0116
+```
+
+Full reporting package:
+
+```text
+npm --prefix reporting test
+```
+
+Output:
+
+```text
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1131.9758
+```
+
+Syntax and whitespace checks:
+
+```text
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+git diff --check
+```
+
+Output: no output; exit code `0`.
+
+### Fix-round 2 commit
+
+Committed together with the implementation and regression tests as `fix: migrate legacy weekly retro snapshot databases`.
+
+### Fix-round 2 concerns
+
+- Pre-fix redaction rows never stored aggregate data, so migration cannot reconstruct an aggregate after raw content was already nulled; it preserves the tombstone with a null projection and preserves aggregate projection behavior for post-migration redactions.
+- No live, remote, production, or parent report-generator integration evidence is claimed.

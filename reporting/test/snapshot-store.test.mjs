@@ -7,11 +7,14 @@ import test from 'node:test';
 import {
   SnapshotIdentityCollisionError,
   SnapshotRedactedError,
+  CURRENT_SCHEMA_VERSION,
+  LEGACY_SOURCE_SYSTEM,
   createSnapshotStore
 } from '../src/snapshot-store.mjs';
 import { createReportingServer, publishWeeklyRetroSnapshot } from '../src/server.mjs';
 
 const SCHEMA_PATH = new URL('../schema/001_snapshot_store.sql', import.meta.url);
+const MIGRATION_PATH = new URL('../schema/002_snapshot_store_source_system.sql', import.meta.url);
 
 async function withStore(callback) {
   const directory = await mkdtemp(join(tmpdir(), 'icf-weekly-retro-'));
@@ -52,6 +55,14 @@ test('snapshot schema migration creates raw, summary-state, and tombstone tables
   assert.doesNotMatch(redactionTable, /FOREIGN KEY/);
 });
 
+test('schema metadata includes the versioned pre-fix compatibility migration', async () => {
+  const migration = await readFile(MIGRATION_PATH, 'utf8');
+  assert.match(migration, /BEGIN IMMEDIATE/);
+  assert.match(migration, /legacy/);
+  assert.match(migration, /VALUES \(2, 'snapshot_store_source_system'/);
+  assert.equal(CURRENT_SCHEMA_VERSION, 2);
+});
+
 test('reporting package declares the minimum node:sqlite runtime', async () => {
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(packageJson.engines.node, '>=22.5.0');
@@ -89,6 +100,153 @@ test('SQLite snapshots remain available after reopening the local database', asy
   const reopenedStore = createSnapshotStore({ databasePath });
   try {
     assert.equal(reopenedStore.getSnapshot(identity()).envelope.marker, 'durable-local-state');
+  } finally {
+    reopenedStore.close();
+  }
+});
+
+test('reopening a pre-fix database upgrades raw and tombstone data safely', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'icf-weekly-retro-legacy-migration-'));
+  const databasePath = join(directory, 'snapshots.sqlite');
+  const legacyDb = new DatabaseSync(databasePath);
+  legacyDb.exec(`
+    PRAGMA foreign_keys = ON;
+    CREATE TABLE schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at TEXT NOT NULL
+    );
+    CREATE TABLE snapshot_envelopes (
+      source_id TEXT NOT NULL,
+      week_key TEXT NOT NULL,
+      category_id TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      envelope_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (source_id, week_key, category_id)
+    );
+    CREATE TABLE snapshot_summary_state (
+      source_id TEXT NOT NULL,
+      week_key TEXT NOT NULL,
+      category_id TEXT NOT NULL,
+      is_stale INTEGER NOT NULL DEFAULT 0 CHECK (is_stale IN (0, 1)),
+      stale_reason TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (source_id, week_key, category_id),
+      FOREIGN KEY (source_id, week_key, category_id)
+        REFERENCES snapshot_envelopes (source_id, week_key, category_id)
+        ON DELETE CASCADE
+    );
+    CREATE TABLE snapshot_redactions (
+      source_id TEXT NOT NULL,
+      week_key TEXT NOT NULL,
+      category_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      redacted_at TEXT NOT NULL,
+      PRIMARY KEY (source_id, week_key, category_id),
+      FOREIGN KEY (source_id, week_key, category_id)
+        REFERENCES snapshot_envelopes (source_id, week_key, category_id)
+        ON DELETE CASCADE
+    );
+    INSERT INTO schema_migrations (version, name, applied_at)
+    VALUES (1, 'snapshot_store', '2026-09-14T00:00:00.000Z');
+  `);
+  legacyDb.prepare(`
+    INSERT INTO snapshot_envelopes
+      (source_id, week_key, category_id, schema_version, envelope_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'legacy-raw', '2026-W37', 'delivery', '1.0',
+    JSON.stringify({ marker: 'pre-fix-raw', report: { metrics: { commits: 11 } } }),
+    '2026-09-14T00:00:01.000Z', '2026-09-14T00:00:01.000Z'
+  );
+  legacyDb.prepare(`
+    INSERT INTO snapshot_summary_state
+      (source_id, week_key, category_id, is_stale, stale_reason, updated_at)
+    VALUES (?, ?, ?, 0, NULL, ?)
+  `).run('legacy-raw', '2026-W37', 'delivery', '2026-09-14T00:00:01.000Z');
+  legacyDb.prepare(`
+    INSERT INTO snapshot_envelopes
+      (source_id, week_key, category_id, schema_version, envelope_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, NULL, ?, ?)
+  `).run(
+    'legacy-redacted', '2026-W37', 'quality', '1.0',
+    '2026-09-14T00:00:02.000Z', '2026-09-14T00:00:02.000Z'
+  );
+  legacyDb.prepare(`
+    INSERT INTO snapshot_summary_state
+      (source_id, week_key, category_id, is_stale, stale_reason, updated_at)
+    VALUES (?, ?, ?, 1, 'snapshot_redacted', ?)
+  `).run('legacy-redacted', '2026-W37', 'quality', '2026-09-14T00:00:02.000Z');
+  legacyDb.prepare(`
+    INSERT INTO snapshot_redactions
+      (source_id, week_key, category_id, reason, redacted_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    'legacy-redacted', '2026-W37', 'quality', 'pre-fix tombstone', '2026-09-14T00:00:02.000Z'
+  );
+  legacyDb.close();
+
+  const store = createSnapshotStore({ databasePath });
+  try {
+    const raw = store.getSnapshot({
+      sourceSystem: LEGACY_SOURCE_SYSTEM,
+      sourceId: 'legacy-raw',
+      weekKey: '2026-W37',
+      categoryId: 'delivery'
+    });
+    assert.equal(raw.envelope.marker, 'pre-fix-raw');
+    assert.equal(raw.sourceSystem, LEGACY_SOURCE_SYSTEM);
+    assert.equal(raw.summaryStale, false);
+
+    const tombstone = store.getSnapshot({
+      sourceSystem: LEGACY_SOURCE_SYSTEM,
+      sourceId: 'legacy-redacted',
+      weekKey: '2026-W37',
+      categoryId: 'quality'
+    });
+    assert.equal(tombstone.envelope, null);
+    assert.equal(tombstone.redacted, true);
+    assert.equal(tombstone.redaction.reason, 'pre-fix tombstone');
+    assert.equal(tombstone.redactedAggregate, null);
+    assert.equal(tombstone.summaryStale, true);
+
+    const listed = store.listSnapshots({ fromWeek: '2026-W37', toWeek: '2026-W37' });
+    assert.deepEqual(listed.map(record => [record.sourceSystem, record.sourceId]), [
+      [LEGACY_SOURCE_SYSTEM, 'legacy-raw'],
+      [LEGACY_SOURCE_SYSTEM, 'legacy-redacted']
+    ]);
+
+    const metadata = new DatabaseSync(databasePath);
+    try {
+      assert.equal(metadata.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version, CURRENT_SCHEMA_VERSION);
+      assert.equal(metadata.prepare('PRAGMA user_version').get().user_version, CURRENT_SCHEMA_VERSION);
+      assert.equal(metadata.prepare('SELECT COUNT(*) AS count FROM snapshot_envelopes WHERE source_system = ?').get(LEGACY_SOURCE_SYSTEM).count, 2);
+    } finally {
+      metadata.close();
+    }
+
+    const postMigrationRedaction = store.redactSnapshot(
+      { sourceSystem: LEGACY_SOURCE_SYSTEM, sourceId: 'legacy-raw', weekKey: '2026-W37', categoryId: 'delivery' },
+      'post-migration redaction'
+    );
+    assert.deepEqual(postMigrationRedaction.redactedAggregate, { counts: { commits: 11 } });
+  } finally {
+    store.close();
+  }
+
+  const reopenedStore = createSnapshotStore({ databasePath });
+  try {
+    const migrated = reopenedStore.getSnapshot({
+      sourceSystem: LEGACY_SOURCE_SYSTEM,
+      sourceId: 'legacy-raw',
+      weekKey: '2026-W37',
+      categoryId: 'delivery'
+    });
+    assert.equal(migrated.envelope, null);
+    assert.equal(migrated.redacted, true);
+    assert.deepEqual(migrated.redactedAggregate, { counts: { commits: 11 } });
   } finally {
     reopenedStore.close();
   }

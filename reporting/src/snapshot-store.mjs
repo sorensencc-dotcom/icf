@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAUNCH_CATEGORY_IDS } from './category-contract.mjs';
 
@@ -16,7 +17,10 @@ if (typeof DatabaseSync !== 'function') {
 }
 
 const DEFAULT_SCHEMA_PATH = fileURLToPath(new URL('../schema/001_snapshot_store.sql', import.meta.url));
+const DEFAULT_MIGRATION_PATH = fileURLToPath(new URL('../schema/002_snapshot_store_source_system.sql', import.meta.url));
 const DEFAULT_SCHEMA_VERSION = '1.0';
+const CURRENT_SCHEMA_VERSION = 2;
+const LEGACY_SOURCE_SYSTEM = 'legacy';
 const MAX_LIST_RESULTS = 100;
 
 export class SnapshotIdentityCollisionError extends Error {
@@ -158,6 +162,90 @@ function assertIdentityMatches(identity, embeddedIdentity) {
 
 function now() {
   return new Date().toISOString();
+}
+
+function hasTable(db, tableName) {
+  return db.prepare(`
+    SELECT 1
+    FROM sqlite_master
+    WHERE type = 'table' AND name = ?
+  `).get(tableName) !== undefined;
+}
+
+function tableColumns(db, tableName) {
+  return new Set(db.prepare(`PRAGMA table_info(${tableName})`).all().map(column => column.name));
+}
+
+function migrationVersion(db) {
+  if (!hasTable(db, 'schema_migrations')) return 0;
+  return db.prepare('SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations').get().version;
+}
+
+function hasCurrentSchema(db) {
+  if (!hasTable(db, 'snapshot_envelopes') ||
+      !hasTable(db, 'snapshot_summary_state') ||
+      !hasTable(db, 'snapshot_redactions')) {
+    return false;
+  }
+  return [
+    ['snapshot_envelopes', 'source_system'],
+    ['snapshot_summary_state', 'source_system'],
+    ['snapshot_redactions', 'source_system', 'aggregate_json']
+  ].every(([tableName, ...columns]) => {
+    const existingColumns = tableColumns(db, tableName);
+    return columns.every(column => existingColumns.has(column));
+  });
+}
+
+function recordMigration(db, version, name) {
+  db.prepare(`
+    INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
+    VALUES (?, ?, ?)
+  `).run(version, name, now());
+}
+
+function migrateSchema(db, schemaPath) {
+  if (!hasTable(db, 'snapshot_envelopes')) {
+    db.exec(readFileSync(schemaPath, 'utf8'));
+  } else if (!hasTable(db, 'schema_migrations')) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      )
+    `);
+    recordMigration(db, 1, 'snapshot_store');
+  }
+
+  if (!hasTable(db, 'schema_migrations')) {
+    throw new Error('snapshot store schema did not create schema_migrations');
+  }
+
+  const appliedVersion = migrationVersion(db);
+  if (!hasCurrentSchema(db)) {
+    if (appliedVersion >= CURRENT_SCHEMA_VERSION) {
+      throw new Error('snapshot store migration metadata is ahead of the physical schema');
+    }
+    const migrationPath = schemaPath === DEFAULT_SCHEMA_PATH
+      ? DEFAULT_MIGRATION_PATH
+      : join(dirname(schemaPath), '002_snapshot_store_source_system.sql');
+    const migrationSql = readFileSync(migrationPath, 'utf8');
+    try {
+      db.exec(migrationSql);
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        // Preserve the original migration error.
+      }
+      throw error;
+    }
+  } else if (appliedVersion < CURRENT_SCHEMA_VERSION) {
+    recordMigration(db, CURRENT_SCHEMA_VERSION, 'snapshot_store_source_system');
+  }
+
+  db.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
 }
 
 function rowParams(identity) {
@@ -329,7 +417,7 @@ export function createSnapshotStore({
     throw new TypeError('onBeforeCommit must be a function when provided');
   }
   const db = new DatabaseSync(databasePath);
-  db.exec(readFileSync(schemaPath, 'utf8'));
+  migrateSchema(db, schemaPath);
   let closed = false;
 
   function ensureOpen() {
@@ -469,4 +557,11 @@ export function createSnapshotStore({
   };
 }
 
-export { DEFAULT_SCHEMA_PATH, DEFAULT_SCHEMA_VERSION, MAX_LIST_RESULTS };
+export {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_MIGRATION_PATH,
+  DEFAULT_SCHEMA_PATH,
+  DEFAULT_SCHEMA_VERSION,
+  LEGACY_SOURCE_SYSTEM,
+  MAX_LIST_RESULTS
+};
