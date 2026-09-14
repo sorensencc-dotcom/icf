@@ -13,9 +13,10 @@ import { validateApiResponse, validateWeeklyRetroReport } from '../src/weekly-re
 
 async function withStore(callback, options = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'icf-weekly-retro-actions-'));
-  const store = createSnapshotStore({ databasePath: join(directory, 'snapshots.sqlite'), ...options });
+  const databasePath = join(directory, 'snapshots.sqlite');
+  const store = createSnapshotStore({ databasePath, ...options });
   try {
-    return await callback(store);
+    return await callback(store, databasePath);
   } finally {
     store.close();
   }
@@ -228,6 +229,20 @@ test('provenance requires safe URL or path and links to the originating snapshot
   assert.throws(() => normalizeAction({ ...base, provenanceLinks: [{ label: 'missing target' }] }), /include url or path/);
 });
 
+test('explicit null status is rejected instead of defaulting to open', () => {
+  assert.throws(() => normalizeAction(action({ status: null })), /status must be a non-empty string/);
+});
+
+test('updates retain existing provenance and reject detachment or reassignment', async () => {
+  await withStore(store => {
+    const origin = { sourceSystem: 'github', sourceId: 'icf-main', weekKey: '2026-W37', categoryId: 'delivery' };
+    const first = store.upsertAction(action({ originatingSnapshot: origin }));
+    const retained = store.upsertAction(action({ wording: 'Updated wording' }));
+    assert.deepEqual(retained.originatingSnapshot, first.originatingSnapshot);
+    assert.throws(() => store.upsertAction(action({ originatingSnapshot: { ...origin, sourceId: 'other' } })), /originating snapshot|originatingSnapshot/);
+  });
+});
+
 test('report and API boundaries validate actions without a configured snapshot store', async () => {
   const report = JSON.parse(await readFile(new URL('./fixtures/valid-report.json', import.meta.url), 'utf8'));
   const origin = { sourceSystem: 'github', sourceId: 'icf-main', weekKey: '2026-W37', categoryId: 'delivery' };
@@ -349,4 +364,19 @@ test('v3 databases migrate action schema to unresolved and redaction support', a
   } finally {
     store.close();
   }
+});
+
+test('redaction scrubs legacy actions whose origin columns predate provenance tracking', async () => {
+  await withStore((store, databasePath) => {
+    const snapshot = { sourceSystem: 'github', sourceId: 'legacy-report', weekKey: '2026-W37', categoryId: 'delivery' };
+    store.upsertSnapshot(snapshot, { schemaVersion: '1.0', report: { metrics: { commits: 1 } } });
+    store.upsertAction(action({ sourceId: snapshot.sourceId, weekKey: snapshot.weekKey, categoryId: snapshot.categoryId }));
+    const database = new DatabaseSync(databasePath);
+    database.prepare(`UPDATE action_records SET origin_source_system = NULL, origin_source_id = NULL,
+      origin_week_key = NULL, origin_category_id = NULL`).run();
+    database.close();
+    const redaction = store.redactSnapshot(snapshot, 'legacy privacy request');
+    assert.equal(redaction.reason, 'legacy privacy request');
+    assert.equal(store.listActions({ weekKey: snapshot.weekKey, sourceId: snapshot.sourceId })[0].redacted, true);
+  });
 });

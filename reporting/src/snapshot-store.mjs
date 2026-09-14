@@ -819,7 +819,34 @@ export function createSnapshotStore({
 
     upsertAction(actionValue) {
       ensureOpen();
-      const action = normalizeAction(actionValue);
+      const actionIdentity = normalizeIdentity({
+        ...actionValue,
+        sourceId: actionValue?.sourceId ?? actionValue?.source_id ?? actionValue?.actionId ?? actionValue?.action_id
+      });
+      const existing = actionRow(db, actionIdentity);
+      const hasOrigin = Object.prototype.hasOwnProperty.call(actionValue ?? {}, 'originatingSnapshot') ||
+        Object.prototype.hasOwnProperty.call(actionValue ?? {}, 'originating_snapshot') ||
+        Object.prototype.hasOwnProperty.call(actionValue ?? {}, 'snapshotIdentity') ||
+        Object.prototype.hasOwnProperty.call(actionValue ?? {}, 'snapshot_identity');
+      if (hasOrigin && existing?.origin_source_id !== null && existing?.origin_source_id !== undefined) {
+        const suppliedOrigin = actionValue.originatingSnapshot ?? actionValue.originating_snapshot ??
+          actionValue.snapshotIdentity ?? actionValue.snapshot_identity;
+        const supplied = normalizeIdentity({ ...suppliedOrigin, sourceId: suppliedOrigin?.sourceId ?? suppliedOrigin?.source_id });
+        if (supplied.sourceSystem !== existing.origin_source_system || supplied.sourceId !== existing.origin_source_id ||
+            supplied.weekKey !== existing.origin_week_key || supplied.categoryId !== existing.origin_category_id) {
+          throw new TypeError('originatingSnapshot must not be reassigned');
+        }
+      }
+      const action = normalizeAction(
+        hasOrigin || !existing
+          ? actionValue
+          : { ...actionValue, originatingSnapshot: {
+            sourceSystem: existing.origin_source_system ?? existing.source_system,
+            sourceId: existing.origin_source_id ?? existing.source_id,
+            weekKey: existing.origin_week_key ?? existing.week_key,
+            categoryId: existing.origin_category_id ?? existing.category_id
+          } }
+      );
       const timestamp = now();
       return withTransaction(db, 'upsertAction', () => {
         return toAction(persistAction(db, action, timestamp));
@@ -1118,9 +1145,12 @@ export function createSnapshotStore({
           SET wording = '[redacted]', display_label = '[redacted]', owner = NULL,
             status = 'abandoned', theme = NULL, themes_json = '[]', provenance_json = '[]',
             history_json = '[]', carried_from_week = NULL, is_redacted = 1, updated_at = ?
-          WHERE origin_source_system = ? AND origin_source_id = ?
-            AND origin_week_key = ? AND origin_category_id = ?
-        `).run(timestamp, ...rowParams(identity));
+          WHERE (
+            (origin_source_system = ? AND origin_source_id = ? AND origin_week_key = ? AND origin_category_id = ?)
+            OR (origin_source_system IS NULL AND origin_source_id IS NULL AND origin_week_key IS NULL AND origin_category_id IS NULL
+              AND source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?)
+          )
+        `).run(timestamp, ...rowParams(identity), ...rowParams(identity));
         invalidateSummaryRows(db, {
           ...identity,
           weekKey: identity.weekKey,

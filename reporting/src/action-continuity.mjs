@@ -67,7 +67,7 @@ function isoWeekKeyFromDate(value) {
 }
 
 export function normalizeActionStatus(value) {
-  const status = requiredString(value ?? 'open', 'status').toLowerCase().replaceAll('-', '_');
+  const status = requiredString(value === undefined ? 'open' : value, 'status').toLowerCase().replaceAll('-', '_');
   const aliases = {
     done: 'completed',
     complete: 'completed',
