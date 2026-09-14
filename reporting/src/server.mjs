@@ -22,7 +22,23 @@ export async function readWeeklyRetro(reportPath = DEFAULT_REPORT_PATH) {
   return report;
 }
 
-export function createReportingServer({ reportPath = DEFAULT_REPORT_PATH, readReport = readWeeklyRetro } = {}) {
+export function publishWeeklyRetroSnapshot({ store, identity, report, schemaVersion = '1.0' }) {
+  if (!store || typeof store.upsertSnapshot !== 'function') {
+    throw new TypeError('A local snapshot store is required for publication');
+  }
+  const validation = validateWeeklyRetroReport(report);
+  if (!validation.ok) {
+    throw new TypeError(`Cannot publish invalid weekly retro report: ${validation.errors.join('; ')}`);
+  }
+  return store.upsertSnapshot(identity, { schemaVersion, report });
+}
+
+export function createReportingServer({
+  reportPath = DEFAULT_REPORT_PATH,
+  readReport = readWeeklyRetro,
+  snapshotStore = null,
+  snapshotIdentity = null
+} = {}) {
   return createServer(async (request, response) => {
     const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
     if (requestUrl.pathname !== API_ROUTE || request.method !== 'GET') {
@@ -35,6 +51,10 @@ export function createReportingServer({ reportPath = DEFAULT_REPORT_PATH, readRe
     try {
       const report = await readReport(reportPath);
       const payload = serializeApiSuccess(report);
+      if (snapshotStore) {
+        const identity = typeof snapshotIdentity === 'function' ? snapshotIdentity(report) : snapshotIdentity;
+        publishWeeklyRetroSnapshot({ store: snapshotStore, identity, report });
+      }
       response.writeHead(200);
       response.end(JSON.stringify(payload));
     } catch (error) {
