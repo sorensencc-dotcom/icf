@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-06",
+  "window": "7d",
+  "metrics": {
+    "commits": 12,
+    "contributors": 1,
+    "insertions": 418,
+    "deletions": 31,
+    "net_loc": 387,
+    "test_ratio": 0
+  },
+  "note": "Partial report: backlog and source coverage unavailable."
+}

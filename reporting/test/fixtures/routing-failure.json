@@ -1,0 +1,4 @@
+{
+  "status": "UNAVAILABLE",
+  "error": "Weekly retro artifact missing or unreadable at reporting/test/fixtures/missing-weekly-retro.json: ENOENT"
+}

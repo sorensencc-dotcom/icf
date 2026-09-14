@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-13",
+  "window": "7d",
+  "metrics": {
+    "commits": 37,
+    "contributors": 2,
+    "prs_merged": null,
+    "prs_referenced": 5,
+    "insertions": 3182,
+    "deletions": 234,
+    "net_loc": 2948,
+    "logical_sloc_added": 2529,
+    "test_loc": 648,
+    "test_ratio": 0.2,
+    "active_days": 3,
+    "sessions": 7,
+    "deep_sessions": 2,
+    "medium_sessions": 1,
+    "micro_sessions": 4,
+    "avg_session_minutes": 51,
+    "loc_per_session_hour": 550,
+    "feat_pct": 0.22,
+    "fix_pct": 0.1,
+    "docs_pct": 0.32,
+    "chore_pct": 0.19,
+    "peak_hour": 23,
+    "ai_assisted_commits": 3,
+    "focus_score": 0.28,
+    "focus_area": "(root)"
+  },
+  "authors": {
+    "Chris Sorensen": {
+      "commits": 32,
+      "insertions": 3119,
+      "deletions": 229,
+      "test_ratio": 0.2,
+      "top_area": "modules/, (root), docs/"
+    }
+  },
+  "automation": {
+    "toolforge-release-bot": {
+      "commits": 5,
+      "insertions": 63,
+      "deletions": 5
+    }
+  },
+  "version_range": ["2.64.0", "2.66.2"],
+  "release_commits": 5,
+  "streak_days": 0,
+  "user_streak_days": 0,
+  "streak_anchor": "2026-09-08",
+  "tweetable": "Week of Sep 6: 37 commits (2 contributors, 1 human + release bot), 2.9k net LOC, 20% tests, 5 releases (v2.64→v2.66.2), peak: 11pm | Streak: broken, last shipped 09-08",
+  "test_health": {
+    "total_test_files": 184,
+    "regression_test_commits": 0,
+    "test_files_changed": 10
+  },
+  "backlog": {
+    "total_open": 4,
+    "p0_p1": 1,
+    "p2": 3,
+    "completed_this_period": 0,
+    "added_this_period": 0
+  },
+  "shortcut_debt": {
+    "markers_found": 0,
+    "no_trigger": 0
+  },
+  "note": "4th same-day re-run of 7d retro (following 2026-09-13-1/2/3.json) — 0 new commits since 2026-09-13-3.json (GUARD_LATEST_COMMIT still 2026-09-09). check-retro-needed.ps1 returned PROCEED despite 0-new delta; user explicitly ran /retro again. Streak corrected to broken (0d) since anchor 09-08 is now 4 days behind today 09-13."
+}
