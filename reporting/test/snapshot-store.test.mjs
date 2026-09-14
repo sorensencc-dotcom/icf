@@ -51,6 +51,7 @@ test('snapshot schema migration creates raw, summary-state, and tombstone tables
   assert.match(schema, /snapshot_envelopes/);
   assert.match(schema, /snapshot_summary_state/);
   assert.match(schema, /snapshot_redactions/);
+  assert.match(schema, /snapshot_trend_summaries/);
   const redactionTable = schema.slice(schema.indexOf('CREATE TABLE IF NOT EXISTS snapshot_redactions'));
   assert.doesNotMatch(redactionTable, /FOREIGN KEY/);
 });
@@ -60,7 +61,7 @@ test('schema metadata includes the versioned pre-fix compatibility migration', a
   assert.match(migration, /BEGIN IMMEDIATE/);
   assert.match(migration, /legacy/);
   assert.match(migration, /VALUES \(2, 'snapshot_store_source_system'/);
-  assert.equal(CURRENT_SCHEMA_VERSION, 2);
+  assert.equal(CURRENT_SCHEMA_VERSION, 3);
 });
 
 test('reporting package declares the minimum node:sqlite runtime', async () => {

@@ -11,6 +11,7 @@ import {
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPORT_PATH = resolve(MODULE_DIR, '../test/fixtures/valid-report.json');
+export const HISTORY_API_ROUTE = '/api/reporting/weekly-retro/history';
 
 export async function readWeeklyRetro(reportPath = DEFAULT_REPORT_PATH) {
   const raw = await readFile(reportPath, 'utf8');
@@ -37,10 +38,35 @@ export function createReportingServer({
   reportPath = DEFAULT_REPORT_PATH,
   readReport = readWeeklyRetro,
   snapshotStore = null,
-  snapshotIdentity = null
+  snapshotIdentity = null,
+  historyAdapter = null
 } = {}) {
   return createServer(async (request, response) => {
     const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
+    if (requestUrl.pathname === HISTORY_API_ROUTE && request.method === 'GET') {
+      response.setHeader('Content-Type', 'application/json; charset=UTF-8');
+      try {
+        if (!historyAdapter || typeof historyAdapter.getTrend !== 'function') {
+          throw new Error('Local history adapter is not configured');
+        }
+        const categoryId = requestUrl.searchParams.get('categoryId') ?? requestUrl.searchParams.get('category');
+        const window = Number(requestUrl.searchParams.get('window'));
+        const trend = historyAdapter.getTrend({ categoryId, window });
+        const recalculating = trend.state === 'TrendRecalculating';
+        response.writeHead(recalculating ? 202 : 200);
+        response.end(JSON.stringify({
+          status: recalculating ? 'TREND_RECALCULATING' : 'SUCCESS',
+          data: trend
+        }));
+      } catch (error) {
+        response.writeHead(503);
+        response.end(JSON.stringify({
+          status: 'UNAVAILABLE',
+          error: `Weekly retro history unavailable: ${error instanceof Error ? error.message : String(error)}`
+        }));
+      }
+      return;
+    }
     if (requestUrl.pathname !== API_ROUTE || request.method !== 'GET') {
       response.writeHead(404, { 'Content-Type': 'application/json; charset=UTF-8' });
       response.end(JSON.stringify({ status: 'NOT_FOUND', error: 'Reporting route not found' }));

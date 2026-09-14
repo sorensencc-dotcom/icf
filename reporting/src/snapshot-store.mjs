@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAUNCH_CATEGORY_IDS } from './category-contract.mjs';
+import { computeTrend } from './trend-summary.mjs';
 
 let DatabaseSync;
 try {
@@ -18,8 +19,9 @@ if (typeof DatabaseSync !== 'function') {
 
 const DEFAULT_SCHEMA_PATH = fileURLToPath(new URL('../schema/001_snapshot_store.sql', import.meta.url));
 const DEFAULT_MIGRATION_PATH = fileURLToPath(new URL('../schema/002_snapshot_store_source_system.sql', import.meta.url));
+const DEFAULT_SUMMARY_MIGRATION_PATH = fileURLToPath(new URL('../schema/003_snapshot_trend_summaries.sql', import.meta.url));
 const DEFAULT_SCHEMA_VERSION = '1.0';
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 const LEGACY_SOURCE_SYSTEM = 'legacy';
 const MAX_LIST_RESULTS = 100;
 
@@ -197,6 +199,12 @@ function hasCurrentSchema(db) {
   });
 }
 
+function hasSummarySchema(db) {
+  if (!hasTable(db, 'snapshot_trend_summaries')) return false;
+  return ['source_system', 'source_id', 'category_id', 'window', 'from_week', 'to_week', 'summary_json', 'is_stale']
+    .every(column => tableColumns(db, 'snapshot_trend_summaries').has(column));
+}
+
 function recordMigration(db, version, name) {
   db.prepare(`
     INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
@@ -242,7 +250,25 @@ function migrateSchema(db, schemaPath) {
       throw error;
     }
   } else if (appliedVersion < CURRENT_SCHEMA_VERSION) {
-    recordMigration(db, CURRENT_SCHEMA_VERSION, 'snapshot_store_source_system');
+    recordMigration(db, 2, 'snapshot_store_source_system');
+  }
+
+  if (!hasSummarySchema(db)) {
+    const summaryMigrationPath = schemaPath === DEFAULT_SCHEMA_PATH
+      ? DEFAULT_SUMMARY_MIGRATION_PATH
+      : join(dirname(schemaPath), '003_snapshot_trend_summaries.sql');
+    try {
+      db.exec(readFileSync(summaryMigrationPath, 'utf8'));
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        // Preserve the original migration error.
+      }
+      throw error;
+    }
+  } else if (migrationVersion(db) < CURRENT_SCHEMA_VERSION) {
+    recordMigration(db, CURRENT_SCHEMA_VERSION, 'snapshot_trend_summaries');
   }
 
   db.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -405,6 +431,48 @@ function withTransaction(db, operation, callback, beforeCommit) {
   }
 }
 
+function invalidateSummaryRows(db, { sourceSystem, sourceId, weekKey, fromWeek, toWeek, categoryId, reason }) {
+  const clauses = [];
+  const params = [];
+  if (sourceSystem !== undefined) {
+    clauses.push('source_system = ?');
+    params.push(sourceSystem);
+  }
+  if (sourceId !== undefined) {
+    clauses.push('source_id = ?');
+    params.push(sourceId);
+  }
+  if (categoryId !== undefined) {
+    clauses.push('category_id = ?');
+    params.push(categoryId);
+  }
+  if (weekKey !== undefined) {
+    clauses.push('from_week <= ? AND to_week >= ?');
+    params.push(weekKey, weekKey);
+  }
+  if (fromWeek !== undefined && toWeek !== undefined) {
+    clauses.push('from_week <= ? AND to_week >= ?');
+    params.push(toWeek, fromWeek);
+  }
+  if (clauses.length === 0) throw new TypeError('summary invalidation requires an identity, week, or range');
+  const result = db.prepare(`
+    UPDATE snapshot_trend_summaries
+    SET is_stale = 1, stale_reason = ?, updated_at = ?
+    WHERE ${clauses.join(' AND ')}
+  `).run(reason, now(), ...params);
+  return result.changes;
+}
+
+function summaryKey(summary, identity) {
+  if (!summary || typeof summary !== 'object') throw new TypeError('summary must be an object');
+  const window = Number(summary.window);
+  if (![4, 8, 12].includes(window)) throw new RangeError('summary window must be one of: 4, 8, 12');
+  const fromWeek = normalizeWeekKey(summary.fromWeek);
+  const toWeek = normalizeWeekKey(summary.toWeek);
+  if (fromWeek > toWeek) throw new RangeError('summary fromWeek must be less than or equal to toWeek');
+  return { ...identity, window, fromWeek, toWeek };
+}
+
 export function createSnapshotStore({
   databasePath = ':memory:',
   schemaPath = DEFAULT_SCHEMA_PATH,
@@ -452,6 +520,11 @@ export function createSnapshotStore({
             SET is_stale = 1, stale_reason = 'snapshot_changed', updated_at = ?
             WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
           `).run(timestamp, ...rowParams(identity));
+          invalidateSummaryRows(db, {
+            ...identity,
+            weekKey: identity.weekKey,
+            reason: 'snapshot_changed'
+          });
         } else {
           db.prepare(`
             INSERT INTO snapshot_envelopes
@@ -463,6 +536,11 @@ export function createSnapshotStore({
               (source_system, source_id, week_key, category_id, is_stale, stale_reason, updated_at)
             VALUES (?, ?, ?, ?, 0, NULL, ?)
           `).run(...rowParams(identity), timestamp);
+          invalidateSummaryRows(db, {
+            ...identity,
+            weekKey: identity.weekKey,
+            reason: 'snapshot_upserted'
+          });
         }
         return toRecord(queryRecord(db, identity));
       }, onBeforeCommit);
@@ -475,7 +553,7 @@ export function createSnapshotStore({
       return row ? toRecord(row) : null;
     },
 
-    listSnapshots({ fromWeek, toWeek, categoryId } = {}) {
+    listSnapshots({ fromWeek, toWeek, categoryId, sourceSystem, sourceId } = {}) {
       ensureOpen();
       if (fromWeek === undefined || toWeek === undefined) {
         throw new TypeError('fromWeek and toWeek are required for bounded snapshot queries');
@@ -484,14 +562,76 @@ export function createSnapshotStore({
       const to = normalizeWeekKey(toWeek);
       if (from > to) throw new RangeError('fromWeek must be less than or equal to toWeek');
       const category = categoryId === undefined ? null : normalizeCategoryId(categoryId);
+      const system = sourceSystem === undefined ? null : normalizeString(sourceSystem, 'sourceSystem');
+      const source = sourceId === undefined ? null : normalizeString(sourceId, 'sourceId');
       const rows = db.prepare(`
         ${IDENTITY_QUERY}
         WHERE i.week_key >= ? AND i.week_key <= ?
           AND (? IS NULL OR i.category_id = ?)
+          AND (? IS NULL OR i.source_system = ?)
+          AND (? IS NULL OR i.source_id = ?)
         ORDER BY i.week_key ASC, i.source_system ASC, i.source_id ASC, i.category_id ASC
         LIMIT ${MAX_LIST_RESULTS}
-      `).all(from, to, category, category);
+      `).all(from, to, category, category, system, system, source, source);
       return rows.map(toRecord);
+    },
+
+    invalidateSummaries(filter = {}) {
+      ensureOpen();
+      const normalized = { ...filter };
+      for (const field of ['sourceSystem', 'sourceId', 'categoryId']) {
+        if (normalized[field] !== undefined) {
+          normalized[field] = field === 'categoryId'
+            ? normalizeCategoryId(normalized[field])
+            : normalizeString(normalized[field], field);
+        }
+      }
+      if (normalized.weekKey !== undefined) normalized.weekKey = normalizeWeekKey(normalized.weekKey);
+      if (normalized.fromWeek !== undefined) normalized.fromWeek = normalizeWeekKey(normalized.fromWeek);
+      if (normalized.toWeek !== undefined) normalized.toWeek = normalizeWeekKey(normalized.toWeek);
+      return withTransaction(db, 'invalidateSummaries', () => invalidateSummaryRows(db, normalized));
+    },
+
+    getTrendSummary({ sourceSystem, sourceId, categoryId, window, fromWeek, toWeek } = {}) {
+      ensureOpen();
+      const identity = normalizeIdentity({ sourceSystem, sourceId, weekKey: toWeek, categoryId });
+      const key = summaryKey({ window, fromWeek, toWeek }, identity);
+      const row = db.prepare(`
+        SELECT summary_json, is_stale, stale_reason, updated_at
+        FROM snapshot_trend_summaries
+        WHERE source_system = ? AND source_id = ? AND category_id = ?
+          AND window = ? AND from_week = ? AND to_week = ?
+      `).get(identity.sourceSystem, identity.sourceId, identity.categoryId, key.window, key.fromWeek, key.toWeek);
+      if (!row) return null;
+      return {
+        summary: JSON.parse(row.summary_json),
+        isStale: row.is_stale === 1,
+        staleReason: row.stale_reason,
+        updatedAt: row.updated_at
+      };
+    },
+
+    saveTrendSummary({ sourceSystem, sourceId, summary } = {}) {
+      ensureOpen();
+      const identity = normalizeIdentity({
+        sourceSystem,
+        sourceId,
+        weekKey: summary?.toWeek,
+        categoryId: summary?.categoryId
+      });
+      const key = summaryKey(summary, identity);
+      const serialized = canonicalJson(summary);
+      const timestamp = now();
+      return withTransaction(db, 'saveTrendSummary', () => {
+        db.prepare(`
+          INSERT INTO snapshot_trend_summaries
+            (source_system, source_id, category_id, window, from_week, to_week, summary_json, is_stale, stale_reason, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
+          ON CONFLICT (source_system, source_id, category_id, window, from_week, to_week)
+          DO UPDATE SET summary_json = excluded.summary_json, is_stale = 0, stale_reason = NULL, updated_at = excluded.updated_at
+        `).run(identity.sourceSystem, identity.sourceId, identity.categoryId, key.window, key.fromWeek, key.toWeek, serialized, timestamp);
+        return { state: 'ready', status: 'ready', updatedAt: timestamp, summary: JSON.parse(serialized) };
+      });
     },
 
     redactSnapshot(identityValue, reasonValue) {
@@ -529,6 +669,11 @@ export function createSnapshotStore({
               VALUES (?, ?, ?, ?, 1, 'snapshot_redacted', ?)
             `).run(...rowParams(identity), timestamp);
           }
+          invalidateSummaryRows(db, {
+            ...identity,
+            weekKey: identity.weekKey,
+            reason: 'snapshot_redacted'
+          });
         }
         const aggregateJson = aggregate === null ? null : canonicalJson(aggregate);
         db.prepare(`
@@ -560,6 +705,7 @@ export function createSnapshotStore({
 export {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_MIGRATION_PATH,
+  DEFAULT_SUMMARY_MIGRATION_PATH,
   DEFAULT_SCHEMA_PATH,
   DEFAULT_SCHEMA_VERSION,
   LEGACY_SOURCE_SYSTEM,
