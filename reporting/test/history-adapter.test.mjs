@@ -76,6 +76,31 @@ test('latest-week lookup uses the newest snapshot beyond the list cap', async ()
   }
 });
 
+test('legacy listSnapshots fallback selects the newest week when order and limit are ignored', () => {
+  const rows = ['2026-W34', '2026-W37', '2026-W35'].map((week, index) => ({
+    ...identity(week),
+    envelope: envelope(index + 1)
+  }));
+  const calls = [];
+  const store = {
+    listSnapshots(options) {
+      calls.push(options);
+      return rows;
+    },
+    getTrendSummary() {
+      return null;
+    }
+  };
+  const history = createHistoryAdapter({ store, sourceSystem: 'github', sourceId: 'icf-main' });
+
+  const trend = history.getTrend({ categoryId: 'delivery', window: 4 });
+
+  assert.equal(trend.state, TREND_RECALCULATING_STATE);
+  assert.equal(trend.toWeek, '2026-W37');
+  assert.equal(calls[0].order, 'desc');
+  assert.equal(calls[0].limit, 100);
+});
+
 test('new redaction invalidates overlapping summaries without a raw envelope', async () => {
   const { store, history } = await setup();
   try {

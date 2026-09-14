@@ -566,6 +566,7 @@ export function createSnapshotStore({
       const source = sourceId === undefined ? null : normalizeString(sourceId, 'sourceId');
       if (!['asc', 'desc'].includes(order)) throw new TypeError('order must be asc or desc');
       if (!Number.isInteger(limit) || limit < 1) throw new RangeError('limit must be a positive integer');
+      const boundedLimit = Math.min(limit, MAX_LIST_RESULTS);
       const sortDirection = order === 'desc' ? 'DESC' : 'ASC';
       const rows = db.prepare(`
         ${IDENTITY_QUERY}
@@ -574,7 +575,7 @@ export function createSnapshotStore({
           AND (? IS NULL OR i.source_system = ?)
           AND (? IS NULL OR i.source_id = ?)
         ORDER BY i.week_key ${sortDirection}, i.source_system ${sortDirection}, i.source_id ${sortDirection}, i.category_id ${sortDirection}
-        LIMIT ${limit}
+        LIMIT ${boundedLimit}
       `).all(from, to, category, category, system, system, source, source);
       return rows.map(toRecord);
     },

@@ -3,6 +3,7 @@ import { normalizeSnapshot } from './snapshot-envelope.mjs';
 import { computeTrend, SUPPORTED_TREND_WINDOWS, weekRange } from './trend-summary.mjs';
 
 export const TREND_RECALCULATING_STATE = 'TrendRecalculating';
+const MAX_LATEST_FALLBACK_ROWS = 100;
 
 function normalizeSource(value, field) {
   if (typeof value !== 'string' || value.length === 0) throw new TypeError(`${field} must be a non-empty string`);
@@ -55,6 +56,7 @@ export function createHistoryAdapter({ store, sourceSystem, sourceId, toWeek = n
   }
 
   function latestWeek(categoryId) {
+    // Current stores advertise the optimized SQL capability explicitly.
     if (typeof store.getLatestSnapshotWeek === 'function') {
       return store.getLatestSnapshotWeek({
         categoryId,
@@ -69,9 +71,16 @@ export function createHistoryAdapter({ store, sourceSystem, sourceId, toWeek = n
       sourceSystem: configuredSourceSystem,
       sourceId: configuredSourceId,
       order: 'desc',
-      limit: 1
+      limit: MAX_LATEST_FALLBACK_ROWS
     });
-    return rows[0]?.weekKey ?? null;
+    // Legacy listSnapshots implementations may ignore order and limit. Select
+    // the newest returned ISO week deterministically instead of trusting rows[0].
+    return rows.reduce((latest, row) => {
+      const weekKey = row?.weekKey ?? row?.week_key;
+      return typeof weekKey === 'string' && (latest === null || weekKey > latest)
+        ? weekKey
+        : latest;
+    }, null);
   }
 
   return {

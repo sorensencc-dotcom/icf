@@ -327,6 +327,19 @@ test('listSnapshots requires week bounds, filters category, and caps results', a
     const result = store.listSnapshots({ fromWeek: '2026-W01', toWeek: '2026-W53', categoryId: 'delivery' });
     assert.equal(result.length, 100);
     assert.ok(result.every(record => record.categoryId === 'delivery'));
+    const oversizedLimit = store.listSnapshots({
+      fromWeek: '2026-W01',
+      toWeek: '2026-W53',
+      categoryId: 'delivery',
+      limit: 1000
+    });
+    assert.equal(oversizedLimit.length, 100);
+    assert.equal(store.listSnapshots({
+      fromWeek: '2026-W01',
+      toWeek: '2026-W53',
+      categoryId: 'delivery',
+      limit: 2
+    }).length, 2);
     assert.throws(() => store.listSnapshots({ categoryId: 'delivery' }), /fromWeek and toWeek/);
   });
 });
