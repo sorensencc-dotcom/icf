@@ -16,6 +16,7 @@ import {
   normalizeMetric,
   validateCategoryRegistry
 } from './category-contract.mjs';
+import { normalizeActions } from './action-continuity.mjs';
 
 export {
   CATEGORY_REGISTRY,
@@ -147,6 +148,11 @@ function addError(errors, path, message) {
 function validateDate(value, errors) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     addError(errors, 'date', 'must be a YYYY-MM-DD string');
+    return;
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    addError(errors, 'date', 'must be a real calendar date');
   }
 }
 
@@ -233,6 +239,12 @@ function validateReportShape(report, { allowPartial }) {
   if ('session_focus' in report) validateSessionFocus(report.session_focus, errors);
   if ('actions' in report && (!Array.isArray(report.actions) || report.actions.some(action => !isRecord(action)))) {
     addError(errors, 'actions', 'must be an array of action objects');
+  } else if (Array.isArray(report.actions)) {
+    try {
+      normalizeActions(report, { requireStatus: true });
+    } catch (error) {
+      addError(errors, 'actions', error instanceof Error ? error.message : String(error));
+    }
   }
 
   if ('version_range' in report &&

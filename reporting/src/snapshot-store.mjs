@@ -3,10 +3,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAUNCH_CATEGORY_IDS } from './category-contract.mjs';
 import {
+  ACTIVE_ACTION_STATUSES,
   MAX_ACTION_HISTORY_RESULTS,
   MAX_ACTION_LIST_RESULTS,
   normalizeAction,
-  normalizeActions
+  normalizeActionStatus,
+  normalizeActions,
+  normalizeWeekKey
 } from './action-continuity.mjs';
 import { computeTrend, weekRange } from './trend-summary.mjs';
 
@@ -27,10 +30,12 @@ const DEFAULT_SCHEMA_PATH = fileURLToPath(new URL('../schema/001_snapshot_store.
 const DEFAULT_MIGRATION_PATH = fileURLToPath(new URL('../schema/002_snapshot_store_source_system.sql', import.meta.url));
 const DEFAULT_SUMMARY_MIGRATION_PATH = fileURLToPath(new URL('../schema/003_snapshot_trend_summaries.sql', import.meta.url));
 const DEFAULT_ACTION_MIGRATION_PATH = fileURLToPath(new URL('../schema/004_action_continuity.sql', import.meta.url));
+const DEFAULT_ACTION_REDACTION_MIGRATION_PATH = fileURLToPath(new URL('../schema/005_action_redaction.sql', import.meta.url));
 const DEFAULT_SCHEMA_VERSION = '1.0';
 const SUMMARY_SCHEMA_VERSION = 3;
 const ACTION_SCHEMA_VERSION = 4;
-const CURRENT_SCHEMA_VERSION = 4;
+const ACTION_REDACTION_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 5;
 const LEGACY_SOURCE_SYSTEM = 'legacy';
 const MAX_LIST_RESULTS = 100;
 
@@ -71,14 +76,6 @@ function normalizeString(value, field) {
     throw new TypeError(`${field} must be a non-empty string`);
   }
   return value;
-}
-
-function normalizeWeekKey(value) {
-  const weekKey = normalizeString(value, 'weekKey');
-  if (!/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/.test(weekKey)) {
-    throw new TypeError('weekKey must be an ISO week key from YYYY-W01 through YYYY-W53');
-  }
-  return weekKey;
 }
 
 function normalizeCategoryId(value) {
@@ -214,12 +211,19 @@ function hasSummarySchema(db) {
     .every(column => tableColumns(db, 'snapshot_trend_summaries').has(column));
 }
 
-function hasActionSchema(db) {
+function hasBaseActionSchema(db) {
   if (!hasTable(db, 'action_records')) return false;
   return [
     'source_system', 'source_id', 'week_key', 'category_id', 'wording', 'display_label',
     'owner', 'status', 'theme', 'themes_json', 'provenance_json', 'history_json',
     'carried_from_week', 'created_at', 'updated_at'
+  ].every(column => tableColumns(db, 'action_records').has(column));
+}
+
+function hasActionSchema(db) {
+  if (!hasBaseActionSchema(db)) return false;
+  return [
+    'origin_source_system', 'origin_source_id', 'origin_week_key', 'origin_category_id', 'is_redacted'
   ].every(column => tableColumns(db, 'action_records').has(column));
 }
 
@@ -289,7 +293,7 @@ function migrateSchema(db, schemaPath) {
     recordMigration(db, SUMMARY_SCHEMA_VERSION, 'snapshot_trend_summaries');
   }
 
-  if (!hasActionSchema(db)) {
+  if (!hasBaseActionSchema(db)) {
     const actionMigrationPath = schemaPath === DEFAULT_SCHEMA_PATH
       ? DEFAULT_ACTION_MIGRATION_PATH
       : join(dirname(schemaPath), '004_action_continuity.sql');
@@ -305,6 +309,24 @@ function migrateSchema(db, schemaPath) {
     }
   } else if (migrationVersion(db) < ACTION_SCHEMA_VERSION) {
     recordMigration(db, ACTION_SCHEMA_VERSION, 'action_continuity');
+  }
+
+  if (!hasActionSchema(db)) {
+    const redactionMigrationPath = schemaPath === DEFAULT_SCHEMA_PATH
+      ? DEFAULT_ACTION_REDACTION_MIGRATION_PATH
+      : join(dirname(schemaPath), '005_action_redaction.sql');
+    try {
+      db.exec(readFileSync(redactionMigrationPath, 'utf8'));
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        // Preserve the original migration error.
+      }
+      throw error;
+    }
+  } else if (migrationVersion(db) < ACTION_REDACTION_SCHEMA_VERSION) {
+    recordMigration(db, ACTION_REDACTION_SCHEMA_VERSION, 'action_redaction');
   }
 
   db.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -325,9 +347,10 @@ function projectNumericRecord(value) {
 
 function projectStringRecord(value) {
   if (!isRecord(value)) return {};
+  const sensitiveKey = /action|owner|history|provenance|wording|label|description|evidence|link/i;
   return Object.fromEntries(
     Object.keys(value).sort()
-      .filter(key => typeof value[key] === 'string' && value[key].trim().length > 0)
+      .filter(key => !sensitiveKey.test(key) && typeof value[key] === 'string' && value[key].trim().length > 0)
       .map(key => [key, value[key]])
   );
 }
@@ -430,6 +453,7 @@ function actionVersion(action, observedAt) {
     themes: action.themes,
     provenanceLinks: action.provenanceLinks,
     carriedFromWeek: action.carriedFromWeek,
+    originatingSnapshot: action.originatingSnapshot,
     observedAt
   };
 }
@@ -447,7 +471,13 @@ function actionVersionFromRow(row) {
     theme: row.theme,
     themes: parseJsonArray(row.themes_json, 'themes'),
     provenanceLinks: parseJsonArray(row.provenance_json, 'provenanceLinks'),
-    carriedFromWeek: row.carried_from_week
+    carriedFromWeek: row.carried_from_week,
+    originatingSnapshot: row.origin_source_id === null ? null : {
+      sourceSystem: row.origin_source_system,
+      sourceId: row.origin_source_id,
+      weekKey: row.origin_week_key,
+      categoryId: row.origin_category_id
+    }
   };
 }
 
@@ -463,7 +493,8 @@ function actionRow(db, identity) {
   return db.prepare(`
     SELECT source_system, source_id, week_key, category_id, wording, display_label,
       owner, status, theme, themes_json, provenance_json, history_json,
-      carried_from_week, created_at, updated_at
+      carried_from_week, origin_source_system, origin_source_id, origin_week_key, origin_category_id,
+      is_redacted, created_at, updated_at
     FROM action_records
     WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
   `).get(...rowParams(identity));
@@ -505,6 +536,19 @@ function toAction(row) {
     provenanceLinks,
     provenance: provenanceLinks,
     carriedFromWeek: row.carried_from_week,
+    originatingSnapshot: row.origin_source_id === null ? null : {
+      sourceSystem: row.origin_source_system,
+      sourceId: row.origin_source_id,
+      weekKey: row.origin_week_key,
+      categoryId: row.origin_category_id
+    },
+    snapshotIdentity: row.origin_source_id === null ? null : {
+      sourceSystem: row.origin_source_system,
+      sourceId: row.origin_source_id,
+      weekKey: row.origin_week_key,
+      categoryId: row.origin_category_id
+    },
+    redacted: row.is_redacted === 1,
     history,
     wordingHistory: history,
     recurringTheme: recurring.length > 0,
@@ -524,6 +568,15 @@ function persistAction(db, action, timestamp, historyBase = null) {
     ? parseJsonArray(existing.history_json, 'history')
     : Array.isArray(historyBase) ? [...historyBase] : [];
   if (!history.length || !actionVersionEqual(history.at(-1), next)) history.push(next);
+  if (existing?.is_redacted === 1) {
+    throw new SnapshotRedactedError({
+      sourceSystem: existing.source_system,
+      sourceId: existing.source_id,
+      weekKey: existing.week_key,
+      categoryId: existing.category_id
+    });
+  }
+  const origin = action.originatingSnapshot;
   const values = [
     action.wording,
     action.displayLabel,
@@ -534,6 +587,11 @@ function persistAction(db, action, timestamp, historyBase = null) {
     canonicalJson(action.provenanceLinks),
     canonicalJson(history),
     action.carriedFromWeek,
+    origin?.sourceSystem ?? null,
+    origin?.sourceId ?? null,
+    origin?.weekKey ?? null,
+    origin?.categoryId ?? null,
+    0,
     timestamp
   ];
   if (!existing) {
@@ -541,14 +599,16 @@ function persistAction(db, action, timestamp, historyBase = null) {
       INSERT INTO action_records
         (source_system, source_id, week_key, category_id, wording, display_label, owner,
          status, theme, themes_json, provenance_json, history_json, carried_from_week,
+         origin_source_system, origin_source_id, origin_week_key, origin_category_id, is_redacted,
          created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(...rowParams(action), ...values, timestamp);
   } else {
     db.prepare(`
       UPDATE action_records
-      SET wording = ?, display_label = ?, owner = ?, status = ?, theme = ?, themes_json = ?,
-        provenance_json = ?, history_json = ?, carried_from_week = ?, updated_at = ?
+       SET wording = ?, display_label = ?, owner = ?, status = ?, theme = ?, themes_json = ?,
+        provenance_json = ?, history_json = ?, carried_from_week = ?,
+        origin_source_system = ?, origin_source_id = ?, origin_week_key = ?, origin_category_id = ?, is_redacted = ?, updated_at = ?
       WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
     `).run(...values, ...rowParams(action));
   }
@@ -573,9 +633,7 @@ function actionFilterValues(filter = {}) {
   if (normalized.owner !== undefined && normalized.owner !== null) normalized.owner = normalizeString(normalized.owner, 'owner');
   if (normalized.status !== undefined) {
     const statuses = Array.isArray(normalized.status) ? normalized.status : [normalized.status];
-    normalized.status = statuses.map(status => normalizeAction({
-      sourceSystem: 'validation', sourceId: 'validation', weekKey: '2026-W01', categoryId: 'delivery', wording: 'validation', status
-    }).status);
+    normalized.status = statuses.map(status => normalizeActionStatus(status));
   }
   return normalized;
 }
@@ -714,7 +772,7 @@ export function createSnapshotStore({
         if (existing && existing.redaction_reason !== null && existing.redaction_reason !== undefined) {
           throw new SnapshotRedactedError(identity);
         }
-        const ingestedActions = normalizeActions(normalizedEnvelope.parsed, { identity });
+        const ingestedActions = normalizeActions(normalizedEnvelope.parsed, { identity, requireStatus: true });
         if (existing && existing.envelope_json === normalizedEnvelope.serialized &&
             existing.schema_version === normalizedEnvelope.schemaVersion) {
           for (const action of ingestedActions) persistAction(db, action, timestamp);
@@ -770,7 +828,10 @@ export function createSnapshotStore({
 
     getAction(actionValue) {
       ensureOpen();
-      const action = normalizeAction({ ...actionValue, wording: actionValue.wording ?? 'lookup' });
+      const action = normalizeIdentity({
+        ...actionValue,
+        sourceId: actionValue?.sourceId ?? actionValue?.source_id ?? actionValue?.actionId ?? actionValue?.action_id
+      });
       const row = actionRow(db, action);
       return row ? toAction(row) : null;
     },
@@ -813,7 +874,8 @@ export function createSnapshotStore({
       const rows = db.prepare(`
         SELECT source_system, source_id, week_key, category_id, wording, display_label,
           owner, status, theme, themes_json, provenance_json, history_json,
-          carried_from_week, created_at, updated_at
+          carried_from_week, origin_source_system, origin_source_id, origin_week_key, origin_category_id,
+          is_redacted, created_at, updated_at
         FROM action_records
         WHERE ${clauses.join(' AND ')}
         ORDER BY week_key ${direction}, source_system ${direction}, source_id ${direction}, category_id ${direction}
@@ -859,26 +921,27 @@ export function createSnapshotStore({
       const filter = typeof weekValue === 'string' ? { weekKey: weekValue } : { ...(weekValue ?? {}) };
       const targetWeek = normalizeWeekKey(filter.weekKey);
       const [previousWeek] = weekRange(targetWeek, 2);
-      const normalized = actionFilterValues({ ...filter, weekKey: previousWeek });
-      const clauses = ['week_key = ?', "status IN ('open', 'in_progress', 'carried_over')"];
-      const params = [previousWeek];
-      for (const [field, column] of [['sourceSystem', 'source_system'], ['sourceId', 'source_id'], ['categoryId', 'category_id']]) {
-        if (normalized[field] !== undefined) {
-          clauses.push(`${column} = ?`);
-          params.push(normalized[field]);
-        }
-      }
-      const previousRows = db.prepare(`
-        SELECT source_system, source_id, week_key, category_id, wording, display_label,
-          owner, status, theme, themes_json, provenance_json, history_json,
-          carried_from_week, created_at, updated_at
-        FROM action_records
-        WHERE ${clauses.join(' AND ')}
-        ORDER BY source_system ASC, source_id ASC, category_id ASC
-        LIMIT ${MAX_ACTION_LIST_RESULTS}
-      `).all(...params);
       const timestamp = now();
       return withTransaction(db, 'carryForwardActions', () => {
+        const normalized = actionFilterValues({ ...filter, weekKey: previousWeek });
+        const clauses = ['week_key = ?', `status IN (${ACTIVE_ACTION_STATUSES.map(() => '?').join(', ')})`, 'is_redacted = 0'];
+        const params = [previousWeek, ...ACTIVE_ACTION_STATUSES];
+        for (const [field, column] of [['sourceSystem', 'source_system'], ['sourceId', 'source_id'], ['categoryId', 'category_id']]) {
+          if (normalized[field] !== undefined) {
+            clauses.push(`${column} = ?`);
+            params.push(normalized[field]);
+          }
+        }
+        const previousRows = db.prepare(`
+          SELECT source_system, source_id, week_key, category_id, wording, display_label,
+            owner, status, theme, themes_json, provenance_json, history_json,
+            carried_from_week, origin_source_system, origin_source_id, origin_week_key, origin_category_id,
+            is_redacted, created_at, updated_at
+          FROM action_records
+          WHERE ${clauses.join(' AND ')}
+          ORDER BY source_system ASC, source_id ASC, category_id ASC
+          LIMIT ${MAX_ACTION_LIST_RESULTS}
+        `).all(...params);
         const carried = [];
         for (const row of previousRows) {
           const identity = {
@@ -888,6 +951,7 @@ export function createSnapshotStore({
             categoryId: row.category_id
           };
           const existing = actionRow(db, identity);
+          if (existing && !ACTIVE_ACTION_STATUSES.includes(existing.status)) continue;
           if (!existing) {
             const previous = actionVersionFromRow(row);
             const next = normalizeAction({
@@ -1049,6 +1113,14 @@ export function createSnapshotStore({
             `).run(...rowParams(identity), timestamp);
           }
         }
+        db.prepare(`
+          UPDATE action_records
+          SET wording = '[redacted]', display_label = '[redacted]', owner = NULL,
+            status = 'abandoned', theme = NULL, themes_json = '[]', provenance_json = '[]',
+            history_json = '[]', carried_from_week = NULL, is_redacted = 1, updated_at = ?
+          WHERE origin_source_system = ? AND origin_source_id = ?
+            AND origin_week_key = ? AND origin_category_id = ?
+        `).run(timestamp, ...rowParams(identity));
         invalidateSummaryRows(db, {
           ...identity,
           weekKey: identity.weekKey,
@@ -1086,6 +1158,7 @@ export {
   DEFAULT_MIGRATION_PATH,
   DEFAULT_SUMMARY_MIGRATION_PATH,
   DEFAULT_ACTION_MIGRATION_PATH,
+  DEFAULT_ACTION_REDACTION_MIGRATION_PATH,
   DEFAULT_SCHEMA_PATH,
   DEFAULT_SCHEMA_VERSION,
   LEGACY_SOURCE_SYSTEM,

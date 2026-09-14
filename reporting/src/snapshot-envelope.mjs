@@ -5,7 +5,7 @@ import {
   normalizeCategoryMetrics,
   normalizeMetric
 } from './category-contract.mjs';
-import { normalizeActions } from './action-continuity.mjs';
+import { normalizeActions, normalizeWeekKey } from './action-continuity.mjs';
 
 export const CURRENT_SNAPSHOT_SCHEMA_VERSION = 'current';
 export const LEGACY_SNAPSHOT_SCHEMA_VERSION = 'legacy';
@@ -71,9 +71,7 @@ function identityFrom(value, envelope, report, record, container = envelope) {
   if (![sourceSystem, sourceId, weekKey, categoryId].every(item => typeof item === 'string' && item.length > 0)) {
     throw new TypeError('snapshot envelope requires source identity, week key, and category ID');
   }
-  if (!/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/.test(weekKey)) {
-    throw new TypeError('snapshot weekKey must be an ISO week key from YYYY-W01 through YYYY-W53');
-  }
+  normalizeWeekKey(weekKey, 'snapshot weekKey');
   if (!LAUNCH_CATEGORY_IDS.includes(categoryId)) {
     throw new TypeError(`snapshot categoryId must be one of: ${LAUNCH_CATEGORY_IDS.join(', ')}`);
   }

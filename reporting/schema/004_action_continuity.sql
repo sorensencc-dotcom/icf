@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS action_records (
   wording TEXT NOT NULL,
   display_label TEXT NOT NULL,
   owner TEXT,
-  status TEXT NOT NULL CHECK (status IN ('open', 'in_progress', 'carried_over', 'completed', 'abandoned')),
+  status TEXT NOT NULL CHECK (status IN ('open', 'in_progress', 'carried_over', 'unresolved', 'completed', 'abandoned')),
   theme TEXT,
   themes_json TEXT NOT NULL,
   provenance_json TEXT NOT NULL,
