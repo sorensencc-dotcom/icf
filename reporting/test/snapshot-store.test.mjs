@@ -61,7 +61,7 @@ test('schema metadata includes the versioned pre-fix compatibility migration', a
   assert.match(migration, /BEGIN IMMEDIATE/);
   assert.match(migration, /legacy/);
   assert.match(migration, /VALUES \(2, 'snapshot_store_source_system'/);
-  assert.equal(CURRENT_SCHEMA_VERSION, 3);
+  assert.equal(CURRENT_SCHEMA_VERSION, 4);
 });
 
 test('reporting package declares the minimum node:sqlite runtime', async () => {

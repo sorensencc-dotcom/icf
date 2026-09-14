@@ -50,6 +50,7 @@ export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'backlog',
   'shortcut_debt',
   'note',
+  'actions',
   'since',
   'until',
   'base_branch',
@@ -75,6 +76,7 @@ export const CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
 ]);
 
 export const OPTIONAL_PROVENANCE_FIELDS = Object.freeze(['since', 'until', 'base_branch', 'session_focus']);
+export const OPTIONAL_ACTION_FIELDS = Object.freeze(['actions']);
 
 export const CURRENT_METRIC_FIELDS = Object.freeze([
   'commits',
@@ -229,6 +231,9 @@ function validateReportShape(report, { allowPartial }) {
     addError(errors, 'base_branch', 'must be a non-empty string');
   }
   if ('session_focus' in report) validateSessionFocus(report.session_focus, errors);
+  if ('actions' in report && (!Array.isArray(report.actions) || report.actions.some(action => !isRecord(action)))) {
+    addError(errors, 'actions', 'must be an array of action objects');
+  }
 
   if ('version_range' in report &&
       (!Array.isArray(report.version_range) ||

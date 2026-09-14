@@ -5,6 +5,7 @@ import {
   normalizeCategoryMetrics,
   normalizeMetric
 } from './category-contract.mjs';
+import { normalizeActions } from './action-continuity.mjs';
 
 export const CURRENT_SNAPSHOT_SCHEMA_VERSION = 'current';
 export const LEGACY_SNAPSHOT_SCHEMA_VERSION = 'legacy';
@@ -159,6 +160,7 @@ export function normalizeSnapshot(value) {
       ?? [];
   }
   const state = deriveState(metrics, explicitState, redacted);
+  const actions = redacted ? [] : normalizeActions(envelope, { identity });
   return {
     schemaVersion: CURRENT_SNAPSHOT_SCHEMA_VERSION,
     sourceSchemaVersion: String(sourceSchemaVersion),
@@ -174,6 +176,7 @@ export function normalizeSnapshot(value) {
     redacted,
     redactedAggregate: record?.redactedAggregate ?? null,
     summaryStale: record?.summaryStale === true,
+    actions,
     normalized: true,
     normalizationChanged: !['1.0', CURRENT_SNAPSHOT_SCHEMA_VERSION].includes(String(sourceSchemaVersion))
   };

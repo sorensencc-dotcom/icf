@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAUNCH_CATEGORY_IDS } from './category-contract.mjs';
-import { computeTrend } from './trend-summary.mjs';
+import {
+  MAX_ACTION_HISTORY_RESULTS,
+  MAX_ACTION_LIST_RESULTS,
+  normalizeAction,
+  normalizeActions
+} from './action-continuity.mjs';
+import { computeTrend, weekRange } from './trend-summary.mjs';
 
 let DatabaseSync;
 try {
@@ -20,8 +26,11 @@ if (typeof DatabaseSync !== 'function') {
 const DEFAULT_SCHEMA_PATH = fileURLToPath(new URL('../schema/001_snapshot_store.sql', import.meta.url));
 const DEFAULT_MIGRATION_PATH = fileURLToPath(new URL('../schema/002_snapshot_store_source_system.sql', import.meta.url));
 const DEFAULT_SUMMARY_MIGRATION_PATH = fileURLToPath(new URL('../schema/003_snapshot_trend_summaries.sql', import.meta.url));
+const DEFAULT_ACTION_MIGRATION_PATH = fileURLToPath(new URL('../schema/004_action_continuity.sql', import.meta.url));
 const DEFAULT_SCHEMA_VERSION = '1.0';
-const CURRENT_SCHEMA_VERSION = 3;
+const SUMMARY_SCHEMA_VERSION = 3;
+const ACTION_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 4;
 const LEGACY_SOURCE_SYSTEM = 'legacy';
 const MAX_LIST_RESULTS = 100;
 
@@ -205,6 +214,15 @@ function hasSummarySchema(db) {
     .every(column => tableColumns(db, 'snapshot_trend_summaries').has(column));
 }
 
+function hasActionSchema(db) {
+  if (!hasTable(db, 'action_records')) return false;
+  return [
+    'source_system', 'source_id', 'week_key', 'category_id', 'wording', 'display_label',
+    'owner', 'status', 'theme', 'themes_json', 'provenance_json', 'history_json',
+    'carried_from_week', 'created_at', 'updated_at'
+  ].every(column => tableColumns(db, 'action_records').has(column));
+}
+
 function recordMigration(db, version, name) {
   db.prepare(`
     INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
@@ -267,8 +285,26 @@ function migrateSchema(db, schemaPath) {
       }
       throw error;
     }
-  } else if (migrationVersion(db) < CURRENT_SCHEMA_VERSION) {
-    recordMigration(db, CURRENT_SCHEMA_VERSION, 'snapshot_trend_summaries');
+  } else if (migrationVersion(db) < SUMMARY_SCHEMA_VERSION) {
+    recordMigration(db, SUMMARY_SCHEMA_VERSION, 'snapshot_trend_summaries');
+  }
+
+  if (!hasActionSchema(db)) {
+    const actionMigrationPath = schemaPath === DEFAULT_SCHEMA_PATH
+      ? DEFAULT_ACTION_MIGRATION_PATH
+      : join(dirname(schemaPath), '004_action_continuity.sql');
+    try {
+      db.exec(readFileSync(actionMigrationPath, 'utf8'));
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        // Preserve the original migration error.
+      }
+      throw error;
+    }
+  } else if (migrationVersion(db) < ACTION_SCHEMA_VERSION) {
+    recordMigration(db, ACTION_SCHEMA_VERSION, 'action_continuity');
   }
 
   db.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -368,6 +404,180 @@ function toRedactionRecord(row) {
     redactedAggregate: parseAggregate(row),
     summaryStale: true
   };
+}
+
+function parseJsonArray(value, field) {
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) throw new TypeError(`${field} must be an array`);
+    return parsed;
+  } catch (error) {
+    throw new Error(`Stored action ${field} is invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function actionVersion(action, observedAt) {
+  return {
+    sourceSystem: action.sourceSystem,
+    sourceId: action.sourceId,
+    weekKey: action.weekKey,
+    categoryId: action.categoryId,
+    wording: action.wording,
+    displayLabel: action.displayLabel,
+    owner: action.owner,
+    status: action.status,
+    theme: action.theme,
+    themes: action.themes,
+    provenanceLinks: action.provenanceLinks,
+    carriedFromWeek: action.carriedFromWeek,
+    observedAt
+  };
+}
+
+function actionVersionFromRow(row) {
+  return {
+    sourceSystem: row.source_system,
+    sourceId: row.source_id,
+    weekKey: row.week_key,
+    categoryId: row.category_id,
+    wording: row.wording,
+    displayLabel: row.display_label,
+    owner: row.owner,
+    status: row.status,
+    theme: row.theme,
+    themes: parseJsonArray(row.themes_json, 'themes'),
+    provenanceLinks: parseJsonArray(row.provenance_json, 'provenanceLinks'),
+    carriedFromWeek: row.carried_from_week
+  };
+}
+
+function actionVersionEqual(left, right) {
+  const comparable = value => {
+    const { observedAt, ...withoutTimestamp } = value;
+    return withoutTimestamp;
+  };
+  return canonicalJson(comparable(left)) === canonicalJson(comparable(right));
+}
+
+function actionRow(db, identity) {
+  return db.prepare(`
+    SELECT source_system, source_id, week_key, category_id, wording, display_label,
+      owner, status, theme, themes_json, provenance_json, history_json,
+      carried_from_week, created_at, updated_at
+    FROM action_records
+    WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
+  `).get(...rowParams(identity));
+}
+
+function recurringThemes(history, currentThemes) {
+  const weeksByTheme = new Map();
+  for (const version of history) {
+    const themes = Array.isArray(version.themes)
+      ? version.themes
+      : version.theme ? [version.theme] : [];
+    for (const theme of themes) {
+      if (!weeksByTheme.has(theme)) weeksByTheme.set(theme, new Set());
+      weeksByTheme.get(theme).add(version.weekKey);
+    }
+  }
+  return [...new Set(currentThemes)].filter(theme => (weeksByTheme.get(theme)?.size ?? 0) > 1).sort();
+}
+
+function toAction(row) {
+  const history = parseJsonArray(row.history_json, 'history');
+  const themes = parseJsonArray(row.themes_json, 'themes');
+  const provenanceLinks = parseJsonArray(row.provenance_json, 'provenanceLinks');
+  const recurring = recurringThemes(history, themes);
+  return {
+    sourceSystem: row.source_system,
+    sourceId: row.source_id,
+    actionId: row.source_id,
+    weekKey: row.week_key,
+    categoryId: row.category_id,
+    wording: row.wording,
+    title: row.wording,
+    displayLabel: row.display_label,
+    label: row.display_label,
+    owner: row.owner,
+    status: row.status,
+    theme: row.theme,
+    themes,
+    provenanceLinks,
+    provenance: provenanceLinks,
+    carriedFromWeek: row.carried_from_week,
+    history,
+    wordingHistory: history,
+    recurringTheme: recurring.length > 0,
+    recurringThemes: recurring,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function persistAction(db, action, timestamp, historyBase = null) {
+  const existing = actionRow(db, action);
+  const current = existing ? actionVersionFromRow(existing) : null;
+  const next = actionVersion(action, timestamp);
+  if (current && actionVersionEqual(current, next)) return existing;
+
+  const history = existing
+    ? parseJsonArray(existing.history_json, 'history')
+    : Array.isArray(historyBase) ? [...historyBase] : [];
+  if (!history.length || !actionVersionEqual(history.at(-1), next)) history.push(next);
+  const values = [
+    action.wording,
+    action.displayLabel,
+    action.owner,
+    action.status,
+    action.theme,
+    canonicalJson(action.themes),
+    canonicalJson(action.provenanceLinks),
+    canonicalJson(history),
+    action.carriedFromWeek,
+    timestamp
+  ];
+  if (!existing) {
+    db.prepare(`
+      INSERT INTO action_records
+        (source_system, source_id, week_key, category_id, wording, display_label, owner,
+         status, theme, themes_json, provenance_json, history_json, carried_from_week,
+         created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(...rowParams(action), ...values, timestamp);
+  } else {
+    db.prepare(`
+      UPDATE action_records
+      SET wording = ?, display_label = ?, owner = ?, status = ?, theme = ?, themes_json = ?,
+        provenance_json = ?, history_json = ?, carried_from_week = ?, updated_at = ?
+      WHERE source_system = ? AND source_id = ? AND week_key = ? AND category_id = ?
+    `).run(...values, ...rowParams(action));
+  }
+  return actionRow(db, action);
+}
+
+function actionFilterValues(filter = {}) {
+  const normalized = { ...filter };
+  if (normalized.weekKey !== undefined) normalized.weekKey = normalizeWeekKey(normalized.weekKey);
+  if (normalized.fromWeek !== undefined) normalized.fromWeek = normalizeWeekKey(normalized.fromWeek);
+  if (normalized.toWeek !== undefined) normalized.toWeek = normalizeWeekKey(normalized.toWeek);
+  if (normalized.fromWeek !== undefined || normalized.toWeek !== undefined) {
+    if (normalized.fromWeek === undefined || normalized.toWeek === undefined) {
+      throw new TypeError('fromWeek and toWeek must be provided together');
+    }
+    if (normalized.fromWeek > normalized.toWeek) throw new RangeError('fromWeek must be less than or equal to toWeek');
+  }
+  for (const field of ['sourceSystem', 'sourceId']) {
+    if (normalized[field] !== undefined) normalized[field] = normalizeString(normalized[field], field);
+  }
+  if (normalized.categoryId !== undefined) normalized.categoryId = normalizeCategoryId(normalized.categoryId);
+  if (normalized.owner !== undefined && normalized.owner !== null) normalized.owner = normalizeString(normalized.owner, 'owner');
+  if (normalized.status !== undefined) {
+    const statuses = Array.isArray(normalized.status) ? normalized.status : [normalized.status];
+    normalized.status = statuses.map(status => normalizeAction({
+      sourceSystem: 'validation', sourceId: 'validation', weekKey: '2026-W01', categoryId: 'delivery', wording: 'validation', status
+    }).status);
+  }
+  return normalized;
 }
 
 const IDENTITY_QUERY = `
@@ -504,8 +714,10 @@ export function createSnapshotStore({
         if (existing && existing.redaction_reason !== null && existing.redaction_reason !== undefined) {
           throw new SnapshotRedactedError(identity);
         }
+        const ingestedActions = normalizeActions(normalizedEnvelope.parsed, { identity });
         if (existing && existing.envelope_json === normalizedEnvelope.serialized &&
             existing.schema_version === normalizedEnvelope.schemaVersion) {
+          for (const action of ingestedActions) persistAction(db, action, timestamp);
           return toRecord(existing);
         }
 
@@ -542,7 +754,153 @@ export function createSnapshotStore({
             reason: 'snapshot_upserted'
           });
         }
+        for (const action of ingestedActions) persistAction(db, action, timestamp);
         return toRecord(queryRecord(db, identity));
+      }, onBeforeCommit);
+    },
+
+    upsertAction(actionValue) {
+      ensureOpen();
+      const action = normalizeAction(actionValue);
+      const timestamp = now();
+      return withTransaction(db, 'upsertAction', () => {
+        return toAction(persistAction(db, action, timestamp));
+      }, onBeforeCommit);
+    },
+
+    getAction(actionValue) {
+      ensureOpen();
+      const action = normalizeAction({ ...actionValue, wording: actionValue.wording ?? 'lookup' });
+      const row = actionRow(db, action);
+      return row ? toAction(row) : null;
+    },
+
+    listActions(filter = {}) {
+      ensureOpen();
+      const normalized = actionFilterValues(filter);
+      if (normalized.weekKey === undefined && (normalized.fromWeek === undefined || normalized.toWeek === undefined)) {
+        throw new TypeError('weekKey or fromWeek and toWeek are required for bounded action queries');
+      }
+      const clauses = [];
+      const params = [];
+      if (normalized.weekKey !== undefined) {
+        clauses.push('week_key = ?');
+        params.push(normalized.weekKey);
+      } else {
+        clauses.push('week_key >= ? AND week_key <= ?');
+        params.push(normalized.fromWeek, normalized.toWeek);
+      }
+      for (const field of ['sourceSystem', 'sourceId', 'categoryId']) {
+        if (normalized[field] !== undefined) {
+          clauses.push(`${field === 'categoryId' ? 'category_id' : field === 'sourceId' ? 'source_id' : 'source_system'} = ?`);
+          params.push(normalized[field]);
+        }
+      }
+      if (normalized.owner !== undefined) {
+        clauses.push(normalized.owner === null ? 'owner IS NULL' : 'owner = ?');
+        if (normalized.owner !== null) params.push(normalized.owner);
+      }
+      if (normalized.status !== undefined) {
+        clauses.push(`status IN (${normalized.status.map(() => '?').join(', ')})`);
+        params.push(...normalized.status);
+      }
+      const order = normalized.order ?? 'asc';
+      if (!['asc', 'desc'].includes(order)) throw new TypeError('order must be asc or desc');
+      const limit = normalized.limit ?? MAX_ACTION_LIST_RESULTS;
+      if (!Number.isInteger(limit) || limit < 1) throw new RangeError('limit must be a positive integer');
+      const boundedLimit = Math.min(limit, MAX_ACTION_LIST_RESULTS);
+      const direction = order === 'desc' ? 'DESC' : 'ASC';
+      const rows = db.prepare(`
+        SELECT source_system, source_id, week_key, category_id, wording, display_label,
+          owner, status, theme, themes_json, provenance_json, history_json,
+          carried_from_week, created_at, updated_at
+        FROM action_records
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY week_key ${direction}, source_system ${direction}, source_id ${direction}, category_id ${direction}
+        LIMIT ${boundedLimit}
+      `).all(...params);
+      const scopeClauses = [];
+      const scopeParams = [];
+      for (const [field, column] of [['sourceSystem', 'source_system'], ['sourceId', 'source_id'], ['categoryId', 'category_id']]) {
+        if (normalized[field] !== undefined) {
+          scopeClauses.push(`${column} = ?`);
+          scopeParams.push(normalized[field]);
+        }
+      }
+      const themeRows = db.prepare(`
+        SELECT source_system, source_id, week_key, category_id, theme, themes_json, history_json
+        FROM action_records
+        ${scopeClauses.length ? `WHERE ${scopeClauses.join(' AND ')}` : ''}
+        ORDER BY week_key ASC
+        LIMIT ${MAX_ACTION_HISTORY_RESULTS}
+      `).all(...scopeParams);
+      const themeWeeks = new Map();
+      for (const themeRow of themeRows) {
+        const history = parseJsonArray(themeRow.history_json, 'history');
+        const versions = [...history, { weekKey: themeRow.week_key, themes: parseJsonArray(themeRow.themes_json, 'themes') }];
+        for (const version of versions) {
+          const themes = Array.isArray(version.themes) ? version.themes : version.theme ? [version.theme] : [];
+          for (const theme of themes) {
+            if (!themeWeeks.has(theme)) themeWeeks.set(theme, new Set());
+            themeWeeks.get(theme).add(version.weekKey);
+          }
+        }
+      }
+      return rows.map(row => {
+        const result = toAction(row);
+        result.recurringThemes = result.themes.filter(theme => (themeWeeks.get(theme)?.size ?? 0) > 1).sort();
+        result.recurringTheme = result.recurringThemes.length > 0;
+        return result;
+      });
+    },
+
+    carryForwardActions(weekValue) {
+      ensureOpen();
+      const filter = typeof weekValue === 'string' ? { weekKey: weekValue } : { ...(weekValue ?? {}) };
+      const targetWeek = normalizeWeekKey(filter.weekKey);
+      const [previousWeek] = weekRange(targetWeek, 2);
+      const normalized = actionFilterValues({ ...filter, weekKey: previousWeek });
+      const clauses = ['week_key = ?', "status IN ('open', 'in_progress', 'carried_over')"];
+      const params = [previousWeek];
+      for (const [field, column] of [['sourceSystem', 'source_system'], ['sourceId', 'source_id'], ['categoryId', 'category_id']]) {
+        if (normalized[field] !== undefined) {
+          clauses.push(`${column} = ?`);
+          params.push(normalized[field]);
+        }
+      }
+      const previousRows = db.prepare(`
+        SELECT source_system, source_id, week_key, category_id, wording, display_label,
+          owner, status, theme, themes_json, provenance_json, history_json,
+          carried_from_week, created_at, updated_at
+        FROM action_records
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY source_system ASC, source_id ASC, category_id ASC
+        LIMIT ${MAX_ACTION_LIST_RESULTS}
+      `).all(...params);
+      const timestamp = now();
+      return withTransaction(db, 'carryForwardActions', () => {
+        const carried = [];
+        for (const row of previousRows) {
+          const identity = {
+            sourceSystem: row.source_system,
+            sourceId: row.source_id,
+            weekKey: targetWeek,
+            categoryId: row.category_id
+          };
+          const existing = actionRow(db, identity);
+          if (!existing) {
+            const previous = actionVersionFromRow(row);
+            const next = normalizeAction({
+              ...previous,
+              weekKey: targetWeek,
+              status: 'carried_over',
+              carriedFromWeek: previousWeek
+            });
+            persistAction(db, next, timestamp, parseJsonArray(row.history_json, 'history'));
+          }
+          carried.push(toAction(actionRow(db, identity)));
+        }
+        return carried;
       }, onBeforeCommit);
     },
 
@@ -727,6 +1085,7 @@ export {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_MIGRATION_PATH,
   DEFAULT_SUMMARY_MIGRATION_PATH,
+  DEFAULT_ACTION_MIGRATION_PATH,
   DEFAULT_SCHEMA_PATH,
   DEFAULT_SCHEMA_VERSION,
   LEGACY_SOURCE_SYSTEM,
