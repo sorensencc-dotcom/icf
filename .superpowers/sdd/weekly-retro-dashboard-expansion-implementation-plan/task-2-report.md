@@ -117,3 +117,116 @@ Output: no output; all commands exited `0` before commit.
 - The repository-level `AGENTS.md`, `CLAUDE.md`, governance documents, and `memory/` paths named in the supplied governance instructions were absent from this checkout; available Task 1/project artifacts and the supplied expansion spec were used instead.
 - Category definitions intentionally reference fields proven by the current validated report. Task 3+ consumers must preserve registry IDs/source paths and must not infer new categories or source schemas outside this contract.
 - The package has no separate lint/build/full-parent-suite command; `npm --prefix reporting test`, Node syntax checks, and diff checks are the available local evidence.
+
+## Fix round 1 — review findings addressed
+
+### Status
+
+DONE_WITH_CONCERNS
+
+### Findings and fixes
+
+1. Runtime report validation now calls `normalizeCategoryMetrics` after registry validation. Strict reports must provide every registered source field with the declared value type; explicit partial mode permits missing registered fields and marks them partial. The malformed nested `test_health.total_test_files` path is rejected before a successful response can be emitted. `server.mjs` now serializes before writing the `200` headers, so injected reader failures remain bounded `503 UNAVAILABLE` responses.
+2. `normalizeMetric` now validates `null` for non-nullable value types instead of skipping validation. Null remains permitted only for nullable metric types or explicit empty/partial/unavailable states.
+3. Evidence is contract-validated: exact evidence keys, boolean `drilldown`, non-empty string `source_fields`, unique fields, and linkage to category required source fields.
+4. Rolling windows are constrained to the exact ordered unique list `[4, 8, 12]`.
+5. When source data is supplied, normalized metric values must equal their registered source-field values using `Object.is`; mismatches fail with contextual errors.
+6. Duplicate tests now mutate an existing category ID, add a real duplicate metric ID, duplicate a required source field, and duplicate a metric source field. Registry validation rejects all four cases.
+7. Duplicate metric source fields are now rejected in addition to duplicate required source-field entries.
+8. State tests cover every launch category, including state-copy presence and empty/partial/unavailable/zero-activity normalization for each category's first registered metric.
+
+### Fix-round changed paths
+
+- `reporting/src/category-contract.mjs`
+- `reporting/src/server.mjs`
+- `reporting/src/weekly-retro-contract.mjs`
+- `reporting/test/category-contract.test.mjs`
+- `reporting/test/server.test.mjs`
+
+### Exact failing-first evidence
+
+Command:
+
+```text
+npm --prefix reporting test -- --test-name-pattern='category|metric|registry|state|source|report entry'
+```
+
+Output before fixes:
+
+```text
+ℹ tests 27
+ℹ pass 22
+ℹ fail 5
+```
+
+The five expected red failures covered duplicate metric source fields, null non-nullable metrics, empty evidence, invalid rolling windows, and malformed nested report source validation.
+
+The initial HTTP covering test also exposed this exact runtime error before the serialization-order correction:
+
+```text
+Error [ERR_HTTP_HEADERS_SENT]: Cannot write headers after they are sent to the client
+```
+
+### Exact focused/full verification
+
+Command:
+
+```text
+npm --prefix reporting test
+```
+
+Output:
+
+```text
+✔ launch registry is versioned and carries required category metadata
+✔ every metric declares supported directionality and a source field
+✔ rejects missing metadata, directionality, and source-field requirements
+✔ rejects duplicate, unknown, and incorrectly versioned registry entries
+✔ normalizes a measured metric with direction, unit, and source provenance
+✔ normalizes empty, partial, unavailable, and zero-activity states distinctly
+✔ rejects source mismatches, unknown metrics, invalid values, and invalid states
+✔ validates evidence drill-down shape, uniqueness, and source linkage
+✔ requires exact ordered unique rolling windows
+✔ validated report entry point rejects an invalid category registry without changing report shape
+✔ validated report entry point rejects malformed nested registry source values
+✔ applies state semantics and copy across all launch categories
+✔ normalizes every launch metric from the current validated report fixture
+✔ imports as a browser-valid custom element and renders fetched data
+✔ runs connected lifecycle and renders endpoint, transport, and payload errors
+✔ GET /api/reporting/weekly-retro preserves current success response
+✔ GET /api/reporting/weekly-retro routes committed malformed fixture to UNAVAILABLE
+✔ GET /api/reporting/weekly-retro routes committed unavailable fixture for missing artifact
+✔ GET /api/reporting/weekly-retro rejects malformed nested category source data
+✔ freezes current report field shape and deterministic source values
+✔ accepts partial report fixture only through explicit partial mode
+✔ preserves empty category state and launch category ordering
+✔ preserves non-empty category record ordering
+✔ freezes SUCCESS and UNAVAILABLE API response shapes
+✔ rejects missing, unknown, and incorrectly typed metrics
+✔ preserves and validates optional canonical provenance fields when present
+✔ rejects malformed report JSON without weakening boundary validation
+✔ manifest fixes week keys, category IDs, and record order for downstream tasks
+ℹ tests 28
+ℹ pass 28
+ℹ fail 0
+```
+
+Exit code: `0`.
+
+Commands:
+
+```text
+Get-ChildItem reporting -Recurse -File -Include *.mjs | ForEach-Object { node --check $_.FullName }
+git diff --check
+```
+
+Output: no output; both commands exited `0`.
+
+### Fix-round implementation commit
+
+`6ccf681a574960e498a1b8976633c2f30ce947e3` — `fix: close weekly retro category contract findings`
+
+### Fix-round concerns
+
+- Validation is now enforced through the standalone server's existing `readWeeklyRetro`/serialization path, but the parent report generator remains outside this checkout and was not executed.
+- Local evidence remains focused/full package evidence only; no real browser engine, live service, remote, or production evidence is claimed.
