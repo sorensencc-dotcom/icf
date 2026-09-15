@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
+  CATEGORY_REGISTRY,
+  CATEGORY_REGISTRY_VERSION,
+  LAUNCH_CATEGORY_IDS,
   API_ROUTE,
   serializeApiSuccess,
   serializeApiUnavailable,
@@ -12,6 +15,10 @@ import {
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPORT_PATH = resolve(MODULE_DIR, '../test/fixtures/valid-report.json');
 export const HISTORY_API_ROUTE = '/api/reporting/weekly-retro/history';
+export const CATEGORIES_API_ROUTE = '/api/reporting/weekly-retro/categories';
+export const EVIDENCE_API_ROUTE = '/api/reporting/weekly-retro/evidence';
+export const ACTIONS_API_ROUTE = '/api/reporting/weekly-retro/actions';
+export const ROUTING_API_ROUTE = '/api/reporting/weekly-retro/routing';
 
 export async function readWeeklyRetro(reportPath = DEFAULT_REPORT_PATH) {
   const raw = await readFile(reportPath, 'utf8');
@@ -39,10 +46,33 @@ export function createReportingServer({
   readReport = readWeeklyRetro,
   snapshotStore = null,
   snapshotIdentity = null,
-  historyAdapter = null
+  historyAdapter = null,
+  actionStore = null,
+  routingFacts = null
 } = {}) {
   return createServer(async (request, response) => {
     const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
+    const json = (status, payload) => { response.setHeader('Content-Type', 'application/json; charset=UTF-8'); response.writeHead(status); response.end(JSON.stringify(payload)); };
+    if (request.method === 'GET' && requestUrl.pathname === CATEGORIES_API_ROUTE) {
+      return json(200, { status: 'SUCCESS', schemaVersion: CATEGORY_REGISTRY_VERSION, freshness: 'static', quality: 'validated', partial: false, data: CATEGORY_REGISTRY });
+    }
+    if (request.method === 'GET' && requestUrl.pathname === ROUTING_API_ROUTE) {
+      if (!routingFacts) return json(503, { status: 'UNAVAILABLE', schemaVersion: '1.0', freshness: 'unavailable', quality: 'unavailable', partial: true, error: 'Routing facts unavailable' });
+      return json(200, { status: 'SUCCESS', schemaVersion: '1.0', freshness: 'current', quality: 'evaluator_facts', partial: false, data: routingFacts });
+    }
+    if (request.method === 'GET' && (requestUrl.pathname === ACTIONS_API_ROUTE || requestUrl.pathname === EVIDENCE_API_ROUTE)) {
+      try {
+        const fromWeek = requestUrl.searchParams.get('fromWeek');
+        const toWeek = requestUrl.searchParams.get('toWeek');
+        if (!fromWeek || !toWeek) throw new TypeError('fromWeek and toWeek are required');
+        if (!actionStore || typeof actionStore.listActions !== 'function') throw new Error('Action ledger unavailable');
+        const data = actionStore.listActions({ fromWeek, toWeek, categoryId: requestUrl.searchParams.get('categoryId') ?? undefined, limit: 100 });
+        const projected = requestUrl.pathname === EVIDENCE_API_ROUTE
+          ? data.flatMap(action => action.provenanceLinks.map(link => ({ sourceId: action.sourceId, weekKey: action.weekKey, categoryId: action.categoryId, ...link })))
+          : data.map(({ wording, title, displayLabel, label, owner, status, theme, themes, provenanceLinks, ...safe }) => ({ ...safe, wording, title, displayLabel, label, owner, status, theme, themes, provenanceLinks }));
+        return json(200, { status: 'SUCCESS', schemaVersion: '1.0', freshness: 'current', quality: 'validated', partial: false, data: projected });
+      } catch (error) { return json(503, { status: 'UNAVAILABLE', schemaVersion: '1.0', freshness: 'unavailable', quality: 'unavailable', partial: true, error: error instanceof Error ? error.message : String(error) }); }
+    }
     if (requestUrl.pathname === HISTORY_API_ROUTE && request.method === 'GET') {
       response.setHeader('Content-Type', 'application/json; charset=UTF-8');
       try {
