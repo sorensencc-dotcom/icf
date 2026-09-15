@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createReportingServer, DEFAULT_REPORT_PATH, CATEGORIES_API_ROUTE, ROUTING_API_ROUTE, ACTIONS_API_ROUTE } from '../src/server.mjs';
+import { interpretReport, validateRoutingFacts } from '../src/routing-telemetry.mjs';
 
 const FIXTURES = dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,18 @@ test('Task 6 read projections expose validated categories and bounded unavailabl
   const actions = await requestPath(server, `${ACTIONS_API_ROUTE}?fromWeek=2026-W37&toWeek=2026-W37`);
   assert.equal(actions.status, 503);
   assert.equal(actions.payload.status, 'UNAVAILABLE');
+});
+
+test('Task 7 routing facts are bounded and invalid model output cannot replace report data', () => {
+  assert.deepEqual(validateRoutingFacts({ selectedModel: 'local-model', evaluatorScore: 0.91, confidence: 0.8, state: 'selected' }), {
+    schemaVersion: '1.0', state: 'selected', selectedModel: 'local-model', evaluatorScore: 0.91, confidence: 0.8,
+    fallbackOutcome: null, latencyMs: null, tokenUsage: null, reviewState: 'selected'
+  });
+  assert.throws(() => validateRoutingFacts({ state: 'selected', rawPrompt: 'secret' }), /unsupported field/);
+  const report = { date: '2026-09-13' };
+  assert.deepEqual(interpretReport(report, { state: 'unavailable', selectedModel: null }).report, report);
+  assert.equal(interpretReport(report, { state: 'unavailable' }).status, 'INTERPRETATION_UNAVAILABLE');
+  assert.equal(interpretReport(report, { state: 'fallback', fallbackOutcome: 'deterministic' }).status, 'AVAILABLE');
 });
 
 test('GET /api/reporting/weekly-retro preserves current success response', async t => {

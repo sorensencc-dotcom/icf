@@ -11,6 +11,7 @@ import {
   serializeApiUnavailable,
   validateWeeklyRetroReport
 } from './weekly-retro-contract.mjs';
+import { validateRoutingFacts } from './routing-telemetry.mjs';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPORT_PATH = resolve(MODULE_DIR, '../test/fixtures/valid-report.json');
@@ -58,7 +59,8 @@ export function createReportingServer({
     }
     if (request.method === 'GET' && requestUrl.pathname === ROUTING_API_ROUTE) {
       if (!routingFacts) return json(503, { status: 'UNAVAILABLE', schemaVersion: '1.0', freshness: 'unavailable', quality: 'unavailable', partial: true, error: 'Routing facts unavailable' });
-      return json(200, { status: 'SUCCESS', schemaVersion: '1.0', freshness: 'current', quality: 'evaluator_facts', partial: false, data: routingFacts });
+      try { return json(200, { status: 'SUCCESS', schemaVersion: '1.0', freshness: 'current', quality: 'evaluator_facts', partial: false, data: validateRoutingFacts(routingFacts) }); }
+      catch (error) { return json(503, { status: 'UNAVAILABLE', schemaVersion: '1.0', freshness: 'invalid', quality: 'unavailable', partial: true, error: error.message }); }
     }
     if (request.method === 'GET' && (requestUrl.pathname === ACTIONS_API_ROUTE || requestUrl.pathname === EVIDENCE_API_ROUTE)) {
       try {
