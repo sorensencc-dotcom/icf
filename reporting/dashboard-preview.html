@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weekly Retro Dashboard Preview</title>
+  <style>
+    :root { color-scheme: dark; --forge:#1a1410; --white:#faf6f0; --brass:#b8922a; --ash:#9a9088; --iron:#2c2420; --rust:#c4501a; }
+    body { margin:0; padding:2rem; background:#0e0b09; color:var(--white); }
+    main { max-width:1100px; margin:auto; }
+    .notice { margin-bottom:1rem; color:#d7e7c1; font:14px Barlow,Arial,sans-serif; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="notice">Local ICF preview · fixture data · not connected to kb-sync</p>
+    <weekly-reporting-dashboard src="/preview-report"></weekly-reporting-dashboard>
+  </main>
+  <script type="module">
+    const report = await fetch('/test/fixtures/valid-report.json').then(response => response.json());
+    const realFetch = window.fetch.bind(window);
+    window.fetch = (url, init) => url === '/preview-report'
+      ? Promise.resolve(new Response(JSON.stringify({ status: 'SUCCESS', data: report }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      : realFetch(url, init);
+    await import('./weekly-reporting-dashboard.mjs');
+  </script>
+</body>
+</html>
