@@ -79,7 +79,7 @@ test('imports as a browser-valid custom element and renders fetched data', async
       init: { method: 'GET', headers: { Accept: 'application/json' } }
     }]);
     assert.match(element.shadowRoot.innerHTML, /Weekly Retro Reporting/);
-    assert.match(element.shadowRoot.innerHTML, />37<\/div>/);
+    assert.match(element.shadowRoot.innerHTML, />37<\/dd>/);
     assert.match(element.shadowRoot.innerHTML, /2026-09-13/);
   } finally {
     restoreFakeDom(previous);
@@ -117,6 +117,28 @@ test('runs connected lifecycle and renders endpoint, transport, and payload erro
     await new Promise(resolve => setImmediate(resolve));
     assert.match(failed.shadowRoot.innerHTML, /Weekly telemetry unavailable: offline/);
     assert.match(failed.shadowRoot.innerHTML, /role="alert"/);
+  } finally {
+    restoreFakeDom(previous);
+  }
+});
+
+test('renders review-canvas drill-down sections and rejects HTML responses clearly', async () => {
+  const { previous } = installFakeDom();
+  try {
+    const dashboard = await import(`../weekly-reporting-dashboard.mjs?canvas-test=${Date.now()}`);
+    const element = new dashboard.WeeklyReportingDashboard();
+    element.render({ date: '2026-09-13', window: '7d', metrics: { commits: 2 }, categories: [{ id: 'delivery', name: 'Delivery', summary: 'Shipped work' }], evidence: [{ label: 'commit abc123' }], actions: [{ title: 'Review flaky test', status: 'open' }] });
+    assert.match(element.shadowRoot.innerHTML, /aria-label="Executive summary"/);
+    assert.match(element.shadowRoot.innerHTML, /Category review/);
+    assert.match(element.shadowRoot.innerHTML, /commit abc123/);
+    assert.match(element.shadowRoot.innerHTML, /Review flaky test/);
+    assert.match(element.shadowRoot.innerHTML, /href="#category-delivery"/);
+
+    globalThis.fetch = async () => ({ ok: true, status: 200, async text() { return '<html>'; } });
+    const broken = new dashboard.WeeklyReportingDashboard();
+    broken.setAttribute('src', '/api/reporting/weekly-retro');
+    await broken.load();
+    assert.match(broken.shadowRoot.innerHTML, /non-JSON content/);
   } finally {
     restoreFakeDom(previous);
   }
