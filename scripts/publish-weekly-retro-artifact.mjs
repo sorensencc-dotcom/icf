@@ -28,7 +28,7 @@ function deriveProjections(report) {
   const definitions = new Map(CATEGORY_REGISTRY.categories.map(category => [category.id, category]));
   const categories = normalized.map(category => {
     const definition = definitions.get(category.category_id);
-    const measured = category.metrics.filter(metric => metric.state === 'measured').length;
+    const measured = category.metrics.filter(metric => metric.state !== 'unavailable').length;
     return {
       id: category.category_id,
       name: definition.label,
@@ -38,7 +38,7 @@ function deriveProjections(report) {
   const evidence = normalized.flatMap(category => {
     const definition = definitions.get(category.category_id);
     return category.metrics
-      .filter(metric => metric.state === 'measured')
+      .filter(metric => metric.state !== 'unavailable' && metric.value !== null)
       .map(metric => ({
         label: `${definition.label}: ${metric.id} = ${metric.value}`,
         source: metric.source_field,
