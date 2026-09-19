@@ -40,12 +40,16 @@ function deriveProjections(report) {
     return category.metrics
       .filter(metric => metric.state !== 'unavailable' && metric.value !== null)
       .map(metric => ({
-        label: `${definition.label}: ${metric.id} = ${metric.value}`,
+        label: `${definition.label}: ${metric.metric_id} = ${metric.value}`,
         source: metric.source_field,
         category: category.category_id
       }));
   });
-  return { categories, evidence };
+  return {
+    categories,
+    evidence,
+    actions: Array.isArray(report.actions) ? report.actions : undefined
+  };
 }
 
 const reportPath = argument('--report');
