@@ -1,0 +1,21 @@
+{
+  "name": "@icf/monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Iron Command Forge (ICF) — Unified Operations, Reporting, and Knowledge Dashboard",
+  "workspaces": [
+    "reporting",
+    "dashboard"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "test": "npm run test --workspace=reporting && node --test test/*.test.mjs",
+    "test:gateway": "node --test test/*.test.mjs",
+    "test:all": "npm run test --workspaces --if-present && node --test test/*.test.mjs",
+    "start": "node src/server.mjs",
+    "build": "npm run build --workspaces --if-present"
+  }
+}

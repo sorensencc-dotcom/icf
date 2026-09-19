@@ -1,0 +1,10 @@
+{
+  "name": "@icf/dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Iron Command Forge — Web Dashboard and Client Assets",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

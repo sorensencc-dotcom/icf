@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iron Command Forge (ICF) — Architecture Specification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,400&family=Barlow+Condensed:wght@400;600;700&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #f2ece2;
+      color: #2c2420;
+      font-family: 'Barlow Condensed', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .diagram-container {
+      background: #f2ece2;
+      border: 2px solid #2c2420;
+      border-radius: 4px;
+      padding: 48px;
+      max-width: 1200px;
+      width: 100%;
+      box-shadow: 0 12px 32px rgba(44, 36, 32, 0.08);
+    }
+    header {
+      border-bottom: 2px solid #c4501a;
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .title-group h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #2c2420;
+      line-height: 1.1;
+    }
+    .title-group p {
+      font-size: 1rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #5c5349;
+      margin-top: 6px;
+      font-weight: 600;
+    }
+    .badge {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.8rem;
+      background: #2c2420;
+      color: #f2ece2;
+      padding: 6px 14px;
+      border-radius: 2px;
+      letter-spacing: 0.05em;
+    }
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    footer {
+      margin-top: 36px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(92, 83, 73, 0.25);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: #5c5349;
+      font-family: 'Geist Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+
+<div class="diagram-container">
+  <header>
+    <div class="title-group">
+      <h1>Iron Command Forge Architecture</h1>
+      <p>Standalone Architecture, Subsystems, Dataflow, &amp; Daemon Controls</p>
+    </div>
+    <div class="badge">REPO: sorensencc-dotcom/icf</div>
+  </header>
+
+  <svg viewBox="0 0 1100 680" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#c4501a" />
+      </marker>
+      <marker id="arrow-dark" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2c2420" />
+      </marker>
+      <pattern id="diagonal-stripe" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(196,80,26,0.12)" stroke-width="2" />
+      </pattern>
+    </defs>
+
+    <!-- LAYER 1: CLIENT & DASHBOARD SURFACE -->
+    <g id="subsystem-dashboard">
+      <rect x="40" y="30" width="1020" height="150" rx="4" fill="#f2ece2" stroke="#2c2420" stroke-width="1.5" />
+      <rect x="40" y="30" width="1020" height="28" fill="#2c2420" />
+      <text x="56" y="49" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="2">SUBSYSTEM 1: CLIENT &amp; DASHBOARD SURFACE (/dashboard)</text>
+      
+      <!-- Box 1A: Web Dashboard SPA -->
+      <rect x="70" y="75" width="280" height="85" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="86" y="98" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Web Dashboard SPA</text>
+      <text x="86" y="118" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">index.html · Multi-tab Command Feed</text>
+      <text x="86" y="138" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">GET /dashboard · Port 8080</text>
+
+      <!-- Box 1B: Design System Tokens -->
+      <rect x="410" y="75" width="280" height="85" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="426" y="98" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Cast Iron Charlie DS</text>
+      <text x="426" y="118" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">_ds/ · colors_and_type.css · _ds_bundle.js</text>
+      <text x="426" y="138" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Warm Editorial Tokens &amp; Custom Elements</text>
+
+      <!-- Box 1C: Web Components -->
+      <rect x="750" y="75" width="280" height="85" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="766" y="98" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Weekly Retro Custom Element</text>
+      <text x="766" y="118" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">&lt;weekly-reporting-dashboard&gt;</text>
+      <text x="766" y="138" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Shadow DOM · Live API Binding</text>
+    </g>
+
+    <!-- CONNECTORS: Dashboard to Gateway -->
+    <path d="M 210 160 L 210 230" stroke="#c4501a" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow)" fill="none" />
+    <text x="218" y="198" font-family="'Geist Mono', monospace" font-size="10" fill="#c4501a">Static Assets</text>
+
+    <path d="M 890 160 L 890 230" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" fill="none" />
+    <text x="898" y="198" font-family="'Geist Mono', monospace" font-size="10" fill="#c4501a">Fetch JSON API</text>
+
+    <!-- LAYER 2: HTTP GATEWAY & ADAPTER RUNTIME -->
+    <g id="subsystem-gateway">
+      <rect x="40" y="235" width="1020" height="150" rx="4" fill="#f2ece2" stroke="#2c2420" stroke-width="1.5" />
+      <rect x="40" y="235" width="1020" height="28" fill="#2c2420" />
+      <text x="56" y="254" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="2">SUBSYSTEM 2: SERVER &amp; ADAPTER RUNTIME (src/server.mjs)</text>
+
+      <!-- Box 2A: Static Router -->
+      <rect x="70" y="280" width="280" height="85" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="86" y="303" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Static Asset Server</text>
+      <text x="86" y="323" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Path Traversal Guard · Safe Mime Types</text>
+      <text x="86" y="343" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">127.0.0.1 Binding Only</text>
+
+      <!-- Box 2B: API Router -->
+      <rect x="410" y="280" width="280" height="85" rx="3" fill="#fff" stroke="#c4501a" stroke-width="1.6" />
+      <text x="426" y="303" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">API Projection Router</text>
+      <text x="426" y="323" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">/api/reporting/weekly-retro/*</text>
+      <text x="426" y="343" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">categories · evidence · actions · history</text>
+
+      <!-- Box 2C: Local Transport -->
+      <rect x="750" y="280" width="280" height="85" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="766" y="303" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Transport Adapter</text>
+      <text x="766" y="323" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">LocalFileAdapterTransport.mjs</text>
+      <text x="766" y="343" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">Atomic Reads · Unavailability Handling</text>
+    </g>
+
+    <!-- CONNECTORS: Gateway to Core & Daemons -->
+    <path d="M 550 365 L 550 435" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" fill="none" />
+    <text x="558" y="403" font-family="'Geist Mono', monospace" font-size="10" fill="#c4501a">Contract Validation</text>
+
+    <!-- LAYER 3: REPORTING ENGINE & PERSISTENCE -->
+    <g id="subsystem-reporting">
+      <rect x="40" y="440" width="700" height="200" rx="4" fill="#f2ece2" stroke="#2c2420" stroke-width="1.5" />
+      <rect x="40" y="440" width="700" height="28" fill="#2c2420" />
+      <text x="56" y="459" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="2">SUBSYSTEM 3: REPORTING CORE &amp; PERSISTENCE (reporting/src)</text>
+
+      <!-- Box 3A: Snapshot Store -->
+      <rect x="70" y="485" width="190" height="135" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="82" y="508" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">Snapshot Store</text>
+      <text x="82" y="528" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">SQLite node:sqlite engine</text>
+      <text x="82" y="546" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">001_snapshot_store.sql</text>
+      <text x="82" y="564" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">Atomic upsert &amp; rollback</text>
+      <text x="82" y="598" font-family="'Geist Mono', monospace" font-size="10" fill="#c4501a">Composite Identity</text>
+
+      <!-- Box 3B: Trend Projection -->
+      <rect x="285" y="485" width="200" height="135" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="297" y="508" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">Trend &amp; Analytics</text>
+      <text x="297" y="528" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">trend-summary.mjs</text>
+      <text x="297" y="546" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">4, 8, 12-week windows</text>
+      <text x="297" y="564" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">Recalculating state guards</text>
+      <text x="297" y="598" font-family="'Geist Mono', monospace" font-size="10" fill="#c4501a">Bounded Rolling Windows</text>
+
+      <!-- Box 3C: Action Continuity -->
+      <rect x="510" y="485" width="200" height="135" rx="3" fill="#fff" stroke="#5c5349" stroke-width="1.2" />
+      <text x="522" y="508" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">Action Continuity</text>
+      <text x="522" y="528" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">action-continuity.mjs</text>
+      <text x="522" y="546" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">Carry-forward unresolved</text>
+      <text x="522" y="564" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">Redaction tombstone audit</text>
+      <text x="522" y="598" font-family="'Geist Mono', monospace" font-size="10" fill="#c4501a">83/83 Tests Passing</text>
+    </g>
+
+    <!-- LAYER 4: DAEMON & WATCHDOG -->
+    <g id="subsystem-daemon">
+      <rect x="760" y="440" width="300" height="200" rx="4" fill="#fff" stroke="#2c2420" stroke-width="1.5" />
+      <rect x="760" y="440" width="300" height="28" fill="#c4501a" />
+      <text x="776" y="459" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#fff" letter-spacing="2">SUBSYSTEM 4: DAEMON &amp; WATCHDOG</text>
+
+      <text x="780" y="492" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Windows Process Supervisor</text>
+      <text x="780" y="515" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">ensure-dashboard-server.ps1</text>
+      <text x="780" y="535" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">register-dashboard-server-task.ps1</text>
+      
+      <rect x="780" y="555" width="260" height="65" rx="3" fill="#f2ece2" stroke="#5c5349" stroke-width="1" />
+      <text x="792" y="575" font-family="'Barlow Condensed', sans-serif" font-weight="600" font-size="13" fill="#2c2420">Task: ICF-Dashboard-Server</text>
+      <text x="792" y="593" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">Triggers: AtStartup, AtLogon</text>
+      <text x="792" y="609" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Health Check: Port 8080 Probe</text>
+    </g>
+
+    <!-- CONNECTOR: Watchdog to Server -->
+    <path d="M 850 440 L 850 385" stroke="#2c2420" stroke-width="1.8" stroke-dasharray="3,3" marker-end="url(#arrow-dark)" fill="none" />
+    <text x="858" y="415" font-family="'Geist Mono', monospace" font-size="10" fill="#2c2420">Supervises</text>
+  </svg>
+
+  <footer>
+    <div>IRON COMMAND FORGE (ICF) · ARCHITECTURE SPECIFICATION v1.0</div>
+    <div>CATHRYN LAVERY DIAGRAM STANDARD · WARM EDITORIAL PALETTE</div>
+  </footer>
+</div>
+
+</body>
+</html>
