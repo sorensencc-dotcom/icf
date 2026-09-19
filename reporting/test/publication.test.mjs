@@ -49,7 +49,7 @@ test('invalid generation cannot replace the last valid snapshot', async () => {
 test('enabled publisher persists supplied projections without changing legacy metrics', async () => {
   await withStore(async store => {
     const valid = JSON.parse(await readFile(new URL('./fixtures/valid-report.json', import.meta.url)));
-    const result = await publishWeeklyRetro({ store, identity, writerEnabled: true, readReport: async () => valid, categories: [{ id: 'delivery', name: 'Delivery' }], evidence: [{ label: 'commit abc' }], actions: [{ title: 'Review tests', status: 'open', sourceId: 'issue-1', categoryId: 'delivery', weekKey: '2026-W37' }] });
+    const result = await publishWeeklyRetro({ store, identity, writerEnabled: true, readReport: async () => valid, categories: [{ id: 'delivery', name: 'Delivery' }], evidence: [{ label: 'commit abc' }], actions: [{ title: 'Review tests', wording: 'Review tests', displayLabel: 'Review tests', status: 'open', sourceSystem: 'icf', sourceId: 'issue-1', categoryId: 'delivery', weekKey: '2026-W37' }] });
     assert.equal(result.record.envelope.report.metrics.commits, valid.metrics.commits);
     assert.deepEqual(result.record.envelope.report.categories, [{ id: 'delivery', name: 'Delivery' }]);
     assert.deepEqual(result.record.envelope.report.evidence, [{ label: 'commit abc' }]);
