@@ -56,6 +56,9 @@ export const CURRENT_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
   'until',
   'base_branch',
   'session_focus'
+  , 'categories'
+  , 'evidence'
+  , 'routingFacts'
 ]);
 
 export const CURRENT_REQUIRED_REPORT_TOP_LEVEL_FIELDS = Object.freeze([
@@ -246,6 +249,12 @@ function validateReportShape(report, { allowPartial }) {
       addError(errors, 'actions', error instanceof Error ? error.message : String(error));
     }
   }
+  for (const field of ['categories', 'evidence']) {
+    if (field in report && (!Array.isArray(report[field]) || report[field].some(item => !isRecord(item)))) {
+      addError(errors, field, 'must be an array of objects');
+    }
+  }
+  if ('routingFacts' in report && !isRecord(report.routingFacts)) addError(errors, 'routingFacts', 'must be an object');
 
   if ('version_range' in report &&
       (!Array.isArray(report.version_range) ||
