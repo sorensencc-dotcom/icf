@@ -3,7 +3,8 @@ param(
     [switch]$Uninstall,
     [switch]$List,
     [string]$RepoRoot = 'C:\dev\icf',
-    [string]$TaskName = 'ICF-Dashboard-Server'
+    [string]$TaskName = 'ICF-Dashboard-Server',
+    [int]$Port = 8081
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,7 +28,7 @@ if ($Uninstall) {
 
 $action = New-ScheduledTaskAction `
     -Execute 'powershell.exe' `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -RepoRoot `"$RepoRoot`" -Port $Port"
 $triggers = @(
     (New-ScheduledTaskTrigger -AtStartup),
     (New-ScheduledTaskTrigger -AtLogOn)
@@ -46,7 +47,8 @@ Register-ScheduledTask `
     -Trigger $triggers `
     -Settings $settings `
     -Principal $principal `
-    -Description 'Keeps the Iron Command Forge (ICF) dashboard and reporting server available on localhost:8080.' `
-    -Force | Out-Null
+    -Description "Keeps the Iron Command Forge (ICF) dashboard available on the Tailscale address at port $Port." `
+    -Force `
+    -ErrorAction Stop | Out-Null
 
 Write-Output "Registered scheduled task: $TaskName"

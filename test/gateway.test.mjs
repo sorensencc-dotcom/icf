@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { createGatewayServer } from '../src/server.mjs';
+import { createMobileSnapshotService } from '../src/mobile-snapshot.mjs';
 
 test('ICF Gateway Server serves static dashboard and reporting routes', async () => {
   const server = createGatewayServer();
@@ -44,4 +45,20 @@ test('ICF Gateway Server serves static dashboard and reporting routes', async ()
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test('mobile snapshot requires auth and serves a signed validated snapshot', async () => {
+  const mobileSnapshot = createMobileSnapshotService({ signingKey: 'test-signing-key', authToken: 'test-token' });
+  const server = createGatewayServer({ mobileSnapshot });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  try {
+    assert.equal((await fetch(`${baseUrl}/api/mobile/snapshot`)).status, 401);
+    const response = await fetch(`${baseUrl}/api/mobile/snapshot`, { headers: { Authorization: 'Bearer test-token' } });
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.partial, false);
+    assert.equal(payload.manifest.schema_version, '1.0');
+    assert.equal(payload.freshness, 'fresh');
+  } finally { await new Promise((resolve) => server.close(resolve)); }
 });

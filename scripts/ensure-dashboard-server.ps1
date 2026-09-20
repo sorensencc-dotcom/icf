@@ -1,15 +1,21 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = 'C:\dev\icf',
-    [int]$Port = 8080,
+    [int]$Port = 8081,
+    [string]$BindHost = '',
     [int]$WaitSeconds = 15
 )
 
 $ErrorActionPreference = 'Stop'
-$DashboardUrl = "http://127.0.0.1:$Port/dashboard"
-$ApiUrl = "http://127.0.0.1:$Port/api/reporting/weekly-retro"
 $Node = (Get-Command node.exe -ErrorAction Stop).Source
 $ServerScript = Join-Path $RepoRoot 'src\server.mjs'
+
+if ([string]::IsNullOrWhiteSpace($BindHost)) { $BindHost = (tailscale ip -4 2>$null | Select-Object -First 1).Trim() }
+if ([string]::IsNullOrWhiteSpace($BindHost)) { throw 'Tailscale IPv4 address unavailable; start Tailscale before starting ICF.' }
+$DashboardUrl = "http://$BindHost`:$Port/dashboard"
+$ApiUrl = "http://$BindHost`:$Port/api/reporting/weekly-retro"
+$env:PORT = [string]$Port
+$env:ICF_HOST = $BindHost
 
 function Test-Dashboard {
     try {

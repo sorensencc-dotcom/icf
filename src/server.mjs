@@ -4,11 +4,14 @@ import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
 import { createReportingServer } from '../reporting/src/server.mjs';
+import { createMobileSnapshotService } from './mobile-snapshot.mjs';
+import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 export const ROOT = resolve(__dirname, '..');
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
+export const HOST = process.env.ICF_HOST || '127.0.0.1';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
 
 const retroTransport = new LocalFileAdapterTransport({
@@ -34,6 +37,7 @@ const MIME_TYPES = {
 
 export function createGatewayServer(options = {}) {
   const reportingServer = createReportingServer(options);
+  const mobileSnapshot = options.mobileSnapshot || (process.env.ICF_SNAPSHOT_SIGNING_KEY && process.env.ICF_MOBILE_AUTH_TOKEN ? createMobileSnapshotService({ reportPath: options.reportPath || RETRO_PATH }) : null);
 
   return createServer(async (req, res) => {
     // Check raw requested URL for directory traversal patterns
@@ -45,6 +49,15 @@ export function createGatewayServer(options = {}) {
 
     const reqUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
     const pathname = reqUrl.pathname;
+
+    if (pathname === '/api/mobile/snapshot' || pathname === '/api/mobile/health') {
+      if (!mobileSnapshot) { res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' }); res.end(JSON.stringify({ status: 'UNAVAILABLE', error: 'Mobile snapshot service is not configured' })); return; }
+      if (req.method !== 'GET' || req.headers.authorization !== `Bearer ${mobileSnapshot.authToken}`) { res.writeHead(401, { 'Content-Type': 'application/json; charset=UTF-8' }); res.end(JSON.stringify({ status: 'UNAUTHORIZED' })); return; }
+      const snapshot = await mobileSnapshot.getSnapshot();
+      if (!snapshot || !mobileSnapshot.verify(snapshot)) { res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' }); res.end(JSON.stringify({ status: 'UNAVAILABLE', freshness: 'unavailable', error: 'No valid snapshot available' })); return; }
+      const payload = pathname === '/api/mobile/health' ? { status: 'SUCCESS', freshness: snapshot.freshness, age_ms: snapshot.age_ms, created_at: snapshot.manifest.created_at, last_failure: snapshot.last_failure } : { status: 'SUCCESS', freshness: snapshot.freshness, partial: false, manifest: snapshot.manifest, signature: snapshot.signature, data: snapshot.data };
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(payload)); return;
+    }
 
     // 1. API Projections & Reporting Routes
     if (pathname.startsWith('/api/reporting/')) {
@@ -71,6 +84,11 @@ export function createGatewayServer(options = {}) {
             res.end(JSON.stringify({ status: 'SUCCESS', data: Array.isArray(data[projection]) ? data[projection] : [] }));
             return;
           } catch (err) {
+            if (projection === 'categories') {
+              res.writeHead(200);
+              res.end(JSON.stringify({ status: 'SUCCESS', data: CATEGORY_REGISTRY.categories }));
+              return;
+            }
             return reportingServer.emit('request', req, res);
           }
         }
@@ -118,9 +136,9 @@ export function createGatewayServer(options = {}) {
 // Direct execution entrypoint
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const server = createGatewayServer();
-  server.listen(PORT, '127.0.0.1', () => {
-    console.log(`[ICF Gateway Server] Running at http://127.0.0.1:${PORT}`);
-    console.log(`[ICF Gateway Server] Dashboard: http://127.0.0.1:${PORT}/dashboard`);
-    console.log(`[ICF Gateway Server] API Endpoint: http://127.0.0.1:${PORT}/api/reporting/weekly-retro`);
+  server.listen(PORT, HOST, () => {
+    console.log(`[ICF Gateway Server] Running at http://${HOST}:${PORT}`);
+    console.log(`[ICF Gateway Server] Dashboard: http://${HOST}:${PORT}/dashboard`);
+    console.log(`[ICF Gateway Server] API Endpoint: http://${HOST}:${PORT}/api/reporting/weekly-retro`);
   });
 }
