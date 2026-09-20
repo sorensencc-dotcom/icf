@@ -1672,10 +1672,10 @@ flowchart TD
       <div style="margin-top: 1.5rem; padding: 1.25rem; background: rgba(34, 27, 23, 0.6); border-left: 4px solid #7a9fbf; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div>
           <div style="font-family: var(--font-ui); font-size: 0.9rem; font-weight: 700; color: #7a9fbf; letter-spacing: 0.1em; text-transform: uppercase;">
-            🌙 Nightly Maintenance Window (08:00 PM &amp; 08:30 PM ET)
+            🌙 Nightly Maintenance Window (08:00 PM – 08:30 PM ET)
           </div>
           <div style="font-size: 0.85rem; color: var(--bone); margin-top: 0.25rem;">
-            <code>08:00 PM</code> <strong>KB-Sync-Master-Pipeline</strong> (wiki validation, link integrity, autohealing) ➔ <code>08:30 PM</code> <strong>KB-Sync-TRM-Triage</strong> (gap triage engine, RFC drafting &amp; fact reconciliation).
+            <code>08:00 PM</code> <strong>KB-Sync-Master-Pipeline</strong> (wiki validation, link integrity, autohealing) ➔ <code>08:00 PM</code> <strong>TRM-Notebooklm-Chat-Archive</strong> (all-notebook chat archival → knowledge.db) ➔ <code>08:30 PM</code> <strong>KB-Sync-TRM-Triage</strong> (gap triage engine, RFC drafting &amp; fact reconciliation).
           </div>
         </div>
         <span class="tag date" style="background: rgba(90, 158, 111, 0.15); color: var(--sage); border-color: rgba(90, 158, 111, 0.4);">SCHEDULED DAILY</span>
@@ -1699,8 +1699,9 @@ flowchart TD
     M3 -->|"15 min buffer"| M4["07:00 AM: CIC-Daily-Status\n(Aggregates JSON &amp; Renders ICF Dashboard)"]
   end
 
-  subgraph EveningChain["Nightly Maintenance (08:00 PM &amp; 08:30 PM ET)"]
-    E1["08:00 PM: KB-Sync-Master-Pipeline\n(Wiki Validation &amp; Autoheal)"] -->|"30 min buffer"| E2["08:30 PM: KB-Sync-TRM-Triage\n(Gap Triage &amp; RFC Synthesis Pass)"]
+  subgraph EveningChain["Nightly Maintenance (08:00 PM – 08:30 PM ET)"]
+    E1["08:00 PM: KB-Sync-Master-Pipeline\n(Wiki Validation &amp; Autoheal)"] -->|"parallel"| E1b["08:00 PM: TRM-Notebooklm-Chat-Archive\n(All-Notebook Chat Archival)"]
+    E1b -->|"30 min buffer"| E2["08:30 PM: KB-Sync-TRM-Triage\n(Gap Triage &amp; RFC Synthesis Pass)"]
   end</code></pre>
     </div>
 
@@ -1777,7 +1778,16 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'KB-Sync-Master-Pipeline\\' -TaskPath \\'\\KB-SYNC\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'KB-Sync-Master-Pipeline\\' -TaskPath \\'\\\\KB-SYNC\\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">TRM-Notebooklm-Chat-Archive</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\TRM\</span></td>
+            <td><span class="tag date">Daily 08:00 PM</span></td>
+            <td>~5–15 mins</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● WAKE ENABLED</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'TRM-Notebooklm-Chat-Archive\\' -TaskPath \\'\\\\TRM\\\\'')">Run Task</button></td>
           </tr>
         </tbody>
       </table>
