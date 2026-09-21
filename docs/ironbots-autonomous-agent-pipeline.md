@@ -17,35 +17,47 @@ flowchart TD
     end
 
     subgraph Engines["2. Autonomous Bot Fleet"]
+        NB["Notebook-Ingester Bot (Daily 02:00 AM)\nscripts/notebook-ingester-bot.mjs"]
         D["KB-Sentinel Bot (Daily 03:00 AM)\nscripts/kb-sentinel-bot.mjs"]
         E["TRM-Bot (Daily 04:00 AM)\nscripts/trm-bot-runner.mjs"]
+        WM["Watchlist-Miner Bot (Daily 05:00 AM)\nscripts/watchlist-miner-bot.mjs"]
         K["Daemon-Healer Bot (Every 15 Min)\nscripts/daemon-healer-bot.mjs"]
-        L["CI-Watchdog Bot (Hourly / 06:00 AM)\nscripts/ci-watchdog-bot.mjs"]
+        L["CI-Watchdog Bot (Daily 06:00 AM)\nscripts/ci-watchdog-bot.mjs"]
     end
 
     subgraph Targets["3. Knowledge Base & Telemetry"]
+        FTS["SQLite FTS5 Knowledge Base (.kb_cache/knowledge_fts5.db)"]
         F["Wiki Frontmatter & Link Autoheal"]
         G["RFC Decision Notes (wiki/research/rfc-gap-*.md)"]
+        CD["Competitor Drift Reports (wiki/research/competitor-drift-*.md)"]
         M["Port 8080 Process Recovery & Uptime"]
         N["CI Failure Detection & Error Logs"]
         I["Telemetry Hub (_status-feed/*.json)"]
         J["Iron Command Forge (ICF Snapshot Store)"]
     end
 
+    A -->|Daily 02:00 AM| NB
     A -->|Daily 03:00 AM| D
     A -->|Daily 04:00 AM| E
+    A -->|Daily 05:00 AM| WM
     A -->|Every 15 Min| K
-    A -->|Hourly 06:00 AM| L
+    A -->|Daily 06:00 AM| L
 
+    B --> NB
     B --> D
     B --> E
+    B --> WM
     B --> K
     B --> L
 
+    NB --> FTS
+    NB --> I
     D --> F
     D --> I
     E --> G
     E --> I
+    WM --> CD
+    WM --> I
     K --> M
     K --> I
     L --> N
@@ -78,8 +90,10 @@ All background automation bots added to the `\Ironbots\` fleet must adhere to th
 
 | Bot Name | Script Entrypoint | Schedule | Task Category | Primary Telemetry Artifact |
 |---|---|---|---|---|
+| **Notebook-Ingester** | `scripts/notebook-ingester-bot.mjs` | Daily 02:00 AM | `\Ironbots\` | `_status-feed/notebook_ingester_report.json` |
 | **KB-Sentinel** | `scripts/kb-sentinel-bot.mjs` | Daily 03:00 AM | `\Ironbots\` | `_status-feed/kb_sentinel_report.json` |
 | **TRM-Bot** | `scripts/trm-bot-runner.mjs` | Daily 04:00 AM | `\Ironbots\` | `_status-feed/trm_bot_report.json` |
+| **Watchlist-Miner** | `scripts/watchlist-miner-bot.mjs` | Daily 05:00 AM | `\Ironbots\` | `_status-feed/watchlist_miner_report.json` |
 | **Daemon-Healer** | `scripts/daemon-healer-bot.mjs` | Every 15 Minutes | `\Ironbots\` | `_status-feed/daemon_health.json` |
 | **CI-Watchdog** | `scripts/ci-watchdog-bot.mjs` | Daily 06:00 AM | `\Ironbots\` | `_status-feed/ci_alerts.json` |
 
@@ -93,8 +107,10 @@ All background automation bots added to the `\Ironbots\` fleet must adhere to th
 npm run bot:all
 
 # Run individual bots
+npm run bot:notebook:ingest
 npm run bot:kb:sentinel
 npm run bot:trm:triage
+npm run bot:watchlist:mine
 npm run bot:daemon:heal
 npm run bot:ci:watchdog
 ```
@@ -105,8 +121,10 @@ npm run bot:ci:watchdog
 Get-ScheduledTask -TaskPath "\Ironbots\"
 
 # Upgrade all tasks to Unattended S4U Mode (Run in Administrator PowerShell)
+pwsh -NoProfile -File scripts/schedule-task-wrapper-Notebook-Ingester.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-KB-Sentinel.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-TRM-Bot.ps1 -Action Register -Unattended -Force
+pwsh -NoProfile -File scripts/schedule-task-wrapper-Watchlist-Miner.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-Daemon-Healer.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-CI-Watchdog.ps1 -Action Register -Unattended -Force
 ```

@@ -1494,10 +1494,118 @@ flowchart TD
   </section>
 
   <!-- ================================================================= -->
-  <!-- TAB 5: WEEKLY REPORTING -->
-  <section id="tab-reporting" class="tab-pane" aria-label="Weekly Retro Reporting">
+  <!-- TAB 5: WEEKLY & DAILY REPORTING -->
+  <!-- ================================================================= -->
+  <section id="tab-reporting" class="tab-pane" aria-label="Weekly Retro & Daily Ironbots Reporting">
+    <!-- Daily Ironbots Fleet Activity Panel -->
+    <div class="panel" style="margin-bottom: 2rem;">
+      <div class="section-label">Ironbots Fleet Telemetry</div>
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Daily Ironbots Autonomous Activity &amp; Health</div>
+          <div style="font-size: 0.85rem; color: var(--ash); margin-top: 0.2rem;">
+            Continuous 24/7 background automation fleet running under Windows Task Scheduler with 0 token burn.
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <button type="button" class="btn-secondary" onclick="copyCommand('npm run bot:all')">Run Full Fleet 📋</button>
+          <button type="button" class="panel-action" onclick="loadIronbotsDailyReport()">Refresh Telemetry →</button>
+        </div>
+      </div>
+
+      <!-- Fleet KPI Metrics -->
+      <div class="grid-metrics" style="margin-bottom: 1.5rem;">
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="ironbotsFleetScore" style="color: #5a9e6f;">92 / 100</div>
+            <div class="stat-label">Fleet Health Score</div>
+          </div>
+          <div class="stat-sub" id="ironbotsFleetStatusSub">● Operational (0 Token Burn)</div>
+        </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="ironbotsActiveCount" style="color: var(--white);">6 / 6</div>
+            <div class="stat-label">Active Ironbots</div>
+          </div>
+          <div class="stat-sub">S4U Unattended Schedulers</div>
+        </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="ironbotsDocsCount" style="color: #5eead4;">459 Docs</div>
+            <div class="stat-label">Knowledge Base Index</div>
+          </div>
+          <div class="stat-sub">SQLite FTS5 Porter Stemming</div>
+        </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="ironbotsDaemonStatus" style="color: #a78bfa;">Port 8080</div>
+            <div class="stat-label">Daemon Supervisor</div>
+          </div>
+          <div class="stat-sub">Auto-Recovery Active</div>
+        </div>
+      </div>
+
+      <!-- Live Ironbots Activity Table -->
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th style="width: 220px;">Bot Name &amp; Category</th>
+            <th style="width: 140px;">Schedule</th>
+            <th>Daily Operational Summary</th>
+            <th style="width: 150px;">Status</th>
+            <th style="width: 120px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="ironbotsFleetTableBody">
+          <tr>
+            <td><strong style="color:var(--white);">NotebookLM Ingester</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 02:00 AM</span></td>
+            <td>459 documents indexed into SQLite FTS5 (0 token burn)</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:notebook:ingest')">Run Bot</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">KB-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 03:00 AM</span></td>
+            <td>Health Score: 92/100 (409 files scanned, 0 broken links)</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● PASS (92/100)</span></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:kb:sentinel')">Run Bot</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">TRM-Bot Drafter</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 04:00 AM</span></td>
+            <td>2,056 total research gaps tracked and RFCs drafted</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● PASS</span></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:trm:triage')">Run Bot</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">Watchlist Drift Miner</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 05:00 AM</span></td>
+            <td>3 competitor models evaluated (Google SAM, Anthropic, OpenAI)</td>
+            <td><span class="status-badge live" style="font-size:0.6rem; color:#a78bfa; border-color:rgba(167,139,250,0.4);">● DRIFT MONITORED</span></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:watchlist:mine')">Run Bot</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">Daemon-Healer</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag high">Every 15 Min</span></td>
+            <td>Probes port 8080 health; auto-recovers dead server from C:\dev</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (200 OK)</span></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:daemon:heal')">Run Bot</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">CI-Watchdog</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 06:00 AM</span></td>
+            <td>Polls GitHub Actions for failures; extracts delivery-guard error logs</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● ACTIVE</span></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:ci:watchdog')">Run Bot</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Weekly Retro Telemetry Panel -->
     <div class="panel">
-      <div class="section-label">Reporting</div>
+      <div class="section-label">Weekly Telemetry</div>
       <div class="panel-header">
         <div class="panel-title">Weekly Retro Telemetry</div>
         <button type="button" class="panel-action" onclick="document.querySelector('weekly-reporting-dashboard').load()">Refresh →</button>
@@ -1734,6 +1842,15 @@ flowchart TD
         </thead>
         <tbody>
           <tr>
+            <td><strong style="color:var(--white);">Notebook-Ingester</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 02:00 AM</span></td>
+            <td>Ingests research accessions &amp; wiki nodes into SQLite FTS5 index</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/notebook_ingester_report.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY (459 DOCS)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Notebook-Ingester\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
             <td><strong style="color:var(--white);">KB-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
             <td><span class="tag date">Daily 03:00 AM</span></td>
             <td>Wiki frontmatter linting, broken wikilink check &amp; autohealing</td>
@@ -1750,6 +1867,15 @@ flowchart TD
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/trm_bot_report.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● READY (2,056 GAPS)</span></td>
             <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'TRM-Bot\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">Watchlist-Miner</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 05:00 AM</span></td>
+            <td>Tracks upstream model architecture baselines and flags competitor drift</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/watchlist_miner_report.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem; color:#a78bfa; border-color:rgba(167,139,250,0.4);">● DRIFT MONITORED</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Watchlist-Miner\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Daemon-Healer</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -3012,6 +3138,74 @@ flowchart TD
     }
   }
 
+  async function loadIronbotsDailyReport() {
+    try {
+      let data = null;
+      const res = await fetch('/api/reporting/ironbots', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        data = json.data;
+      } else {
+        const fallbackRes = await fetch('../../_status-feed/ironbots_daily_report.json', { cache: 'no-store' });
+        if (fallbackRes.ok) {
+          data = await fallbackRes.json();
+        }
+      }
+
+      if (!data) return;
+
+      const scoreEl = document.getElementById('ironbotsFleetScore');
+      const statusSubEl = document.getElementById('ironbotsFleetStatusSub');
+      const activeEl = document.getElementById('ironbotsActiveCount');
+      const docsEl = document.getElementById('ironbotsDocsCount');
+      const daemonEl = document.getElementById('ironbotsDaemonStatus');
+      const tbody = document.getElementById('ironbotsFleetTableBody');
+
+      if (scoreEl) {
+        scoreEl.textContent = `${data.fleetHealthScore} / 100`;
+        scoreEl.style.color = data.fleetHealthScore >= 85 ? '#5a9e6f' : (data.fleetHealthScore >= 60 ? 'var(--brass)' : 'var(--ember)');
+      }
+      if (statusSubEl) {
+        statusSubEl.textContent = `● ${data.fleetStatus || 'Operational'} (0 Token Burn)`;
+      }
+      if (activeEl) {
+        activeEl.textContent = `${data.botCount || 6} / ${data.botCount || 6}`;
+      }
+      if (docsEl && data.summaryMetrics) {
+        docsEl.textContent = `${data.summaryMetrics.totalDocsIndexed || 0} Docs`;
+      }
+      if (daemonEl && data.summaryMetrics) {
+        daemonEl.textContent = `Port 8080 (${data.summaryMetrics.daemonStatus || 'OK'})`;
+      }
+
+      if (tbody && Array.isArray(data.activeBots) && data.activeBots.length > 0) {
+        tbody.innerHTML = data.activeBots.map(b => {
+          const isHealthy = b.status === 'HEALTHY' || b.status === 'PASS' || b.status === 'SUPERVISED';
+          const isDrift = b.status === 'DRIFT_DETECTED' || b.status === 'DRIFT MONITORED';
+          const badgeColor = isHealthy ? '#5a9e6f' : (isDrift ? '#a78bfa' : 'var(--ember)');
+          const badgeBorder = isHealthy ? 'rgba(90,158,111,0.4)' : (isDrift ? 'rgba(167,139,250,0.4)' : 'rgba(196,80,26,0.4)');
+          const botCmd = b.id === 'notebook-ingester' ? 'npm run bot:notebook:ingest'
+            : (b.id === 'kb-sentinel' ? 'npm run bot:kb:sentinel'
+            : (b.id === 'trm-bot' ? 'npm run bot:trm:triage'
+            : (b.id === 'watchlist-miner' ? 'npm run bot:watchlist:mine'
+            : (b.id === 'daemon-healer' ? 'npm run bot:daemon:heal' : 'npm run bot:ci:watchdog'))));
+
+          return `
+            <tr>
+              <td><strong style="color:var(--white);">${escapeHtml(b.name)}</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\\Ironbots\\</span></td>
+              <td><span class="tag date">${escapeHtml(b.schedule)}</span></td>
+              <td>${escapeHtml(b.summary)}</td>
+              <td><span class="status-badge live" style="font-size:0.6rem; color:${badgeColor}; border-color:${badgeBorder};">● ${escapeHtml(b.status)}</span></td>
+              <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('${botCmd}')">Run Bot</button></td>
+            </tr>
+          `;
+        }).join('');
+      }
+    } catch (e) {
+      // Graceful fallback
+    }
+  }
+
   // Initialize
   renderMcpCards();
   renderDomainsTable();
@@ -3019,10 +3213,12 @@ flowchart TD
   fetchHeadroomIcfMetrics();
   loadSkillsInventory();
   renderExecutionRuns();
+  loadIronbotsDailyReport();
   handleHashRoute();
 
   window.addEventListener('hashchange', handleHashRoute);
   setInterval(fetchHeadroomIcfMetrics, 15000);
+  setInterval(loadIronbotsDailyReport, 30000);
 </script>
 
 </body>
