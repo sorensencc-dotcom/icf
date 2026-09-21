@@ -721,7 +721,7 @@
     </button>
     <button type="button" class="tab-btn" id="btn-tab-ops" onclick="switchTab('tab-ops')">
       <span>06. Operations &amp; Automation</span>
-      <span class="tag date" id="tabOpsBadge">6 Tasks</span>
+      <span class="tag date" id="tabOpsBadge">10 Tasks (4 Ironbots)</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-headroom" onclick="switchTab('tab-headroom')">
       <span>07. Headroom Optimizer</span>
@@ -1703,6 +1703,74 @@ flowchart TD
     E1["08:00 PM: KB-Sync-Master-Pipeline\n(Wiki Validation &amp; Autoheal)"] -->|"parallel"| E1b["08:00 PM: TRM-Notebooklm-Chat-Archive\n(All-Notebook Chat Archival)"]
     E1b -->|"30 min buffer"| E2["08:30 PM: KB-Sync-TRM-Triage\n(Gap Triage &amp; RFC Synthesis Pass)"]
   end</code></pre>
+    </div>
+
+    <!-- IRONBOTS AUTONOMOUS FLEET PANEL -->
+    <div class="panel" style="margin-bottom: 2rem; border-top: 3px solid var(--ember);">
+      <div class="section-label">Ironbots Fleet (\Ironbots\)</div>
+      <div class="panel-header">
+        <div class="panel-title" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <span>Autonomous Background Robot Fleet</span>
+          <span class="status-badge live">● 4 ACTIVE (UNATTENDED S4U)</span>
+          <span class="tag date">Zero Token Burn</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn-secondary" onclick="copyCommand('npm run bot:all')">Run Entire Fleet (CLI) 📋</button>
+          <button type="button" class="btn-secondary" onclick="copyCommand('Get-ScheduledTask -TaskPath \'\\Ironbots\\\'')">Inspect \Ironbots\ Tasks 📋</button>
+        </div>
+      </div>
+
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Bot Name &amp; Category</th>
+            <th>Schedule / Frequency</th>
+            <th>Primary Responsibility</th>
+            <th>Logon Type</th>
+            <th>Telemetry Artifact</th>
+            <th>Health Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="color:var(--white);">KB-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 03:00 AM</span></td>
+            <td>Wiki frontmatter linting, broken wikilink check &amp; autohealing</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/kb_sentinel_report.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY (92/100)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'KB-Sentinel\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">TRM-Bot</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 04:00 AM</span></td>
+            <td>Research gap triage, SQLite FTS5 matching &amp; RFC note drafting</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/trm_bot_report.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● READY (2,056 GAPS)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'TRM-Bot\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">Daemon-Healer</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag high">Every 15 Minutes</span></td>
+            <td>Probes port 8080 health; auto-kills stale PIDs &amp; restarts server from C:\dev</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/daemon_health.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (200 OK)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Daemon-Healer\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">CI-Watchdog</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag date">Daily 06:00 AM</span></td>
+            <td>Polls GitHub Actions for failures; extracts delivery-guard error logs</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/ci_alerts.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● ACTIVE (CI GREEN)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'CI-Watchdog\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- SCHEDULED TASKS LIVE INVENTORY TABLE -->

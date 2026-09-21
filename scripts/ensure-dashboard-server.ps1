@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = 'C:\dev\icf',
-    [int]$Port = 8081,
+    [int]$Port = 8080,
     [string]$BindHost = '',
     [int]$WaitSeconds = 15
 )
