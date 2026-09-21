@@ -11,7 +11,7 @@ const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 export const ROOT = resolve(__dirname, '..');
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
-export const HOST = process.env.ICF_HOST || '127.0.0.1';
+export const HOST = process.env.ICF_HOST || '0.0.0.0';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
 
 const retroTransport = new LocalFileAdapterTransport({
@@ -61,6 +61,28 @@ export function createGatewayServer(options = {}) {
 
     // 1. API Projections & Reporting Routes
     if (pathname.startsWith('/api/reporting/')) {
+      if (pathname === '/api/reporting/ironbots' || pathname === '/api/reporting/ironbots/daily') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const reportPath = resolve(ROOT, '../_status-feed/ironbots_daily_report.json');
+          if (existsSync(reportPath)) {
+            const data = JSON.parse(readFileSync(reportPath, 'utf8'));
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', data }));
+            return;
+          }
+          const { aggregateFleetActivity } = await import('../../scripts/ironbots-daily-reporter.mjs');
+          const data = await aggregateFleetActivity({ isDryRun: true });
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', data }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
       if (pathname === '/api/reporting/weekly-retro') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         try {
@@ -134,11 +156,17 @@ export function createGatewayServer(options = {}) {
 }
 
 // Direct execution entrypoint
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+const isDirectEntry = process.argv[1] && (
+  resolve(process.argv[1]).toLowerCase() === resolve(fileURLToPath(import.meta.url)).toLowerCase() ||
+  process.argv[1].replace(/\\/g, '/').endsWith('src/server.mjs')
+);
+
+if (isDirectEntry) {
   const server = createGatewayServer();
   server.listen(PORT, HOST, () => {
     console.log(`[ICF Gateway Server] Running at http://${HOST}:${PORT}`);
     console.log(`[ICF Gateway Server] Dashboard: http://${HOST}:${PORT}/dashboard`);
     console.log(`[ICF Gateway Server] API Endpoint: http://${HOST}:${PORT}/api/reporting/weekly-retro`);
+    console.log(`[ICF Gateway Server] Ironbots Reporting: http://${HOST}:${PORT}/api/reporting/ironbots`);
   });
 }

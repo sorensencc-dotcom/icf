@@ -44,10 +44,13 @@ if (-not (Test-Path -LiteralPath $ServerScript -PathType Leaf)) {
     throw "ICF Dashboard server script not found: $ServerScript"
 }
 
-Start-Process -FilePath $Node `
-    -ArgumentList @($ServerScript) `
-    -WorkingDirectory $RepoRoot `
-    -WindowStyle Hidden
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = $Node
+$psi.Arguments = "`"$ServerScript`""
+$psi.WorkingDirectory = $RepoRoot
+$psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+$psi.UseShellExecute = $true
+[System.Diagnostics.Process]::Start($psi) | Out-Null
 
 $deadline = (Get-Date).AddSeconds($WaitSeconds)
 do {
