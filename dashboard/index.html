@@ -2605,10 +2605,35 @@ flowchart TD
           currentPipelineData = data.trm_pipeline || null;
           renderTrmIntelligence(data.trm_intelligence, data.trm_pipeline);
         }
+        if (data.todos) {
+          renderTodos(data.todos);
+        }
       }
     } catch (e) {
       console.log('Using default telemetry state', e);
     }
+  }
+
+  function renderTodos(todos) {
+    const list = document.getElementById('dailyTodosList');
+    if (!list || !Array.isArray(todos.top_open)) return;
+    if (todos.top_open.length === 0) {
+      list.innerHTML = '<li class="item-card" style="border-left: 3px solid var(--brass);"><div style="font-size: 0.85rem; color: var(--ash); font-style: italic;">No open items.</div></li>';
+      return;
+    }
+    list.innerHTML = todos.top_open.map(t => {
+      const isP1 = t.priority === 'P0' || t.priority === 'P1';
+      const borderColor = isP1 ? 'var(--ember)' : 'var(--brass)';
+      const tagClass = isP1 ? 'high' : 'new';
+      return `
+          <li class="item-card" style="border-left: 3px solid ${borderColor};">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
+              <span class="tag ${tagClass}">${escapeHtml(t.priority || 'P?')}</span>
+              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">${escapeHtml(t.title || '')}</span>
+            </div>
+            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">${escapeHtml(t.detail || '')}</div>
+          </li>`;
+    }).join('');
   }
 
   function renderTrmIntelligence(trm, pipeline) {
