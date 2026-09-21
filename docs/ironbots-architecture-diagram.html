@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ironbots Autonomous Bot Architecture</title>
+  <title>Ironbots Autonomous Bot Architecture & Policy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,400&family=Barlow+Condensed:wght@400;600;700&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -28,7 +28,7 @@
       border: 2px solid #2c2420;
       border-radius: 4px;
       padding: 36px 40px;
-      max-width: 1120px;
+      max-width: 1140px;
       width: 100%;
       box-shadow: 0 12px 32px rgba(44, 36, 32, 0.08);
     }
@@ -87,13 +87,13 @@
 <div class="diagram-container">
   <header>
     <div class="title-group">
-      <h1>Ironbots Autonomous Bot Architecture</h1>
-      <p>Deterministic Zero-Token Background Automation &amp; Unattended S4U Scheduler</p>
+      <h1>Ironbots Autonomous Fleet Architecture</h1>
+      <p>Deterministic Zero-Token Background Automation &amp; Unattended S4U Policy</p>
     </div>
     <div class="badge">CATEGORY: \Ironbots\</div>
   </header>
 
-  <svg viewBox="0 0 1040 560" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 1060 620" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
         <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#c4501a" />
@@ -104,104 +104,118 @@
     </defs>
 
     <!-- Background Grid Bands -->
-    <rect x="20" y="20" width="300" height="490" rx="4" fill="#ebe4d8" stroke="#5c5349" stroke-dasharray="3 3" />
-    <text x="35" y="48" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="16" fill="#5c5349" letter-spacing="1">1. TRIGGER &amp; SCHEDULER</text>
+    <rect x="20" y="20" width="280" height="550" rx="4" fill="#ebe4d8" stroke="#5c5349" stroke-dasharray="3 3" />
+    <text x="35" y="48" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="16" fill="#5c5349" letter-spacing="1">1. SCHEDULER &amp; POLICY</text>
 
-    <rect x="340" y="20" width="360" height="490" rx="4" fill="#ebe4d8" stroke="#5c5349" stroke-dasharray="3 3" />
-    <text x="355" y="48" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="16" fill="#5c5349" letter-spacing="1">2. AUTONOMOUS ENGINES</text>
+    <rect x="320" y="20" width="390" height="550" rx="4" fill="#ebe4d8" stroke="#5c5349" stroke-dasharray="3 3" />
+    <text x="335" y="48" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="16" fill="#5c5349" letter-spacing="1">2. AUTONOMOUS ROBOT FLEET</text>
 
-    <rect x="720" y="20" width="300" height="490" rx="4" fill="#ebe4d8" stroke="#5c5349" stroke-dasharray="3 3" />
-    <text x="735" y="48" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="16" fill="#5c5349" letter-spacing="1">3. PERSISTENCE &amp; TELEMETRY</text>
+    <rect x="730" y="20" width="310" height="550" rx="4" fill="#ebe4d8" stroke="#5c5349" stroke-dasharray="3 3" />
+    <text x="745" y="48" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="16" fill="#5c5349" letter-spacing="1">3. PERSISTENCE &amp; TELEMETRY</text>
 
     <!-- Node 1: Task Scheduler \Ironbots\ -->
-    <rect x="40" y="80" width="260" height="100" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
-    <text x="55" y="110" font-family="'Playfair Display', serif" font-weight="700" font-size="18" fill="#2c2420">Windows Task Scheduler</text>
-    <text x="55" y="132" font-family="'Geist Mono', monospace" font-size="12" fill="#c4501a">Category: \Ironbots\</text>
-    <text x="55" y="152" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">S4U Principal (Runs Unattended)</text>
+    <rect x="35" y="70" width="250" height="130" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <text x="50" y="98" font-family="'Playfair Display', serif" font-weight="700" font-size="17" fill="#2c2420">Task Scheduler \Ironbots\</text>
+    <text x="50" y="120" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">LogonType: S4U (Unattended)</text>
+    <text x="50" y="140" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Runs whether logged in or not</text>
+    <text x="50" y="160" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• No password stored</text>
+    <text x="50" y="180" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Standard for all fleet bots</text>
 
     <!-- Node 2: CLI / On-Demand Trigger -->
-    <rect x="40" y="220" width="260" height="85" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
-    <text x="55" y="250" font-family="'Playfair Display', serif" font-weight="700" font-size="17" fill="#2c2420">Developer / CI Trigger</text>
-    <text x="55" y="272" font-family="'Geist Mono', monospace" font-size="12" fill="#5c5349">npm run bot:all</text>
-    <text x="55" y="290" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Interactive &amp; Dry-Run Flags</text>
+    <rect x="35" y="220" width="250" height="85" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <text x="50" y="248" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Developer / CI Trigger</text>
+    <text x="50" y="270" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">npm run bot:all</text>
+    <text x="50" y="288" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Synchronous &amp; Dry-Run Modes</text>
 
     <!-- Node 3: Low-Token Agent Query -->
-    <rect x="40" y="345" width="260" height="85" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
-    <text x="55" y="375" font-family="'Playfair Display', serif" font-weight="700" font-size="17" fill="#2c2420">GrokBot / Multi-Agent</text>
-    <text x="55" y="397" font-family="'Geist Mono', monospace" font-size="12" fill="#5c5349">Reads JSON Summaries</text>
-    <text x="55" y="415" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#c4501a">&lt; 100 Token Footprint</text>
+    <rect x="35" y="325" width="250" height="95" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <text x="50" y="353" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Agent Query (Grok / Claude)</text>
+    <text x="50" y="375" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">Reads _status-feed/*.json</text>
+    <text x="50" y="395" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#c4501a">&lt; 100 Token Context Footprint</text>
 
-    <!-- Node 4: KB Sentinel Bot -->
-    <rect x="360" y="80" width="320" height="175" rx="3" fill="#f2ece2" stroke="#c4501a" stroke-width="2" />
-    <rect x="360" y="80" width="320" height="28" fill="#c4501a" />
-    <text x="375" y="100" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="14" fill="#f2ece2" letter-spacing="1">BOT 1: KB-SENTINEL (DAILY 03:00 AM)</text>
-    <text x="375" y="132" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">kb-sentinel-bot.mjs</text>
-    <text x="375" y="154" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Scans 400+ Wiki files for frontmatter integrity</text>
-    <text x="375" y="174" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Detects broken wikilinks &amp; doc drift</text>
-    <text x="375" y="194" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Runs autoheal repair passes safely</text>
-    <text x="375" y="214" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Cost: 0 LLM Tokens | Speed: ~300ms</text>
-    <text x="375" y="234" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Wrapper: schedule-task-wrapper-KB-Sentinel.ps1</text>
+    <!-- Node 4: Policy Contract Box -->
+    <rect x="35" y="440" width="250" height="110" rx="3" fill="#f2ece2" stroke="#c4501a" stroke-width="1.5" />
+    <text x="50" y="465" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="14" fill="#c4501a">BOT POLICY CONTRACT</text>
+    <text x="50" y="485" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#2c2420">1. S4U Unattended Execution</text>
+    <text x="50" y="502" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#2c2420">2. Zero LLM Token Footprint</text>
+    <text x="50" y="519" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#2c2420">3. JSON Telemetry Emission</text>
+    <text x="50" y="536" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#2c2420">4. Paired Regression Test Suite</text>
 
-    <!-- Node 5: TRM Bot -->
-    <rect x="360" y="280" width="320" height="195" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
-    <rect x="360" y="280" width="320" height="28" fill="#2c2420" />
-    <text x="375" y="300" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="14" fill="#f2ece2" letter-spacing="1">BOT 2: TRM-BOT (DAILY 04:00 AM)</text>
-    <text x="375" y="332" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">trm-bot-runner.mjs</text>
-    <text x="375" y="354" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Evaluates kb-sync/trm-research-gaps.md</text>
-    <text x="375" y="374" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Matches topics via SQLite FTS5 database</text>
-    <text x="375" y="394" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Synthesizes RFC decision notes in wiki/research/</text>
-    <text x="375" y="414" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Appends SHA-256 ledger entries to wiki/Log.md</text>
-    <text x="375" y="434" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Cost: 0 Tokens for Index / Low for Drafts</text>
-    <text x="375" y="454" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Wrapper: schedule-task-wrapper-TRM-Bot.ps1</text>
+    <!-- Bot 1: KB-Sentinel -->
+    <rect x="335" y="70" width="360" height="110" rx="3" fill="#f2ece2" stroke="#c4501a" stroke-width="2" />
+    <rect x="335" y="70" width="360" height="24" fill="#c4501a" />
+    <text x="345" y="87" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="1">KB-SENTINEL (DAILY 03:00 AM)</text>
+    <text x="345" y="112" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">kb-sentinel-bot.mjs</text>
+    <text x="345" y="132" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Scans 400+ Wiki files for frontmatter &amp; link hygiene</text>
+    <text x="345" y="150" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Runs autoheal repair passes | Cost: 0 Tokens | ~300ms</text>
+    <text x="345" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Output: _status-feed/kb_sentinel_report.json</text>
 
-    <!-- Node 6: Telemetry Feeds -->
-    <rect x="740" y="80" width="260" height="110" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
-    <text x="755" y="110" font-family="'Playfair Display', serif" font-weight="700" font-size="17" fill="#2c2420">Status Feed Telemetry</text>
-    <text x="755" y="132" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">_status-feed/kb_sentinel_report.json</text>
-    <text x="755" y="152" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">_status-feed/trm_bot_report.json</text>
-    <text x="755" y="172" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Health score, counts, elapsed time</text>
+    <!-- Bot 2: TRM-Bot -->
+    <rect x="335" y="195" width="360" height="110" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <rect x="335" y="195" width="360" height="24" fill="#2c2420" />
+    <text x="345" y="212" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="1">TRM-BOT (DAILY 04:00 AM)</text>
+    <text x="345" y="237" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">trm-bot-runner.mjs</text>
+    <text x="345" y="257" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Triages gaps &amp; queries SQLite FTS5 database</text>
+    <text x="345" y="275" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Synthesizes RFC notes &amp; writes wiki/Log.md ledger</text>
+    <text x="345" y="293" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Output: _status-feed/trm_bot_report.json</text>
 
-    <!-- Node 7: Knowledge Base & RFC Artifacts -->
-    <rect x="740" y="215" width="260" height="110" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
-    <text x="755" y="245" font-family="'Playfair Display', serif" font-weight="700" font-size="17" fill="#2c2420">Wiki Entities &amp; Notes</text>
-    <text x="755" y="267" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">wiki/research/rfc-gap-*.md</text>
-    <text x="755" y="287" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">wiki/Log.md (Audit Trail)</text>
-    <text x="755" y="307" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Obsidian Vault &amp; Remote Sync</text>
+    <!-- Bot 3: Daemon-Healer -->
+    <rect x="335" y="320" width="360" height="110" rx="3" fill="#f2ece2" stroke="#c4501a" stroke-width="2" />
+    <rect x="335" y="320" width="360" height="24" fill="#c4501a" />
+    <text x="345" y="337" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="1">DAEMON-HEALER (EVERY 15 MIN)</text>
+    <text x="345" y="362" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">daemon-healer-bot.mjs</text>
+    <text x="345" y="382" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Probes port 8080 &amp; detects 404 / path scoping errors</text>
+    <text x="345" y="400" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Auto-kills stale PIDs &amp; restarts server from C:\dev</text>
+    <text x="345" y="418" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Output: _status-feed/daemon_health.json</text>
 
-    <!-- Node 8: Iron Command Forge Integration -->
-    <rect x="740" y="350" width="260" height="110" rx="3" fill="#f2ece2" stroke="#c4501a" stroke-width="2" />
-    <text x="755" y="380" font-family="'Playfair Display', serif" font-weight="700" font-size="17" fill="#2c2420">Iron Command Forge</text>
-    <text x="755" y="402" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">icf/reporting/snapshot-store</text>
-    <text x="755" y="422" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">Aggregated Health Dashboard</text>
-    <text x="755" y="442" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Real-time status &amp; alert metrics</text>
+    <!-- Bot 4: CI-Watchdog -->
+    <rect x="335" y="445" width="360" height="110" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <rect x="335" y="445" width="360" height="24" fill="#2c2420" />
+    <text x="345" y="462" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="13" fill="#f2ece2" letter-spacing="1">CI-WATCHDOG (HOURLY / 06:00 AM)</text>
+    <text x="345" y="487" font-family="'Playfair Display', serif" font-weight="700" font-size="15" fill="#2c2420">ci-watchdog-bot.mjs</text>
+    <text x="345" y="507" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">• Polls gh run list for GitHub Actions CI failures</text>
+    <text x="345" y="525" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">• Extracts policy errors &amp; generates instant briefing</text>
+    <text x="345" y="543" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Output: _status-feed/ci_alerts.json</text>
+
+    <!-- Right Side Outputs -->
+    <rect x="745" y="70" width="280" height="135" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <text x="760" y="98" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Telemetry Feed Hub</text>
+    <text x="760" y="120" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">_status-feed/kb_sentinel_report.json</text>
+    <text x="760" y="138" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">_status-feed/trm_bot_report.json</text>
+    <text x="760" y="156" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">_status-feed/daemon_health.json</text>
+    <text x="760" y="174" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">_status-feed/ci_alerts.json</text>
+    <text x="760" y="194" font-family="'Barlow Condensed', sans-serif" font-size="12" fill="#5c5349">Structured JSON artifacts for instant inspection</text>
+
+    <rect x="745" y="225" width="280" height="115" rx="3" fill="#f2ece2" stroke="#2c2420" stroke-width="2" />
+    <text x="760" y="253" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Wiki &amp; Knowledge Base</text>
+    <text x="760" y="275" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">wiki/research/rfc-gap-*.md</text>
+    <text x="760" y="295" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">wiki/Log.md (Audit Trail)</text>
+    <text x="760" y="315" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Obsidian Vault &amp; Remote Wiki</text>
+
+    <rect x="745" y="360" width="280" height="110" rx="3" fill="#f2ece2" stroke="#c4501a" stroke-width="2" />
+    <text x="760" y="388" font-family="'Playfair Display', serif" font-weight="700" font-size="16" fill="#2c2420">Iron Command Forge (ICF)</text>
+    <text x="760" y="410" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">icf/reporting/snapshot-store</text>
+    <text x="760" y="430" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#2c2420">Central Telemetry Aggregator</text>
+    <text x="760" y="450" font-family="'Barlow Condensed', sans-serif" font-size="13" fill="#5c5349">Real-time status dashboards &amp; health</text>
 
     <!-- Connectors -->
-    <!-- Task Scheduler to KB Sentinel -->
-    <path d="M 300 130 L 350 130" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" />
-    <!-- Task Scheduler to TRM Bot -->
-    <path d="M 300 150 L 330 150 L 330 330 L 350 330" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
-    <!-- CLI to Both Bots -->
-    <path d="M 300 260 L 330 260 L 330 200 L 350 200" fill="none" stroke="#5c5349" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arrow-muted)" />
-    <path d="M 300 260 L 330 260 L 330 360 L 350 360" fill="none" stroke="#5c5349" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arrow-muted)" />
+    <path d="M 285 130 L 330 130" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 285 150 L 310 150 L 310 250 L 330 250" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 285 170 L 305 170 L 305 375 L 330 375" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 285 190 L 300 190 L 300 500 L 330 500" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
 
-    <!-- KB Sentinel to Telemetry -->
-    <path d="M 680 130 L 730 130" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" />
-    <!-- TRM Bot to Telemetry -->
-    <path d="M 680 340 L 710 340 L 710 160 L 730 160" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 695 125 L 740 125" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 695 250 L 715 250 L 715 150 L 740 150" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 695 375 L 725 375 L 725 170 L 740 170" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 695 500 L 730 500 L 730 185 L 740 185" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
 
-    <!-- TRM Bot to Wiki Artifacts -->
-    <path d="M 680 370 L 710 370 L 710 270 L 730 270" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
-
-    <!-- Telemetry to ICF -->
-    <path d="M 870 190 L 870 340" fill="none" stroke="#c4501a" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#arrow)" />
-
-    <!-- Telemetry to Agent Query -->
-    <path d="M 740 140 L 720 140 L 720 470 L 170 470 L 170 435" fill="none" stroke="#5c5349" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arrow-muted)" />
+    <path d="M 695 270 L 740 270" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 885 205 L 885 355" fill="none" stroke="#c4501a" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#arrow)" />
   </svg>
 
   <footer>
-    <span>DESIGN STANDARD: CATHRYN LAVERY (WARM PALETTE)</span>
-    <span>TOOLFORGE / CIC AUTONOMOUS BOT PIPELINE</span>
+    <span>POLICY STANDARD: UNATTENDED S4U &bull; ZERO TOKEN &bull; CATHRYN LAVERY DIAGRAM DESIGN</span>
+    <span>TOOLFORGE / CIC AUTONOMOUS BOT FLEET</span>
   </footer>
 </div>
 

@@ -1,4 +1,4 @@
-# Ironbots autonomous agent pipeline
+# Ironbots autonomous agent pipeline & policy
 
 Ironbots is the background automated robot subsystem operating within Toolforge and supervised by the Iron Command Forge (ICF) telemetry aggregator.
 
@@ -13,31 +13,43 @@ flowchart TD
         A["Windows Task Scheduler (\Ironbots\)"]
         B["Manual / CI Invocation (npm run bot:all)"]
         C["Agent Status Probing (<100 tokens)"]
+        P["Fleet Engineering Policy Contract"]
     end
 
-    subgraph Engines["2. Autonomous Bot Engines"]
-        D["KB-Sentinel Bot (Daily 03:00 AM)\nscripts/kb-sentinel-bot.mjs\n0 Tokens | ~300ms"]
-        E["TRM-Bot (Daily 04:00 AM)\nscripts/trm-bot-runner.mjs\n0 Tokens Index / Low Drafts"]
+    subgraph Engines["2. Autonomous Bot Fleet"]
+        D["KB-Sentinel Bot (Daily 03:00 AM)\nscripts/kb-sentinel-bot.mjs"]
+        E["TRM-Bot (Daily 04:00 AM)\nscripts/trm-bot-runner.mjs"]
+        K["Daemon-Healer Bot (Every 15 Min)\nscripts/daemon-healer-bot.mjs"]
+        L["CI-Watchdog Bot (Hourly / 06:00 AM)\nscripts/ci-watchdog-bot.mjs"]
     end
 
     subgraph Targets["3. Knowledge Base & Telemetry"]
         F["Wiki Frontmatter & Link Autoheal"]
         G["RFC Decision Notes (wiki/research/rfc-gap-*.md)"]
-        H["SHA-256 Audit Trail (wiki/Log.md)"]
-        I["Telemetry (_status-feed/*.json)"]
+        M["Port 8080 Process Recovery & Uptime"]
+        N["CI Failure Detection & Error Logs"]
+        I["Telemetry Hub (_status-feed/*.json)"]
         J["Iron Command Forge (ICF Snapshot Store)"]
     end
 
     A -->|Daily 03:00 AM| D
     A -->|Daily 04:00 AM| E
-    B -->|npm run bot:kb:sentinel| D
-    B -->|npm run bot:trm:triage| E
+    A -->|Every 15 Min| K
+    A -->|Hourly 06:00 AM| L
+
+    B --> D
+    B --> E
+    B --> K
+    B --> L
 
     D --> F
     D --> I
     E --> G
-    E --> H
     E --> I
+    K --> M
+    K --> I
+    L --> N
+    L --> I
     I --> J
     I -.-> C
 ```
@@ -46,48 +58,55 @@ flowchart TD
 
 ---
 
-## Architectural integration with ICF
+## Ironbots fleet engineering policy
 
-Ironbots operates as a decoupled, zero-token daemon pipeline that emits structured health and progress telemetry ingested by Iron Command Forge:
+All background automation bots added to the `\Ironbots\` fleet must adhere to these four core rules:
 
-1. **Telemetry feeds**:
-   - `_status-feed/kb_sentinel_report.json`: Knowledge base health score (0–100), broken link counts, frontmatter validation counts, and scan duration.
-   - `_status-feed/trm_bot_report.json`: Research gap triage counts, drafted RFC notes, and SQLite topic indexing metrics.
-2. **Snapshot store synchronization**:
-   - ICF's SQLite snapshot store periodically records health state transitions emitted by Ironbots to track long-term repository documentation stability and topic coverage.
-3. **Supervisor integration**:
-   - Task Scheduler handles fault isolation and timeout management under the `\Ironbots\` category.
-   - ICF dashboards read telemetry directly from the filesystem without spawning long-running browser or LLM sessions.
+1. **Unattended execution (S4U)**:
+   - Must provide a dedicated PowerShell scheduled task wrapper under `\Ironbots\`.
+   - Must support Service-for-User (`-LogonType S4U`) so tasks run continuously when the user is logged out.
+2. **Zero token footprint**:
+   - Heavy parsing, regex linting, link checking, process recovery, and CI log scraping must execute deterministically on the host CPU with 0 LLM tokens.
+3. **Structured JSON telemetry**:
+   - Must emit telemetry to `_status-feed/` for consumption by ICF and conversational agents.
+4. **Paired regression testing**:
+   - Must be verified in `tests/ironbots.test.mjs` to satisfy the repository's Delivery Guard CI governance policy.
 
 ---
 
-## Bot roster and schedules
+## Active bot roster & schedules
 
-| Bot Name | Script Entrypoint | Schedule | Task Category | Primary Artifacts |
+| Bot Name | Script Entrypoint | Schedule | Task Category | Primary Telemetry Artifact |
 |---|---|---|---|---|
 | **KB-Sentinel** | `scripts/kb-sentinel-bot.mjs` | Daily 03:00 AM | `\Ironbots\` | `_status-feed/kb_sentinel_report.json` |
-| **TRM-Bot** | `scripts/trm-bot-runner.mjs` | Daily 04:00 AM | `\Ironbots\` | `wiki/research/rfc-gap-*.md`, `_status-feed/trm_bot_report.json` |
+| **TRM-Bot** | `scripts/trm-bot-runner.mjs` | Daily 04:00 AM | `\Ironbots\` | `_status-feed/trm_bot_report.json` |
+| **Daemon-Healer** | `scripts/daemon-healer-bot.mjs` | Every 15 Minutes | `\Ironbots\` | `_status-feed/daemon_health.json` |
+| **CI-Watchdog** | `scripts/ci-watchdog-bot.mjs` | Daily 06:00 AM | `\Ironbots\` | `_status-feed/ci_alerts.json` |
 
 ---
 
-## Operational runbook
+## Operational commands
 
-### Manual execution
-To invoke both bots synchronously from the root repository:
+### Synchronous execution
 ```bash
+# Run entire fleet
 npm run bot:all
+
+# Run individual bots
+npm run bot:kb:sentinel
+npm run bot:trm:triage
+npm run bot:daemon:heal
+npm run bot:ci:watchdog
 ```
 
-### Scheduled task supervision
-To inspect the status of the Ironbots tasks in Task Scheduler:
+### Windows Task Scheduler administration
 ```powershell
-pwsh -NoProfile -File scripts/schedule-task-wrapper-KB-Sentinel.ps1 -Action Status
-pwsh -NoProfile -File scripts/schedule-task-wrapper-TRM-Bot.ps1 -Action Status
-```
+# View all registered Ironbots tasks
+Get-ScheduledTask -TaskPath "\Ironbots\"
 
-To register or update unattended execution (S4U):
-```powershell
-# Run in Administrator PowerShell
+# Upgrade all tasks to Unattended S4U Mode (Run in Administrator PowerShell)
 pwsh -NoProfile -File scripts/schedule-task-wrapper-KB-Sentinel.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-TRM-Bot.ps1 -Action Register -Unattended -Force
+pwsh -NoProfile -File scripts/schedule-task-wrapper-Daemon-Healer.ps1 -Action Register -Unattended -Force
+pwsh -NoProfile -File scripts/schedule-task-wrapper-CI-Watchdog.ps1 -Action Register -Unattended -Force
 ```
