@@ -1,9 +1,13 @@
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
 import { createReportingServer } from '../reporting/src/server.mjs';
+import { createSnapshotStore } from '../reporting/src/snapshot-store.mjs';
+import { createHistoryAdapter } from '../reporting/src/history-adapter.mjs';
+import { validateWeeklyRetroReport } from '../reporting/src/weekly-retro-contract.mjs';
+import { weekRange, SUPPORTED_TREND_WINDOWS } from '../reporting/src/trend-summary.mjs';
 import { createMobileSnapshotService } from './mobile-snapshot.mjs';
 import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 
@@ -13,6 +17,54 @@ export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
 export const HOST = process.env.ICF_HOST || '0.0.0.0';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
+export const REPORTING_HISTORY_SOURCE_SYSTEM = 'icf';
+export const REPORTING_HISTORY_SOURCE_ID = 'weekly-retro';
+
+function isoWeekKey(date) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(value.getTime())) return null;
+  const thursday = new Date(value);
+  thursday.setUTCDate(value.getUTCDate() + 4 - (value.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  return `${thursday.getUTCFullYear()}-W${String(Math.ceil((((thursday - yearStart) / 86400000) + 1) / 7)).padStart(2, '0')}`;
+}
+
+function createReportingHistory(options = {}) {
+  const reportDirectory = options.reportDirectory || resolve(options.reportPath || RETRO_PATH, '..');
+  const databasePath = options.reportingDatabasePath || process.env.ICF_REPORTING_DATABASE_PATH || resolve(reportDirectory, 'snapshots.sqlite');
+  const store = options.snapshotStore || createSnapshotStore({ databasePath });
+  const sourceSystem = options.reportingSourceSystem || REPORTING_HISTORY_SOURCE_SYSTEM;
+  const sourceId = options.reportingSourceId || REPORTING_HISTORY_SOURCE_ID;
+  const historyAdapter = options.historyAdapter || createHistoryAdapter({ store, sourceSystem, sourceId });
+  const candidates = (existsSync(reportDirectory) ? readdirSync(reportDirectory, { withFileTypes: true }) : [])
+    .filter(entry => entry.isFile() && /^retro-.*\.json$/i.test(entry.name))
+    .map(entry => resolve(reportDirectory, entry.name))
+    .sort();
+  const weeks = new Set();
+  for (const artifactPath of candidates) {
+    try {
+      const report = JSON.parse(readFileSync(artifactPath, 'utf8'));
+      const validation = validateWeeklyRetroReport(report);
+      const weekKey = validation.ok ? isoWeekKey(report.date) : null;
+      if (!weekKey) continue;
+      weeks.add(weekKey);
+      for (const category of CATEGORY_REGISTRY.categories) {
+        store.upsertSnapshot({ sourceSystem, sourceId, weekKey, categoryId: category.id }, { schemaVersion: '1.0', report });
+      }
+    } catch {
+      // Invalid history stays unavailable; current latest endpoint owns its error semantics.
+    }
+  }
+  for (const toWeek of weeks) {
+    for (const category of CATEGORY_REGISTRY.categories) {
+      for (const window of SUPPORTED_TREND_WINDOWS) {
+        const weeksInWindow = weekRange(toWeek, window);
+        historyAdapter.rebuildSummaries({ fromWeek: weeksInWindow[0], toWeek, categoryId: category.id });
+      }
+    }
+  }
+  return { store, historyAdapter };
+}
 
 const retroTransport = new LocalFileAdapterTransport({
   filePath: RETRO_PATH,
@@ -36,7 +88,10 @@ const MIME_TYPES = {
 };
 
 export function createGatewayServer(options = {}) {
-  const reportingServer = createReportingServer(options);
+  const reportingHistory = options.historyAdapter
+    ? { store: options.snapshotStore || null, historyAdapter: options.historyAdapter }
+    : createReportingHistory(options);
+  const reportingServer = createReportingServer({ ...options, ...reportingHistory });
   const mobileSnapshot = options.mobileSnapshot || (process.env.ICF_SNAPSHOT_SIGNING_KEY && process.env.ICF_MOBILE_AUTH_TOKEN ? createMobileSnapshotService({ reportPath: options.reportPath || RETRO_PATH }) : null);
 
   return createServer(async (req, res) => {
@@ -65,6 +120,14 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
+          const reporterScript = resolve(ROOT, '../scripts/ironbots-daily-reporter.mjs');
+          if (existsSync(reporterScript)) {
+            const { aggregateFleetActivity } = await import(`file://${reporterScript.replace(/\\/g, '/')}`);
+            const data = await aggregateFleetActivity({ isDryRun: true });
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', data }));
+            return;
+          }
           const reportPath = resolve(ROOT, '../_status-feed/ironbots_daily_report.json');
           if (existsSync(reportPath)) {
             const data = JSON.parse(readFileSync(reportPath, 'utf8'));
@@ -72,10 +135,8 @@ export function createGatewayServer(options = {}) {
             res.end(JSON.stringify({ status: 'SUCCESS', data }));
             return;
           }
-          const { aggregateFleetActivity } = await import('../../scripts/ironbots-daily-reporter.mjs');
-          const data = await aggregateFleetActivity({ isDryRun: true });
-          res.writeHead(200);
-          res.end(JSON.stringify({ status: 'SUCCESS', data }));
+          res.writeHead(404);
+          res.end(JSON.stringify({ status: 'NOT_FOUND', message: 'Ironbots telemetry unavailable' }));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
@@ -121,7 +182,19 @@ export function createGatewayServer(options = {}) {
     }
 
     // 2. Static Dashboard & Web Assets
-    let relativePath = pathname === '/' || pathname === '/dashboard' || pathname === '/dashboard/'
+    const reportingModulePaths = {
+      '/modules/wiki/weekly-reporting-dashboard.mjs': 'reporting/weekly-reporting-dashboard.mjs',
+      '/modules/wiki/src/weekly-retro-contract.mjs': 'reporting/src/weekly-retro-contract.mjs',
+      '/modules/wiki/src/category-contract.mjs': 'reporting/src/category-contract.mjs',
+      '/modules/wiki/src/action-continuity.mjs': 'reporting/src/action-continuity.mjs'
+    };
+    if (reportingModulePaths[pathname]) {
+      const modulePath = resolve(ROOT, reportingModulePaths[pathname]);
+      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(readFileSync(modulePath));
+      return;
+    }
+    let relativePath = pathname === '/' || pathname === '/dashboard' || pathname === '/dashboard/' || pathname === '/dashboard.html' || pathname === '/modules/wiki/dashboard.html'
       ? 'index.html'
       : (pathname.startsWith('/dashboard/') ? pathname.slice('/dashboard/'.length) : pathname.replace(/^\/+/, ''));
 

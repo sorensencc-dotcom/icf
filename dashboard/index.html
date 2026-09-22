@@ -3204,11 +3204,38 @@ flowchart TD
       }
 
       if (tbody && Array.isArray(data.activeBots) && data.activeBots.length > 0) {
+        function getRelativeTime(iso) {
+          if (!iso) return 'Not run yet';
+          const diffMs = Date.now() - new Date(iso).getTime();
+          if (isNaN(diffMs)) return iso;
+          const mins = Math.floor(diffMs / 60000);
+          if (mins < 1) return 'Just now';
+          if (mins < 60) return `${mins}m ago`;
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return `${hrs}h ago`;
+          return `${Math.floor(hrs / 24)}d ago`;
+        }
+
         tbody.innerHTML = data.activeBots.map(b => {
           const isHealthy = b.status === 'HEALTHY' || b.status === 'PASS' || b.status === 'SUPERVISED';
           const isDrift = b.status === 'DRIFT_DETECTED' || b.status === 'DRIFT MONITORED';
           const badgeColor = isHealthy ? '#5a9e6f' : (isDrift ? '#a78bfa' : 'var(--ember)');
           const badgeBorder = isHealthy ? 'rgba(90,158,111,0.4)' : (isDrift ? 'rgba(167,139,250,0.4)' : 'rgba(196,80,26,0.4)');
+          const lastRunText = b.telemetry?.timestamp ? getRelativeTime(b.telemetry.timestamp) : 'Pending';
+
+          let detailsHtml = '';
+          if (b.id === 'ci-watchdog' && Array.isArray(b.telemetry?.alerts) && b.telemetry.alerts.length > 0) {
+            detailsHtml = `<div style="font-size:0.75rem; color:var(--ember); margin-top:0.3rem;">🚨 <strong>Failures:</strong> ${b.telemetry.alerts.map(a => `<a href="${escapeHtml(a.url)}" target="_blank" style="color:var(--ember); text-decoration:underline;">${escapeHtml(a.name)} (${escapeHtml(a.sha)})</a>`).join(', ')}</div>`;
+          } else if (b.id === 'watchlist-miner' && Array.isArray(b.telemetry?.driftFindings) && b.telemetry.driftFindings.length > 0) {
+            detailsHtml = `<div style="font-size:0.75rem; color:#a78bfa; margin-top:0.3rem;">🔍 <strong>Drifts:</strong> ${b.telemetry.driftFindings.map(d => escapeHtml(d.competitorName)).join(', ')}</div>`;
+          } else if (b.id === 'kb-sentinel' && Array.isArray(b.telemetry?.recentIssues) && b.telemetry.recentIssues.length > 0) {
+            detailsHtml = `<div style="font-size:0.75rem; color:var(--ember); margin-top:0.3rem;">⚠️ <strong>Missing frontmatter:</strong> ${b.telemetry.recentIssues.map(i => escapeHtml(i.file.split(/[\\/]/).pop())).join(', ')}</div>`;
+          } else if (b.id === 'notebook-ingester' && b.telemetry?.lastDispatch) {
+            detailsHtml = `<div style="font-size:0.75rem; color:#5eead4; margin-top:0.3rem;">📦 <strong>Last Dispatch:</strong> ${escapeHtml(b.telemetry.lastDispatch.status)} · ${b.telemetry.lastDispatch.dispatchedPacks || 0} packs</div>`;
+          } else if (b.id === 'daemon-healer') {
+            detailsHtml = `<div style="font-size:0.75rem; color:#a78bfa; margin-top:0.3rem;">⚡ <strong>Probe Latency:</strong> ${b.telemetry?.elapsedMs || 0}ms · Port 8080 OK</div>`;
+          }
+
           const botCmd = b.id === 'notebook-ingester' ? 'npm run bot:notebook:ingest'
             : (b.id === 'kb-sentinel' ? 'npm run bot:kb:sentinel'
             : (b.id === 'trm-bot' ? 'npm run bot:trm:triage'
@@ -3217,9 +3244,18 @@ flowchart TD
 
           return `
             <tr>
-              <td><strong style="color:var(--white);">${escapeHtml(b.name)}</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\\Ironbots\\</span></td>
-              <td><span class="tag date">${escapeHtml(b.schedule)}</span></td>
-              <td>${escapeHtml(b.summary)}</td>
+              <td>
+                <strong style="color:var(--white);">${escapeHtml(b.name)}</strong>
+                <br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\\Ironbots\\</span>
+              </td>
+              <td>
+                <span class="tag date">${escapeHtml(b.schedule)}</span>
+                <div style="font-size:0.72rem; color:var(--ash); margin-top:0.25rem;">Last run: ${escapeHtml(lastRunText)}</div>
+              </td>
+              <td>
+                <div>${escapeHtml(b.summary)}</div>
+                ${detailsHtml}
+              </td>
               <td><span class="status-badge live" style="font-size:0.6rem; color:${badgeColor}; border-color:${badgeBorder};">● ${escapeHtml(b.status)}</span></td>
               <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('${botCmd}')">Run Bot</button></td>
             </tr>
