@@ -66,7 +66,9 @@ test('imports as a browser-valid custom element and renders fetched data', async
         ok: true,
         status: 200,
         async json() {
-          return { status: 'SUCCESS', data: validReport };
+          return requests.length === 1
+            ? { status: 'SUCCESS', data: validReport }
+            : { status: 'SUCCESS', data: { status: 'ready', windowWeeks: 4, weeks: ['2026-W36', '2026-W37'], comparison: { commits: { current: 7, previous: 5, delta: 2 } } } };
         }
       };
     };
@@ -77,10 +79,15 @@ test('imports as a browser-valid custom element and renders fetched data', async
     assert.deepEqual(requests, [{
       url: '/api/reporting/weekly-retro',
       init: { method: 'GET', headers: { Accept: 'application/json' } }
+    }, {
+      url: '/api/reporting/weekly-retro/history?categoryId=delivery&window=4',
+      init: { method: 'GET', headers: { Accept: 'application/json' } }
     }]);
     assert.match(element.shadowRoot.innerHTML, /Weekly Retro Reporting/);
     assert.match(element.shadowRoot.innerHTML, />37<\/dd>/);
     assert.match(element.shadowRoot.innerHTML, /2026-09-13/);
+    assert.match(element.shadowRoot.innerHTML, /Week comparison/);
+    assert.match(element.shadowRoot.innerHTML, /2026-W36/);
   } finally {
     restoreFakeDom(previous);
   }
@@ -139,6 +146,35 @@ test('renders review-canvas drill-down sections and rejects HTML responses clear
     broken.setAttribute('src', '/api/reporting/weekly-retro');
     await broken.load();
     assert.match(broken.shadowRoot.innerHTML, /non-JSON content/);
+  } finally {
+    restoreFakeDom(previous);
+  }
+});
+
+test('keeps the current report visible when history is insufficient or unavailable', async () => {
+  const { previous } = installFakeDom();
+  try {
+    const dashboard = await import(`../weekly-reporting-dashboard.mjs?comparison-test=${Date.now()}`);
+    const validReport = JSON.parse(await readFile(join(FIXTURES, 'fixtures', 'valid-report.json'), 'utf8'));
+    const element = new dashboard.WeeklyReportingDashboard();
+    element.render(validReport, { status: 'insufficient_history', missingWeeks: 'Need 2 more weeks.' });
+    assert.match(element.shadowRoot.innerHTML, /Weekly Retro Reporting/);
+    assert.match(element.shadowRoot.innerHTML, /Not enough weekly history/);
+
+    globalThis.fetch = async (url) => ({
+      ok: url.endsWith('/weekly-retro'),
+      status: url.endsWith('/weekly-retro') ? 200 : 503,
+      async json() {
+        return url.endsWith('/weekly-retro')
+          ? { status: 'SUCCESS', data: validReport }
+          : { status: 'UNAVAILABLE', error: 'history store offline' };
+      }
+    });
+    const unavailable = new dashboard.WeeklyReportingDashboard();
+    unavailable.setAttribute('src', '/api/reporting/weekly-retro');
+    await unavailable.load();
+    assert.match(unavailable.shadowRoot.innerHTML, /Weekly Retro Reporting/);
+    assert.match(unavailable.shadowRoot.innerHTML, /history store offline/);
   } finally {
     restoreFakeDom(previous);
   }
