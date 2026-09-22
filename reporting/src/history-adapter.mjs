@@ -109,14 +109,30 @@ export function createHistoryAdapter({ store, sourceSystem, sourceId, toWeek = n
         });
       }
       const insufficient = persisted.summary?.status === 'insufficient_history'
-        || persisted.summary?.state === 'insufficient_history';
+        || persisted.summary?.state === 'insufficient_history'
+        || (persisted.summary?.completeWeeks ?? 0) < window;
+      const weeks = persisted.summary?.weeks ?? [];
+      const observedWeeks = weeks.filter(week => ['success', 'zero_activity'].includes(week.state));
+      const currentWeek = observedWeeks.at(-1)?.weekKey ?? persisted.summary?.toWeek ?? null;
+      const previousWeek = observedWeeks.at(-2)?.weekKey ?? null;
+      const valuesByMetric = new Map((persisted.summary?.metrics ?? []).map(metric => [metric.metricId, metric]));
+      const comparison = {
+        currentWeek,
+        previousWeek,
+        metrics: [...valuesByMetric.values()].map(metric => {
+          const current = metric.values.find(value => value.weekKey === currentWeek)?.value ?? null;
+          const previous = metric.values.find(value => value.weekKey === previousWeek)?.value ?? null;
+          return { metricId: metric.metricId, current, previous, delta: current !== null && previous !== null ? current - previous : null };
+        })
+      };
       return {
         ...persisted.summary,
         state: insufficient ? 'insufficient_history' : 'ready',
         status: insufficient ? 'insufficient_history' : 'ready',
         categoryId,
         window,
-        summary: persisted.summary
+        summary: persisted.summary,
+        comparison
       };
     },
 

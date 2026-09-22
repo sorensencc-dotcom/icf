@@ -146,19 +146,23 @@ export class WeeklyReportingDashboard extends HTMLElementBase {
   comparisonMarkup(history = {}) {
     const status = history.status || history.state || 'unavailable';
     const title = '<h3 id="comparison-title">Week comparison</h3>';
-    if (status === 'insufficient_history') {
-      return `<section class="panel comparison" aria-labelledby="comparison-title">${title}<p class="muted">Not enough weekly history for comparison. ${escapeHtml(history.missingWeeks || 'More completed weeks are required.')}</p></section>`;
-    }
-    if (status !== 'ready') {
+    if (status !== 'ready' && status !== 'insufficient_history') {
       return `<section class="panel comparison" aria-labelledby="comparison-title">${title}<p class="muted">Weekly comparison unavailable: ${escapeHtml(history.error || 'History is not available.')}</p></section>`;
     }
     const weeks = Array.isArray(history.weeks) ? history.weeks : [];
     const comparison = history.comparison && typeof history.comparison === 'object' ? history.comparison : {};
-    const rows = Object.entries(comparison).slice(0, 8).map(([label, value]) => {
-      const detail = value && typeof value === 'object' ? `${value.current ?? '—'} → ${value.previous ?? '—'} (${value.delta ?? '—'})` : value;
-      return `<li><strong>${escapeHtml(label)}</strong><span>${escapeHtml(detail)}</span></li>`;
+    const metrics = Array.isArray(comparison.metrics) ? comparison.metrics : Object.entries(comparison).map(([metricId, value]) => ({ metricId, ...value }));
+    const rows = metrics.slice(0, 8).map((metric) => {
+      const detail = `${metric.current ?? '—'} → ${metric.previous ?? '—'} (${metric.delta ?? '—'})`;
+      return `<li><strong>${escapeHtml(metric.metricId || 'Metric')}</strong><span>${escapeHtml(detail)}</span></li>`;
     }).join('');
-    return `<section class="panel comparison" aria-labelledby="comparison-title">${title}<p class="meta">${escapeHtml(history.windowWeeks || weeks.length || 0)}-week window · ${escapeHtml(weeks.join(' · ') || 'Weeks unavailable')}</p><ul>${rows || '<li class="muted">No comparison metrics available.</li>'}</ul></section>`;
+    const notice = status === 'insufficient_history'
+      ? `<p class="muted">Not enough weekly history for the selected window. ${escapeHtml((history.missingWeeks || []).join?.(', ') || 'More completed weeks are required.')}</p>`
+      : '';
+    const observed = comparison.currentWeek && comparison.previousWeek
+      ? `${comparison.previousWeek} → ${comparison.currentWeek}`
+      : weeks.join(' · ') || 'Weeks unavailable';
+    return `<section class="panel comparison" aria-labelledby="comparison-title">${title}${notice}<p class="meta">${escapeHtml(history.windowWeeks || history.window || weeks.length || 0)}-week window · ${escapeHtml(observed)}</p><ul>${rows || '<li class="muted">No comparison metrics available.</li>'}</ul></section>`;
   }
 
   renderLoading() {
