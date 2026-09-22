@@ -10,12 +10,12 @@ $ErrorActionPreference = 'Stop'
 $Node = (Get-Command node.exe -ErrorAction Stop).Source
 $ServerScript = Join-Path $RepoRoot 'src\server.mjs'
 
-if ([string]::IsNullOrWhiteSpace($BindHost)) { $BindHost = (tailscale ip -4 2>$null | Select-Object -First 1).Trim() }
-if ([string]::IsNullOrWhiteSpace($BindHost)) { throw 'Tailscale IPv4 address unavailable; start Tailscale before starting ICF.' }
+if ([string]::IsNullOrWhiteSpace($BindHost)) { $BindHost = '127.0.0.1' }
+$TailscaleIp = try { (tailscale ip -4 2>$null | Select-Object -First 1).Trim() } catch { $null }
 $DashboardUrl = "http://$BindHost`:$Port/dashboard"
 $ApiUrl = "http://$BindHost`:$Port/api/reporting/weekly-retro"
 $env:PORT = [string]$Port
-$env:ICF_HOST = $BindHost
+$env:ICF_HOST = '0.0.0.0'
 
 function Test-Dashboard {
     try {
@@ -29,6 +29,7 @@ function Test-Dashboard {
 
 if (Test-Dashboard) {
     Write-Output "ICF Dashboard already healthy: $DashboardUrl"
+    if ($TailscaleIp) { Write-Output "  -> Tailscale network access: http://$TailscaleIp`:$Port/dashboard" }
     exit 0
 }
 
@@ -57,6 +58,7 @@ do {
     Start-Sleep -Milliseconds 500
     if (Test-Dashboard) {
         Write-Output "ICF Dashboard started and healthy: $DashboardUrl"
+        if ($TailscaleIp) { Write-Output "  -> Tailscale network access: http://$TailscaleIp`:$Port/dashboard" }
         exit 0
     }
 } while ((Get-Date) -lt $deadline)
