@@ -23,6 +23,7 @@ flowchart TD
         WM["Watchlist-Miner Bot (Daily 05:00 AM)\nscripts/watchlist-miner-bot.mjs"]
         K["Daemon-Healer Bot (Every 15 Min)\nscripts/daemon-healer-bot.mjs"]
         L["CI-Watchdog Bot (Daily 06:00 AM)\nscripts/ci-watchdog-bot.mjs"]
+        IB["IronBot Task Monitor (Every 4 Hours)\nC:/dev/kb-sync/scripts/ironbot/ironbot-task-monitor.ps1"]
     end
 
     subgraph Targets["3. Knowledge Base & Telemetry"]
@@ -34,6 +35,7 @@ flowchart TD
         N["CI Failure Detection & Error Logs"]
         I["Telemetry Hub (_status-feed/*.json)"]
         J["Iron Command Forge (ICF Snapshot Store)"]
+        IA["IronBot Audit Log (C:/dev/kb-sync/docs/audit/ironbot/)"]
     end
 
     A -->|Daily 02:00 AM| NB
@@ -42,6 +44,7 @@ flowchart TD
     A -->|Daily 05:00 AM| WM
     A -->|Every 15 Min| K
     A -->|Daily 06:00 AM| L
+    A -->|Every 4 Hours| IB
 
     B --> NB
     B --> D
@@ -62,6 +65,8 @@ flowchart TD
     K --> I
     L --> N
     L --> I
+    IB --> IA
+    IB --> I
     I --> J
     I -.-> C
 ```
@@ -96,6 +101,9 @@ All background automation bots added to the `\Ironbots\` fleet must adhere to th
 | **Watchlist-Miner** | `scripts/watchlist-miner-bot.mjs` | Daily 05:00 AM | `\Ironbots\` | `_status-feed/watchlist_miner_report.json` |
 | **Daemon-Healer** | `scripts/daemon-healer-bot.mjs` | Every 15 Minutes | `\Ironbots\` | `_status-feed/daemon_health.json` |
 | **CI-Watchdog** | `scripts/ci-watchdog-bot.mjs` | Daily 06:00 AM | `\Ironbots\` | `_status-feed/ci_alerts.json` |
+| **IronBot Task Monitor** | `C:/dev/kb-sync/scripts/ironbot/ironbot-task-monitor.ps1` | Every 4 Hours | `\IronBot\` | `C:/dev/kb-sync/docs/audit/ironbot/` |
+
+> **IronBot Task Monitor** monitors all `\KB-SYNC\`, `\CIC\`, `\TRM\`, and `\CastIronCharlie\` scheduled tasks, runs deterministic self-healing playbooks on failures (stale lock release, git state repair, auth refresh), replays downstream DAG-dependent tasks on successful recovery, and emits structured JSON audit logs + Slack alerts.
 
 ---
 
@@ -115,6 +123,21 @@ npm run bot:daemon:heal
 npm run bot:ci:watchdog
 ```
 
+### IronBot Task Monitor
+```powershell
+# Dry-run (inspect without healing or replaying)
+pwsh -NoProfile -File C:\dev\kb-sync\scripts\ironbot\ironbot-task-monitor.ps1 -DryRun
+
+# Live run (heal and replay)
+pwsh -NoProfile -File C:\dev\kb-sync\scripts\ironbot\ironbot-task-monitor.ps1
+
+# Register unattended 4-hour task (run as Administrator)
+pwsh -NoProfile -ExecutionPolicy Bypass -File C:\dev\kb-sync\scripts\ironbot\register-ironbot-task.ps1
+
+# Verify registration
+Get-ScheduledTask -TaskName "IronBot-TaskMonitor" -TaskPath "\IronBot\" | Select-Object TaskName, State
+```
+
 ### Windows Task Scheduler administration
 ```powershell
 # View all registered Ironbots tasks
@@ -128,3 +151,4 @@ pwsh -NoProfile -File scripts/schedule-task-wrapper-Watchlist-Miner.ps1 -Action 
 pwsh -NoProfile -File scripts/schedule-task-wrapper-Daemon-Healer.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-CI-Watchdog.ps1 -Action Register -Unattended -Force
 ```
+
