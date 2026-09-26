@@ -17,10 +17,14 @@
     "test:all": "npm run test --workspaces --if-present && node --test test/*.test.mjs",
     "start": "node src/server.mjs",
     "build": "npm run build --workspaces --if-present",
+    "bot:notebook:ingest": "node ../scripts/notebook-ingester-bot.mjs",
     "bot:kb:sentinel": "node ../scripts/kb-sentinel-bot.mjs",
     "bot:trm:triage": "node ../scripts/trm-bot-runner.mjs",
+    "bot:watchlist:mine": "node ../scripts/watchlist-miner-bot.mjs",
     "bot:daemon:heal": "node ../scripts/daemon-healer-bot.mjs",
     "bot:ci:watchdog": "node ../scripts/ci-watchdog-bot.mjs",
-    "bot:all": "npm run bot:kb:sentinel && npm run bot:trm:triage && npm run bot:daemon:heal && npm run bot:ci:watchdog"
+    "bot:report": "node ../scripts/ironbots-daily-reporter.mjs",
+    "bot:all": "npm run bot:notebook:ingest && npm run bot:kb:sentinel && npm run bot:trm:triage && npm run bot:watchlist:mine && npm run bot:daemon:heal && npm run bot:ci:watchdog && npm run bot:report",
+    "test:ironbots": "node --test ../tests/ironbots.test.mjs"
   }
 }

@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
 import { createReportingServer } from '../reporting/src/server.mjs';
 import { createSnapshotStore } from '../reporting/src/snapshot-store.mjs';
@@ -12,6 +13,8 @@ import { createMobileSnapshotService } from './mobile-snapshot.mjs';
 import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
+process.stdout?.on?.('error', () => {});
+process.stderr?.on?.('error', () => {});
 export const ROOT = resolve(__dirname, '..');
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
@@ -94,7 +97,61 @@ export function createGatewayServer(options = {}) {
   const reportingServer = createReportingServer({ ...options, ...reportingHistory });
   const mobileSnapshot = options.mobileSnapshot || (process.env.ICF_SNAPSHOT_SIGNING_KEY && process.env.ICF_MOBILE_AUTH_TOKEN ? createMobileSnapshotService({ reportPath: options.reportPath || RETRO_PATH }) : null);
 
-  return createServer(async (req, res) => {
+  const sseClients = new Set();
+  function broadcastSseEvent(event, data) {
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.res.write(payload);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  const statusFeedDir = resolve(ROOT, '../_status-feed');
+  let feedWatcher = null;
+  let debounceTimeout = null;
+
+  if (existsSync(statusFeedDir) && !options.disableWatcher) {
+    try {
+      feedWatcher = watch(statusFeedDir, (eventType, filename) => {
+        if (!filename || !filename.endsWith('.json')) return;
+        if (debounceTimeout) clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(() => {
+          try {
+            const fullPath = join(statusFeedDir, filename);
+            if (existsSync(fullPath)) {
+              let parsedData = null;
+              try { parsedData = JSON.parse(readFileSync(fullPath, 'utf8')); } catch {}
+              broadcastSseEvent('telemetry', {
+                feed: filename,
+                timestamp: new Date().toISOString(),
+                data: parsedData
+              });
+            }
+          } catch {}
+        }, 150);
+        if (debounceTimeout && debounceTimeout.unref) debounceTimeout.unref();
+      });
+      if (feedWatcher && feedWatcher.unref) feedWatcher.unref();
+    } catch {}
+  }
+
+  const heartbeatInterval = setInterval(() => {
+    if (sseClients.size > 0) {
+      broadcastSseEvent('heartbeat', {
+        timestamp: new Date().toISOString(),
+        host: os.hostname(),
+        uptime: process.uptime(),
+        subscribers: sseClients.size,
+        status: 'HEALTHY'
+      });
+    }
+  }, options.heartbeatIntervalMs || 15000);
+  if (heartbeatInterval.unref) heartbeatInterval.unref();
+
+  const server = createServer(async (req, res) => {
     // Check raw requested URL for directory traversal patterns
     if (req.url && (req.url.includes('/..') || req.url.includes('\\..') || req.url.includes('%2e%2e') || req.url.includes('%2E%2E'))) {
       res.writeHead(403, { 'Content-Type': 'text/plain' });
@@ -104,6 +161,25 @@ export function createGatewayServer(options = {}) {
 
     const reqUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
     const pathname = reqUrl.pathname;
+
+    // Real-Time SSE Event Stream endpoint
+    if (pathname === '/api/events' || pathname === '/api/stream' || pathname === '/api/reporting/stream') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.write(`event: connected\ndata: ${JSON.stringify({ status: 'CONNECTED', timestamp: new Date().toISOString(), host: os.hostname(), uptime: process.uptime() })}\n\n`);
+
+      const client = { id: Date.now(), res, req };
+      sseClients.add(client);
+
+      req.on('close', () => {
+        sseClients.delete(client);
+      });
+      return;
+    }
 
     if (pathname === '/api/mobile/snapshot' || pathname === '/api/mobile/health') {
       if (!mobileSnapshot) { res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' }); res.end(JSON.stringify({ status: 'UNAVAILABLE', error: 'Mobile snapshot service is not configured' })); return; }
@@ -137,6 +213,37 @@ export function createGatewayServer(options = {}) {
           }
           res.writeHead(404);
           res.end(JSON.stringify({ status: 'NOT_FOUND', message: 'Ironbots telemetry unavailable' }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm/ingress' || pathname === '/api/reporting/trm-ingress') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const feedPath = resolve(ROOT, '../_status-feed/trm_ingress_status.json');
+          if (existsSync(feedPath)) {
+            const data = JSON.parse(readFileSync(feedPath, 'utf8'));
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', data }));
+            return;
+          }
+          res.writeHead(200);
+          res.end(JSON.stringify({
+            status: 'SUCCESS',
+            data: {
+              status: 'HEALTHY',
+              triageQueue: 0,
+              completed: 0,
+              quarantined: 0,
+              harnessPending: 0,
+              totalTracked: 0,
+              recentCards: []
+            }
+          }));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
@@ -226,6 +333,19 @@ export function createGatewayServer(options = {}) {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end(`404 Not Found: ${pathname}`);
   });
+
+  server.on('close', () => {
+    clearInterval(heartbeatInterval);
+    if (feedWatcher) {
+      try { feedWatcher.close(); } catch {}
+    }
+    for (const client of sseClients) {
+      try { client.res.end(); } catch {}
+    }
+    sseClients.clear();
+  });
+
+  return server;
 }
 
 // Direct execution entrypoint

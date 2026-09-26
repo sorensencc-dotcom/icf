@@ -690,7 +690,7 @@
       <div class="brand-subtitle">Unified Operations, Knowledge Graph, MCP Infrastructure &amp; Status Feed</div>
     </div>
     <div class="header-badges">
-      <span class="status-badge live">● LIVE</span>
+      <span class="status-badge live" id="sseLiveBadge" title="Real-time Server-Sent Events (SSE) Stream">● LIVE SSE</span>
       <div class="synced-badge" id="reportTimestamp">SYNCED 1H AGO</div>
     </div>
   </header>
@@ -3267,6 +3267,43 @@ flowchart TD
     }
   }
 
+  function initRealtimeEventStream() {
+    if (!window.EventSource) return;
+    try {
+      const sse = new EventSource('/api/events');
+      sse.addEventListener('connected', (e) => {
+        const badge = document.getElementById('sseLiveBadge');
+        if (badge) {
+          badge.textContent = '● LIVE SSE';
+          badge.style.opacity = '1';
+        }
+      });
+      sse.addEventListener('telemetry', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload.feed === 'ironbots_daily_report.json') {
+            loadIronbotsDailyReport();
+          } else if (payload.feed === 'daily_status.json' || payload.feed === 'trm_ingress_status.json') {
+            loadDailyStatus();
+          }
+        } catch {}
+      });
+      sse.addEventListener('heartbeat', () => {
+        const badge = document.getElementById('sseLiveBadge');
+        if (badge) {
+          badge.style.opacity = '1';
+        }
+      });
+      sse.onerror = () => {
+        const badge = document.getElementById('sseLiveBadge');
+        if (badge) {
+          badge.textContent = '○ POLLING';
+          badge.style.opacity = '0.6';
+        }
+      };
+    } catch {}
+  }
+
   // Initialize
   renderMcpCards();
   renderDomainsTable();
@@ -3276,6 +3313,7 @@ flowchart TD
   renderExecutionRuns();
   loadIronbotsDailyReport();
   handleHashRoute();
+  initRealtimeEventStream();
 
   window.addEventListener('hashchange', handleHashRoute);
   setInterval(fetchHeadroomIcfMetrics, 15000);

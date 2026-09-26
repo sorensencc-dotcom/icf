@@ -91,8 +91,9 @@ test('gateway ingests weekly artifacts and serves materialized history', async (
     assert.deepEqual(payload.data.weeks.filter(week => week.state !== 'missing').map(week => week.weekKey), ['2026-W38', '2026-W39']);
     assert.equal(payload.data.metrics.find(metric => metric.metricId === 'commits').trend, 'up');
     assert.equal(store.listSnapshots({ fromWeek: '2026-W01', toWeek: '2026-W53', categoryId: 'delivery', sourceSystem: 'icf', sourceId: 'weekly-retro' }).length, 2);
-    createGatewayServer({ reportDirectory, snapshotStore: store });
+    const reloadedServer = createGatewayServer({ reportDirectory, snapshotStore: store, disableWatcher: true });
     assert.equal(store.listSnapshots({ fromWeek: '2026-W01', toWeek: '2026-W53', categoryId: 'delivery', sourceSystem: 'icf', sourceId: 'weekly-retro' }).length, 2);
+    reloadedServer.close();
   } finally {
     await new Promise(resolve => server.close(resolve));
     store.close();
@@ -119,5 +120,51 @@ test('gateway history remains insufficient with one weekly artifact and ignores 
   } finally {
     await new Promise(resolve => server.close(resolve));
     store.close();
+  }
+});
+
+test('gateway serves native real-time SSE stream on /api/events with connected handshake', async () => {
+  const server = createGatewayServer({ disableWatcher: true });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+
+  try {
+    const sseChunks = await new Promise((resolve, reject) => {
+      const req = request({
+        host: '127.0.0.1',
+        port,
+        path: '/api/events',
+        method: 'GET'
+      }, (res) => {
+        assert.equal(res.statusCode, 200);
+        assert.match(res.headers['content-type'], /text\/event-stream/);
+        assert.match(res.headers['cache-control'], /no-cache/);
+        assert.match(res.headers['connection'], /keep-alive/);
+
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => {
+          body += chunk;
+          if (body.includes('event: connected')) {
+            req.destroy();
+            resolve(body);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        if (err.code === 'ECONNRESET' || req.destroyed) {
+          // Expected on req.destroy()
+          return;
+        }
+        reject(err);
+      });
+      req.end();
+    });
+
+    assert.match(sseChunks, /event: connected/);
+    assert.match(sseChunks, /"status":"CONNECTED"/);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
   }
 });
