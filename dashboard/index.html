@@ -1899,6 +1899,76 @@ flowchart TD
       </table>
     </div>
 
+    <!-- MOBILE OUTBOX & STORAGE COMPACTION 2-COL GRID -->
+    <div class="grid-2col" style="margin-bottom: 2rem;">
+      <!-- Left: Mobile Outbox Stream -->
+      <div class="panel" style="border-top: 3px solid var(--ember);">
+        <div class="section-label">Mobile Outbox &amp; Receipts</div>
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" style="display: flex; align-items: center; gap: 0.6rem;">
+              <span>Live Action Receipts</span>
+              <span class="status-badge live" id="outboxLiveStatus" style="font-size: 0.6rem;">● DISPATCH READY</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--ash); margin-top: 0.2rem;">
+              Real-time receipts emitted for mobile voice/text action cards.
+            </div>
+          </div>
+          <button type="button" class="panel-action" onclick="loadMobileOutbox()">Refresh ⟳</button>
+        </div>
+        <div id="mobileOutboxStreamContainer" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding-right: 0.25rem;">
+          <div style="font-size: 0.85rem; color: var(--ash); font-style: italic;">Loading outbox stream...</div>
+        </div>
+      </div>
+
+      <!-- Right: Storage & Compaction Analytics -->
+      <div class="panel" style="border-top: 3px solid var(--brass);">
+        <div class="section-label">Storage Compaction &amp; Pruning</div>
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" style="display: flex; align-items: center; gap: 0.6rem;">
+              <span>SQLite &amp; Telemetry Compactor</span>
+              <span class="status-badge live" id="storageStatusBadge" style="font-size: 0.6rem;">● HEALTHY</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--ash); margin-top: 0.2rem;">
+              Weekly VACUUM optimization, .gz telemetry archiving &amp; task pruning.
+            </div>
+          </div>
+          <button type="button" class="panel-action" onclick="loadStorageAnalytics()">Refresh ⟳</button>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+          <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
+            <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Total Space Freed</div>
+            <div id="storageTotalFreed" style="font-size: 1.15rem; font-weight: 700; color: #5eead4; font-family: monospace;">--</div>
+          </div>
+          <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
+            <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Databases Scanned</div>
+            <div id="storageDbCount" style="font-size: 1.15rem; font-weight: 700; color: var(--white); font-family: monospace;">--</div>
+          </div>
+          <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
+            <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Archives Compacted</div>
+            <div id="storageGzCount" style="font-size: 1.15rem; font-weight: 700; color: var(--brass); font-family: monospace;">--</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="table-clean" style="font-size: 0.8rem;">
+            <thead>
+              <tr>
+                <th>Database File</th>
+                <th>Size</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="storageDbTableBody">
+              <tr><td colspan="3" style="color: var(--ash); font-style: italic;">Loading storage analytics...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- SCHEDULED TASKS LIVE INVENTORY TABLE -->
     <div class="panel" style="margin-bottom: 2rem;">
       <div class="section-label">Windows Task Scheduler Registry</div>
@@ -3267,6 +3337,88 @@ flowchart TD
     }
   }
 
+  async function loadMobileOutbox() {
+    const container = document.getElementById('mobileOutboxStreamContainer');
+    if (!container) return;
+    try {
+      const res = await fetch('/api/reporting/mobile-outbox', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json();
+      const receipts = json.receipts || [];
+      if (receipts.length === 0) {
+        container.innerHTML = `<div style="font-size: 0.85rem; color: var(--ash); font-style: italic; padding: 0.5rem 0;">No receipts in outbox buffer. Ready for mobile voice/text input.</div>`;
+        return;
+      }
+      container.innerHTML = receipts.map(r => {
+        const isQuarantined = r.status === 'QUARANTINED' || r.status === 'QUARANTINE_MOVE_FAILED';
+        const badgeClass = isQuarantined ? 'high' : 'live';
+        const badgeText = isQuarantined ? 'QUARANTINED' : 'COMPLETED';
+        const color = isQuarantined ? 'var(--ember)' : 'var(--sage)';
+        const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'Just now';
+        const cardTitle = r.card_title || r.summary || r.action_id || r.file;
+        const handler = r.action_type || (r.execution_plan && r.execution_plan[0]?.handler) || 'ironbot';
+        return `
+          <div style="background: rgba(44, 36, 32, 0.4); border-left: 3px solid ${color}; padding: 0.55rem 0.75rem; border-top: 1px solid rgba(154, 144, 136, 0.1); border-right: 1px solid rgba(154, 144, 136, 0.1); border-bottom: 1px solid rgba(154, 144, 136, 0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <span class="status-badge ${badgeClass}" style="font-size: 0.55rem;">● ${escapeHtml(badgeText)}</span>
+              <span style="font-size: 0.7rem; color: var(--ash); font-family: monospace;">${escapeHtml(timeStr)}</span>
+            </div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--white); margin-bottom: 0.2rem;">${escapeHtml(cardTitle)}</div>
+            <div style="display: flex; gap: 0.5rem; font-size: 0.72rem; color: var(--ash); font-family: monospace;">
+              <span>Handler: <strong style="color:var(--bone);">${escapeHtml(handler)}</strong></span>
+              <span>·</span>
+              <span>Latency: <strong style="color:var(--bone);">${escapeHtml(String(r.duration_ms || 0))}ms</strong></span>
+            </div>
+            ${r.error ? `<div style="font-size:0.72rem; color:var(--ember); margin-top:0.2rem; font-family:monospace;">${escapeHtml(r.error)}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    } catch {}
+  }
+
+  async function loadStorageAnalytics() {
+    try {
+      const res = await fetch('/api/reporting/storage-pruner', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json();
+      const data = json.data || {};
+      
+      const totalFreedEl = document.getElementById('storageTotalFreed');
+      const dbCountEl = document.getElementById('storageDbCount');
+      const gzCountEl = document.getElementById('storageGzCount');
+      const statusBadge = document.getElementById('storageStatusBadge');
+      const tableBody = document.getElementById('storageDbTableBody');
+
+      if (totalFreedEl) totalFreedEl.textContent = data.totalFreedFormatted || '0 B';
+      if (dbCountEl) dbCountEl.textContent = data.databasesScanned || '0';
+      if (gzCountEl) gzCountEl.textContent = data.telemetryCompactedCount || '0';
+      if (statusBadge) {
+        statusBadge.textContent = `● ${data.status || 'HEALTHY'}`;
+        statusBadge.className = data.status === 'FAILURES_DETECTED' ? 'status-badge high' : 'status-badge live';
+      }
+
+      if (tableBody) {
+        const dbResults = data.databaseResults || [];
+        if (dbResults.length === 0) {
+          tableBody.innerHTML = `<tr><td colspan="3" style="color: var(--ash); font-style: italic;">No database vacuum telemetry recorded.</td></tr>`;
+        } else {
+          tableBody.innerHTML = dbResults.map(db => {
+            const dbName = db.dbPath ? db.dbPath.split(/[\\\\/]/).pop() : 'database';
+            const sizeStr = `${(db.sizeAfter / 1024).toFixed(1)} KB`;
+            const statusClass = db.status === 'SUCCESS' ? 'live' : (db.status === 'SKIPPED_DRY_RUN' ? 'date' : 'high');
+            return `
+              <tr>
+                <td><strong style="color:var(--white);">${escapeHtml(dbName)}</strong></td>
+                <td><span style="font-family:monospace; color:var(--bone);">${escapeHtml(sizeStr)}</span></td>
+                <td><span class="status-badge ${statusClass}" style="font-size:0.55rem;">● ${escapeHtml(db.status)}</span></td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    } catch {}
+  }
+
   function initRealtimeEventStream() {
     if (!window.EventSource) return;
     try {
@@ -3285,6 +3437,9 @@ flowchart TD
             loadIronbotsDailyReport();
           } else if (payload.feed === 'daily_status.json' || payload.feed === 'trm_ingress_status.json') {
             loadDailyStatus();
+            loadMobileOutbox();
+          } else if (payload.feed === 'storage_pruner_status.json') {
+            loadStorageAnalytics();
           }
         } catch {}
       });
@@ -3312,12 +3467,16 @@ flowchart TD
   loadSkillsInventory();
   renderExecutionRuns();
   loadIronbotsDailyReport();
+  loadMobileOutbox();
+  loadStorageAnalytics();
   handleHashRoute();
   initRealtimeEventStream();
 
   window.addEventListener('hashchange', handleHashRoute);
   setInterval(fetchHeadroomIcfMetrics, 15000);
   setInterval(loadIronbotsDailyReport, 30000);
+  setInterval(loadMobileOutbox, 15000);
+  setInterval(loadStorageAnalytics, 30000);
 </script>
 
 </body>

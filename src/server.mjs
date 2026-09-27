@@ -251,6 +251,75 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
+      if (pathname === '/api/reporting/storage-pruner' || pathname === '/api/reporting/storage') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const prunerFeed = resolve(ROOT, '../_status-feed/storage_pruner_status.json');
+          if (existsSync(prunerFeed)) {
+            const data = JSON.parse(readFileSync(prunerFeed, 'utf8'));
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', data }));
+            return;
+          }
+          res.writeHead(200);
+          res.end(JSON.stringify({
+            status: 'SUCCESS',
+            data: {
+              status: 'HEALTHY',
+              totalFreedFormatted: '0 B',
+              totalFreedBytes: 0,
+              databasesScanned: 0,
+              databaseResults: [],
+              telemetryCompactedCount: 0,
+              telemetryResults: [],
+              harnessTasksPrunedCount: 0,
+              harnessResults: []
+            }
+          }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/mobile-outbox' || pathname === '/api/reporting/outbox') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const outboxDirs = [
+            resolve(ROOT, '../trm-drive/inbox/outbox'),
+            resolve(ROOT, '../.trm/inbox/outbox')
+          ];
+          const receipts = [];
+          for (const dir of outboxDirs) {
+            if (existsSync(dir)) {
+              try {
+                const files = readdirSync(dir).filter(f => f.endsWith('.json'));
+                for (const file of files) {
+                  try {
+                    const content = JSON.parse(readFileSync(join(dir, file), 'utf8'));
+                    receipts.push({
+                      file,
+                      ...content
+                    });
+                  } catch {}
+                }
+              } catch {}
+            }
+          }
+          receipts.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+          const sliced = receipts.slice(0, 30);
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', total: receipts.length, count: sliced.length, receipts: sliced }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
       if (pathname === '/api/reporting/weekly-retro') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         try {
