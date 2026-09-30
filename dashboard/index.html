@@ -367,6 +367,42 @@
       .grid-2col { grid-template-columns: 1fr; }
     }
 
+    .fleet-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .fleet-kpis .stat-number { font-size: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 900px) {
+      .fleet-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* Reporting */
+    .report-toggle { display: inline-flex; border: 1px solid rgba(154, 144, 136, 0.3); margin-bottom: 1.5rem; }
+    .report-toggle-btn { background: transparent; border: 0; color: var(--ash); font-family: var(--font-ui); font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.5rem 1.25rem; cursor: pointer; }
+    .report-toggle-btn.active { background: var(--ember); color: var(--white); }
+    .report-stepper { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .report-stepper .btn-secondary { padding: 0.3rem 0.6rem; }
+    .report-meta { font-size: 0.75rem; color: var(--ash); letter-spacing: 0.08em; }
+    .report-headline { font-family: var(--font-display, serif); font-size: 1.25rem; color: var(--bone); margin: 0.5rem 0 1.5rem; }
+    .report-day-grid { display: grid; grid-template-columns: 220px 1fr; gap: 1.5rem; align-items: start; }
+    .report-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .report-insight { background: rgba(34, 27, 23, 0.4); border: 1px solid rgba(154, 144, 136, 0.15); border-top: 3px solid var(--accent, var(--ember)); padding: 1rem; }
+    .report-insight h4 { margin: 0 0 0.4rem; font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent, var(--ember)); }
+    .report-insight p { margin: 0; font-size: 0.85rem; color: var(--bone); line-height: 1.45; }
+    .report-ring { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--ash); text-align: center; }
+    .report-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(154, 144, 136, 0.12); font-size: 0.85rem; color: var(--bone); }
+    .report-row .report-row-meta { color: var(--ash); white-space: nowrap; }
+    .report-row a { color: var(--brass); }
+    .report-standup { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--bone); line-height: 1.55; }
+    .report-bar { height: 6px; background: rgba(154, 144, 136, 0.15); margin-top: 0.3rem; }
+    .report-bar > span { display: block; height: 100%; background: var(--ember); }
+    .report-bars { display: flex; align-items: flex-end; gap: 0.75rem; height: 140px; margin: 0.5rem 0 1.5rem; }
+    .report-bars > div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 0.3rem; height: 100%; font-size: 0.7rem; color: var(--ash); }
+    .report-bars .report-col { width: 100%; background: var(--ember); min-height: 2px; }
+    .report-empty { color: var(--ash); font-size: 0.85rem; font-style: italic; }
+    .report-fleet-line { margin-top: 1rem; font-size: 0.85rem; color: var(--ash); }
+    .report-fleet-line a { color: var(--brass); cursor: pointer; }
+    @media (max-width: 900px) {
+      .report-day-grid { grid-template-columns: 1fr; }
+    }
+
     /* Tables */
     .table-clean {
       width: 100%;
@@ -692,7 +728,6 @@
     <div class="header-badges">
       <a class="status-badge live" id="docsMkdocsLink" href="http://127.0.0.1:8001/" target="_blank" rel="noopener noreferrer" title="Open local MkDocs (rewrite-docs on :8001)" style="text-decoration:none;">DOCS</a>
       <span class="status-badge live" id="sseLiveBadge" title="Real-time Server-Sent Events (SSE) Stream">● LIVE SSE</span>
-      <span class="status-badge soon" id="meridianFocusBadge" title="Operator focus from Meridian (local, read-only)">FOCUS …</span>
       <div class="synced-badge" id="reportTimestamp">SYNCED 1H AGO</div>
     </div>
   </header>
@@ -718,27 +753,31 @@
       <span class="tag date" id="tabTrmBadge" style="background: rgba(196,80,26,0.15); color: var(--ember); border: 1px solid rgba(196,80,26,0.35);">11 Notebooks</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-reporting" onclick="switchTab('tab-reporting')">
-      <span>05. Weekly Reporting</span>
-      <span class="tag date">Telemetry</span>
+      <span>05. Reporting</span>
+      <span class="tag date">Daily · Weekly</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-fleet" onclick="switchTab('tab-fleet')">
+      <span>06. Ironbots Fleet</span>
+      <span class="tag date" id="tabFleetBadge">10 Bots</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-ops" onclick="switchTab('tab-ops')">
-      <span>06. Operations &amp; Automation</span>
+      <span>07. Operations &amp; Automation</span>
       <span class="tag date" id="tabOpsBadge">17 Tasks (10 Ironbots)</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-headroom" onclick="switchTab('tab-headroom')">
-      <span>07. Headroom Optimizer</span>
+      <span>08. Headroom Optimizer</span>
       <span class="tag date" id="tabHeadroomBadge" style="background: rgba(196,80,26,0.15); color: var(--ember); border: 1px solid rgba(196,80,26,0.35);">● 2.1k Saved</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-graft" onclick="switchTab('tab-graft')">
-      <span>08. Graft &amp; Drift</span>
+      <span>09. Graft &amp; Drift</span>
       <span class="tag date" id="tabGraftBadge" style="background: rgba(94,234,212,0.15); color: #5eead4; border: 1px solid rgba(94,234,212,0.35);">● 94.8% Saved</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-skills" onclick="switchTab('tab-skills')">
-      <span>09. Toolforge Skills</span>
+      <span>10. Toolforge Skills</span>
       <span class="tag date" id="tabSkillsBadge">43 Registered</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-history" onclick="switchTab('tab-history')">
-      <span>10. Execution History &amp; Errors</span>
+      <span>11. Execution History &amp; Errors</span>
       <span class="tag date" id="tabHistoryBadge">Telemetry Live</span>
     </button>
   </nav>
@@ -803,6 +842,13 @@
           <div class="stat-label">Active Blockers</div>
         </div>
         <div class="stat-sub" id="qDailyBlockersSub">Handoff status clear</div>
+      </div>
+      <div title="Operator focus from Meridian (local, read-only)">
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyFocus">—</div>
+          <div class="stat-label">Operator Focus</div>
+        </div>
+        <div class="stat-sub" id="qDailyFocusSub">Meridian …</div>
       </div>
     </div>
 
@@ -1497,9 +1543,94 @@ flowchart TD
   </section>
 
   <!-- ================================================================= -->
-  <!-- TAB 5: WEEKLY & DAILY REPORTING -->
+  <!-- TAB 05: REPORTING (DAILY / WEEKLY) -->
   <!-- ================================================================= -->
-  <section id="tab-reporting" class="tab-pane" aria-label="Weekly Retro & Daily Ironbots Reporting">
+  <section id="tab-reporting" class="tab-pane" aria-label="Daily and Weekly Reporting">
+    <div class="report-toggle" role="tablist" aria-label="Reporting period">
+      <button type="button" class="report-toggle-btn active" id="reportModeDaily" onclick="setReportMode('daily')">Daily</button>
+      <button type="button" class="report-toggle-btn" id="reportModeWeekly" onclick="setReportMode('weekly')">Weekly</button>
+    </div>
+
+    <div id="reportDailyView">
+      <div class="panel" style="margin-bottom: 2rem;">
+        <div class="section-label">Daily Report · Meridian</div>
+        <div class="panel-header">
+          <div class="report-stepper">
+            <button type="button" class="btn-secondary" onclick="stepReportDay(-1)" aria-label="Previous day">◀</button>
+            <div class="panel-title" id="reportDayTitle">—</div>
+            <button type="button" class="btn-secondary" onclick="stepReportDay(1)" aria-label="Next day">▶</button>
+            <button type="button" class="panel-action" onclick="stepReportDay(0)">Today</button>
+          </div>
+          <div class="report-meta" id="reportDayMeta"></div>
+        </div>
+        <div class="report-headline" id="reportDayHeadline"></div>
+        <div class="report-day-grid">
+          <div class="report-adherence" id="reportDayAdherence"></div>
+          <div class="report-insights" id="reportDayInsights"></div>
+        </div>
+      </div>
+
+      <div class="grid-2col" style="margin-bottom: 2rem;">
+        <div class="panel">
+          <div class="section-label">Plan</div>
+          <div id="reportDayPlan"></div>
+          <div class="section-label" style="margin-top: 1.5rem;">Unplanned</div>
+          <div id="reportDayUnplanned"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="section-label" style="margin: 0;">Standup</div>
+            <button type="button" class="panel-action" onclick="copyStandup()">Copy →</button>
+          </div>
+          <ul class="report-standup" id="reportDayStandup"></ul>
+        </div>
+      </div>
+
+      <div class="grid-2col">
+        <div class="panel">
+          <div class="section-label">Time by Category</div>
+          <div id="reportDayTime"></div>
+        </div>
+        <div class="panel">
+          <div class="section-label">Commits &amp; Fleet</div>
+          <div id="reportDayCommits"></div>
+          <div class="report-fleet-line" id="reportDayFleet"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="reportWeeklyView" hidden>
+      <div class="panel" style="margin-bottom: 2rem;">
+        <div class="section-label">Rolling 7 Days · Meridian</div>
+        <div class="panel-header">
+          <div class="report-stepper">
+            <button type="button" class="btn-secondary" onclick="stepReportWeek(-1)" aria-label="Previous week">◀</button>
+            <div class="panel-title" id="reportWeekTitle">—</div>
+            <button type="button" class="btn-secondary" onclick="stepReportWeek(1)" aria-label="Next week">▶</button>
+            <button type="button" class="panel-action" onclick="stepReportWeek(0)">This Week</button>
+          </div>
+        </div>
+        <div class="grid-metrics fleet-kpis" id="reportWeekKpis"></div>
+        <div class="report-bars" id="reportWeekBars"></div>
+        <div id="reportWeekDays"></div>
+      </div>
+
+    <!-- Weekly Retro Telemetry Panel -->
+    <div class="panel">
+      <div class="section-label">Weekly Telemetry</div>
+      <div class="panel-header">
+        <div class="panel-title">Weekly Retro Telemetry</div>
+        <button type="button" class="panel-action" onclick="document.querySelector('weekly-reporting-dashboard').load()">Refresh →</button>
+      </div>
+      <weekly-reporting-dashboard src="/api/reporting/weekly-retro"></weekly-reporting-dashboard>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <!-- TAB 06: IRONBOTS FLEET -->
+  <!-- ================================================================= -->
+  <section id="tab-fleet" class="tab-pane" aria-label="Ironbots Fleet">
     <!-- Daily Ironbots Fleet Activity Panel -->
     <div class="panel" style="margin-bottom: 2rem;">
       <div class="section-label">Ironbots Fleet Telemetry</div>
@@ -1517,7 +1648,7 @@ flowchart TD
       </div>
 
       <!-- Fleet KPI Metrics -->
-      <div class="grid-metrics" style="margin-bottom: 1.5rem;">
+      <div class="grid-metrics fleet-kpis" style="margin-bottom: 1.5rem;">
         <div>
           <div class="stat-block">
             <div class="stat-number" id="ironbotsFleetScore" style="color: #5a9e6f;">92 / 100</div>
@@ -1541,10 +1672,10 @@ flowchart TD
         </div>
         <div>
           <div class="stat-block">
-            <div class="stat-number" id="ironbotsDaemonStatus" style="color: #a78bfa;">Port 8080</div>
+            <div class="stat-number" id="ironbotsDaemonStatus" style="color: #a78bfa;">OK</div>
             <div class="stat-label">Daemon Supervisor</div>
           </div>
-          <div class="stat-sub">Auto-Recovery Active</div>
+          <div class="stat-sub">Port 8080 · Auto-Recovery</div>
         </div>
       </div>
 
@@ -1605,20 +1736,10 @@ flowchart TD
         </tbody>
       </table>
     </div>
-
-    <!-- Weekly Retro Telemetry Panel -->
-    <div class="panel">
-      <div class="section-label">Weekly Telemetry</div>
-      <div class="panel-header">
-        <div class="panel-title">Weekly Retro Telemetry</div>
-        <button type="button" class="panel-action" onclick="document.querySelector('weekly-reporting-dashboard').load()">Refresh →</button>
-      </div>
-      <weekly-reporting-dashboard src="/api/reporting/weekly-retro"></weekly-reporting-dashboard>
-    </div>
   </section>
 
   <!-- ================================================================= -->
-  <!-- TAB 06: OPERATIONS & AUTOMATION DAEMONS -->
+  <!-- TAB 07: OPERATIONS & AUTOMATION DAEMONS -->
   <!-- ================================================================= -->
   <section id="tab-ops" class="tab-pane" aria-label="Operations and Automation Daemons">
     <!-- Operations KPI Metrics -->
@@ -3271,6 +3392,8 @@ flowchart TD
       'kbsync': 'tab-kbsync',
       'trm': 'tab-trm',
       'reporting': 'tab-reporting',
+      'fleet': 'tab-fleet',
+      'ironbots': 'tab-fleet',
       'ops': 'tab-ops',
       'operations': 'tab-ops',
       'pipeline': 'tab-ops',
@@ -3413,8 +3536,9 @@ flowchart TD
   }
 
   async function loadMeridianFocus() {
-    const badge = document.getElementById('meridianFocusBadge');
-    if (!badge) return;
+    const numberEl = document.getElementById('qDailyFocus');
+    const subEl = document.getElementById('qDailyFocusSub');
+    if (!numberEl || !subEl) return;
     let data = null;
     try {
       const res = await fetch('/api/reporting/meridian', { cache: 'no-store' });
@@ -3422,27 +3546,238 @@ flowchart TD
     } catch {}
 
     if (!data || !data.available) {
-      badge.className = 'status-badge soon';
-      badge.textContent = 'FOCUS OFFLINE';
-      badge.title = `Meridian unavailable${data && data.reason ? ` (${data.reason})` : ''}`;
+      numberEl.textContent = '—';
+      numberEl.style.color = 'var(--ash)';
+      subEl.textContent = `OFFLINE${data && data.reason ? ` (${data.reason})` : ''}`;
       return;
     }
 
-    const today = `today ${formatMinutes(data.today.total_minutes)}`;
+    numberEl.textContent = formatMinutes(data.today.total_minutes);
     const breakdown = Object.entries(data.today.minutes_by_category)
       .sort((x, y) => y[1] - x[1])
       .map(([category, minutes]) => `${category} ${formatMinutes(minutes)}`)
       .join(' · ');
-    badge.title = `Meridian · ${data.today.session_count} sessions today${breakdown ? `\n${breakdown}` : ''}`;
+    subEl.parentElement.title = `Meridian · ${data.today.session_count} sessions today${breakdown ? `\n${breakdown}` : ''}`;
 
     if (data.daemon_fresh && data.active) {
       const app = data.active.app_name.replace(/\.exe$/i, '');
-      badge.className = 'status-badge live';
-      badge.textContent = `● FOCUS ${app} · ${data.active.category} ${formatMinutes(data.active.elapsed_minutes)} · ${today}`;
+      numberEl.style.color = 'var(--color-status-live)';
+      subEl.textContent = `● ${app} · ${data.active.category} ${formatMinutes(data.active.elapsed_minutes)}`;
     } else {
-      badge.className = 'status-badge progress';
-      badge.textContent = `FOCUS IDLE · ${today}`;
+      numberEl.style.color = 'var(--brass)';
+      subEl.textContent = 'IDLE';
     }
+  }
+
+  // ---- Tab 05 Reporting: Meridian daily / weekly views ----
+  const INSIGHT_ACCENTS = ['var(--ember)', 'var(--brass)', '#5eead4'];
+  let reportMode = 'daily';
+  let reportDay = null;
+  let reportWeekEnd = null;
+  let reportStandupText = '';
+  let lastFleetSummary = null;
+
+  function localDayString(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function shiftDayString(day, delta) {
+    const [y, m, d] = day.split('-').map(Number);
+    return localDayString(new Date(y, m - 1, d + delta));
+  }
+
+  function formatDayLabel(day) {
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function safeHttpsUrl(url) {
+    return typeof url === 'string' && /^https:\/\//i.test(url) ? url : null;
+  }
+
+  function categoryRows(minutesByCategory, idleMinutes) {
+    const entries = Object.entries(minutesByCategory).filter(([, m]) => m > 0).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...entries.map(([, m]) => m));
+    const rows = entries.map(([category, minutes]) => `
+      <div class="report-row" style="display:block;">
+        <div style="display:flex; justify-content:space-between;"><span>${escapeHtml(category)}</span><span class="report-row-meta">${formatMinutes(minutes)}</span></div>
+        <div class="report-bar"><span style="width:${Math.round((minutes / max) * 100)}%"></span></div>
+      </div>`).join('');
+    const idle = idleMinutes ? `<div class="report-row"><span style="color:var(--ash);">idle (excluded)</span><span class="report-row-meta">${formatMinutes(idleMinutes)}</span></div>` : '';
+    return rows || idle ? rows + idle : '<div class="report-empty">No tracked time.</div>';
+  }
+
+  function adherenceRing(adherence, loggedMinutes) {
+    const planned = adherence.planned || 0;
+    const done = adherence.done || 0;
+    const pct = planned ? Math.round((done / planned) * 100) : 0;
+    const r = 52;
+    const circumference = 2 * Math.PI * r;
+    const extra = adherence.unplanned_minutes ? ` · +${formatMinutes(adherence.unplanned_minutes)} unplanned` : '';
+    return `
+      <div class="report-ring">
+        <svg width="140" height="140" viewBox="0 0 140 140" aria-label="Plan adherence ${pct}%">
+          <circle cx="70" cy="70" r="${r}" fill="none" stroke="rgba(154,144,136,0.2)" stroke-width="10"/>
+          <circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--ember)" stroke-width="10"
+            stroke-dasharray="${(circumference * pct) / 100} ${circumference}" transform="rotate(-90 70 70)"/>
+          <text x="70" y="68" text-anchor="middle" fill="var(--white)" font-size="26" font-weight="800">${done}/${planned}</text>
+          <text x="70" y="90" text-anchor="middle" fill="var(--ash)" font-size="11">PLAN DONE</text>
+        </svg>
+        <div>${formatMinutes(loggedMinutes || 0)} logged${escapeHtml(extra)}</div>
+      </div>`;
+  }
+
+  function setReportMode(mode) {
+    reportMode = mode;
+    document.getElementById('reportModeDaily').classList.toggle('active', mode === 'daily');
+    document.getElementById('reportModeWeekly').classList.toggle('active', mode === 'weekly');
+    document.getElementById('reportDailyView').hidden = mode !== 'daily';
+    document.getElementById('reportWeeklyView').hidden = mode !== 'weekly';
+    if (mode === 'weekly') loadReportWeek();
+    else loadReportDay();
+  }
+
+  function stepReportDay(delta) {
+    const today = localDayString(new Date());
+    const next = delta === 0 ? today : shiftDayString(reportDay || today, delta);
+    if (next > today) return;
+    reportDay = next;
+    loadReportDay();
+  }
+
+  function stepReportWeek(delta) {
+    const today = localDayString(new Date());
+    const next = delta === 0 ? today : shiftDayString(reportWeekEnd || today, delta * 7);
+    reportWeekEnd = next > today ? today : next;
+    loadReportWeek();
+  }
+
+  async function fetchReport(path) {
+    try {
+      const res = await fetch(path, { cache: 'no-store' });
+      if (res.ok) return (await res.json()).data;
+    } catch {}
+    return null;
+  }
+
+  async function loadReportDay() {
+    const day = reportDay || localDayString(new Date());
+    reportDay = day;
+    document.getElementById('reportDayTitle').textContent = formatDayLabel(day);
+    const data = await fetchReport(`/api/reporting/meridian/day?date=${day}`);
+    if (day !== reportDay) return;
+
+    const headlineEl = document.getElementById('reportDayHeadline');
+    const metaEl = document.getElementById('reportDayMeta');
+    const adherenceEl = document.getElementById('reportDayAdherence');
+    const insightsEl = document.getElementById('reportDayInsights');
+    const planEl = document.getElementById('reportDayPlan');
+    const unplannedEl = document.getElementById('reportDayUnplanned');
+    const standupEl = document.getElementById('reportDayStandup');
+    const timeEl = document.getElementById('reportDayTime');
+    const commitsEl = document.getElementById('reportDayCommits');
+    const fleetEl = document.getElementById('reportDayFleet');
+
+    const meridian = data && data.meridian;
+    if (!meridian || !meridian.available) {
+      headlineEl.textContent = `Meridian unavailable${meridian && meridian.reason ? ` (${meridian.reason})` : ''}.`;
+      metaEl.textContent = '';
+      [adherenceEl, insightsEl, planEl, unplannedEl, standupEl, timeEl].forEach((el) => { el.innerHTML = ''; });
+    } else {
+      const summary = meridian.summary;
+      const today = localDayString(new Date());
+      metaEl.textContent = summary && summary.generated_at ? `Generated ${new Date(summary.generated_at).toLocaleString()}` : '';
+      if (summary) {
+        headlineEl.textContent = summary.headline || '';
+        adherenceEl.innerHTML = adherenceRing(summary.adherence || {}, summary.logged_minutes);
+        insightsEl.innerHTML = summary.insights.map((insight, i) => `
+          <div class="report-insight" style="--accent:${INSIGHT_ACCENTS[i % INSIGHT_ACCENTS.length]}">
+            <h4>${escapeHtml(insight.title)}</h4><p>${escapeHtml(insight.text)}</p>
+          </div>`).join('');
+        planEl.innerHTML = summary.plan.length ? summary.plan.map((item) => {
+          const url = safeHttpsUrl(item.url);
+          const key = item.task_key ? (url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.task_key)}</a> ` : `${escapeHtml(item.task_key)} `) : '';
+          const mark = item.outcome === 'done' ? '✓' : (item.outcome === 'partial' ? '◐' : '○');
+          return `<div class="report-row"><span>${mark} ${key}${escapeHtml(item.title)}</span><span class="report-row-meta">${formatMinutes(item.minutes || 0)}</span></div>`;
+        }).join('') : '<div class="report-empty">No plan recorded.</div>';
+        unplannedEl.innerHTML = summary.unplanned.length ? summary.unplanned.map((task) =>
+          `<div class="report-row"><span>${escapeHtml(task.title)}</span><span class="report-row-meta">${formatMinutes(task.minutes || 0)}</span></div>`).join('')
+          : '<div class="report-empty">None.</div>';
+        reportStandupText = (summary.standup || []).map((line) => `- ${line}`).join('\n');
+        standupEl.innerHTML = (summary.standup || []).map((line) => `<li>${escapeHtml(line)}</li>`).join('') || '<li class="report-empty">No standup.</li>';
+      } else {
+        headlineEl.textContent = day === today ? 'Summary after midnight — live time and commits below.' : 'No Meridian summary for this day.';
+        adherenceEl.innerHTML = '';
+        insightsEl.innerHTML = '';
+        planEl.innerHTML = '<div class="report-empty">—</div>';
+        unplannedEl.innerHTML = '<div class="report-empty">—</div>';
+        standupEl.innerHTML = '<li class="report-empty">—</li>';
+        reportStandupText = '';
+      }
+      timeEl.innerHTML = `<div class="report-row"><span>Tracked</span><span class="report-row-meta">${formatMinutes(meridian.time.tracked_minutes)}</span></div>`
+        + categoryRows(meridian.time.minutes_by_category, meridian.time.idle_minutes);
+    }
+
+    const commits = (data && data.commits) || { count: 0, repos: {} };
+    const repoList = Object.entries(commits.repos).sort((a, b) => b[1] - a[1])
+      .map(([repo, count]) => `<div class="report-row"><span>${escapeHtml(repo)}</span><span class="report-row-meta">${count}</span></div>`).join('');
+    commitsEl.innerHTML = `<div class="report-row"><span>Commits</span><span class="report-row-meta">${commits.count}</span></div>${repoList}`;
+    const fleetText = lastFleetSummary ? `${lastFleetSummary.registered} bots · health ${lastFleetSummary.score ?? '—'}/100` : 'fleet status loading';
+    fleetEl.innerHTML = `Ironbots: ${escapeHtml(fleetText)} · <a onclick="switchTab('tab-fleet')">open fleet →</a>`;
+  }
+
+  function copyStandup() {
+    if (!reportStandupText) { showToast('No standup for this day'); return; }
+    navigator.clipboard.writeText(reportStandupText)
+      .then(() => showToast('Standup copied'))
+      .catch(() => showToast('Could not copy'));
+  }
+
+  async function loadReportWeek() {
+    const end = reportWeekEnd || localDayString(new Date());
+    reportWeekEnd = end;
+    document.getElementById('reportWeekTitle').textContent = `${formatDayLabel(shiftDayString(end, -6))} – ${formatDayLabel(end)}`;
+    const data = await fetchReport(`/api/reporting/meridian/week?end=${end}`);
+    if (end !== reportWeekEnd) return;
+
+    const kpisEl = document.getElementById('reportWeekKpis');
+    const barsEl = document.getElementById('reportWeekBars');
+    const daysEl = document.getElementById('reportWeekDays');
+    const meridian = data && data.meridian;
+    if (!meridian || !meridian.available) {
+      kpisEl.innerHTML = '';
+      barsEl.innerHTML = '';
+      daysEl.innerHTML = `<div class="report-empty">Meridian unavailable${meridian && meridian.reason ? ` (${escapeHtml(meridian.reason)})` : ''}.</div>`;
+      return;
+    }
+
+    const totals = meridian.totals;
+    const commitDays = (data.commits && data.commits.days) || {};
+    const coding = totals.minutes_by_category.coding || 0;
+    const kpi = (value, label, sub) => `<div><div class="stat-block"><div class="stat-number">${escapeHtml(value)}</div><div class="stat-label">${escapeHtml(label)}</div></div><div class="stat-sub">${escapeHtml(sub)}</div></div>`;
+    kpisEl.innerHTML = [
+      kpi(formatMinutes(totals.tracked_minutes), 'Tracked', `idle ${formatMinutes(totals.idle_minutes)} excluded`),
+      kpi(formatMinutes(Math.round(totals.tracked_minutes / 7)), 'Avg / Day', '7-day rolling'),
+      kpi(totals.tracked_minutes ? `${Math.round((coding / totals.tracked_minutes) * 100)}%` : '—', 'Coding', formatMinutes(coding)),
+      kpi(`${totals.plan.done}/${totals.plan.planned}`, 'Plan Hit', `${(data.commits && data.commits.total) || 0} commits`),
+    ].join('');
+
+    const max = Math.max(1, ...meridian.days.map((d) => d.tracked_minutes));
+    barsEl.innerHTML = meridian.days.map((d) => `
+      <div title="${escapeHtml(formatMinutes(d.tracked_minutes))}">
+        <span>${formatMinutes(d.tracked_minutes)}</span>
+        <div class="report-col" style="height:${Math.round((d.tracked_minutes / max) * 100)}%"></div>
+        <span>${escapeHtml(formatDayLabel(d.day).split(',')[0])}</span>
+      </div>`).join('');
+
+    daysEl.innerHTML = meridian.days.slice().reverse().map((d) => {
+      const commits = commitDays[d.day] ? commitDays[d.day].count : 0;
+      const plan = d.adherence && d.adherence.planned ? ` · plan ${d.adherence.done}/${d.adherence.planned}` : '';
+      return `<div class="report-row" style="cursor:pointer;" onclick="reportDay='${d.day}'; setReportMode('daily');">
+        <span><strong>${escapeHtml(formatDayLabel(d.day))}</strong> — ${d.headline ? escapeHtml(d.headline) : '<span class="report-empty">no summary</span>'}</span>
+        <span class="report-row-meta">${formatMinutes(d.tracked_minutes)}${plan} · ${commits} commits</span>
+      </div>`;
+    }).join('');
   }
 
   async function loadIronbotsDailyReport() {
@@ -3488,11 +3823,14 @@ flowchart TD
       if (tabOpsBadgeEl) {
         tabOpsBadgeEl.textContent = `17 Tasks (${registeredCount} Ironbots)`;
       }
+      const tabFleetBadgeEl = document.getElementById('tabFleetBadge');
+      if (tabFleetBadgeEl) tabFleetBadgeEl.textContent = `${registeredCount} Bots`;
+      lastFleetSummary = { registered: registeredCount, score: data.fleetHealthScore };
       if (docsEl && data.summaryMetrics) {
         docsEl.textContent = `${data.summaryMetrics.totalDocsIndexed || 0} Docs`;
       }
       if (daemonEl && data.summaryMetrics) {
-        daemonEl.textContent = `Port 8080 (${data.summaryMetrics.daemonStatus || 'OK'})`;
+        daemonEl.textContent = data.summaryMetrics.daemonStatus || 'OK';
       }
 
       function getRelativeTime(iso) {
@@ -3774,6 +4112,7 @@ flowchart TD
   renderExecutionRuns();
   loadIronbotsDailyReport();
   loadMeridianFocus();
+  loadReportDay();
   loadMobileOutbox();
   loadStorageAnalytics();
   handleHashRoute();

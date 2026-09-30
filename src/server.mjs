@@ -23,6 +23,29 @@ export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '
 export const REPORTING_HISTORY_SOURCE_SYSTEM = 'icf';
 export const REPORTING_HISTORY_SOURCE_ID = 'weekly-retro';
 
+const TELEMETRY_DIR = resolve(ROOT, '../modules/telemetry');
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const COMMIT_CACHE_TTL_MS = 5 * 60_000;
+const DAY_PARAM = /^\d{4}-\d{2}-\d{2}$/;
+
+// Meridian reports carry AI-written text about the operator's day; serve them to this machine only.
+export function isLoopback(address) {
+  return LOOPBACK_ADDRESSES.has(address);
+}
+
+function importTelemetry(file) {
+  return import(`file://${resolve(TELEMETRY_DIR, file).replace(/\\/g, '/')}`);
+}
+
+function formatLocalDay(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function shiftLocalDay(day, delta) {
+  const [y, m, d] = day.split('-').map(Number);
+  return formatLocalDay(new Date(y, m - 1, d + delta));
+}
+
 function isoWeekKey(date) {
   const value = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(value.getTime())) return null;
@@ -107,6 +130,24 @@ export function createGatewayServer(options = {}) {
         sseClients.delete(client);
       }
     }
+  }
+
+  const commitCache = new Map();
+  let gitAuthor = options.gitAuthor || null;
+  async function countCommits(since, until) {
+    const key = `${since}|${until}`;
+    const cached = commitCache.get(key);
+    if (cached && Date.now() - cached.at < COMMIT_CACHE_TTL_MS) return cached.value;
+
+    const { discoverRepos, collectCommitsByDay } = await importTelemetry('git-activity.mjs');
+    const repos = options.commitRepos || discoverRepos(resolve(ROOT, '..'));
+    if (!gitAuthor) {
+      const { execFileSync } = await import('node:child_process');
+      gitAuthor = execFileSync('git', ['-C', resolve(ROOT, '..'), 'config', 'user.name'], { encoding: 'utf8' }).trim();
+    }
+    const value = await collectCommitsByDay(repos, { since, until, author: gitAuthor });
+    commitCache.set(key, { at: Date.now(), value });
+    return value;
   }
 
   const statusFeedDir = resolve(ROOT, '../_status-feed');
@@ -220,13 +261,37 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
-      if (pathname === '/api/reporting/meridian') {
+      if (pathname === '/api/reporting/meridian' || pathname.startsWith('/api/reporting/meridian/')) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Cache-Control', 'no-store');
+        if (!isLoopback(req.socket.remoteAddress)) {
+          res.writeHead(403);
+          res.end(JSON.stringify({ status: 'FORBIDDEN', error: 'Meridian reports are local-only' }));
+          return;
+        }
         try {
-          const collectorPath = resolve(ROOT, '../modules/telemetry/meridian-telemetry.mjs');
-          const { collectMeridianTelemetry, DEFAULT_MERIDIAN_DB } = await import(`file://${collectorPath.replace(/\\/g, '/')}`);
-          const data = collectMeridianTelemetry(options.meridianDbPath || DEFAULT_MERIDIAN_DB);
+          const meridian = await importTelemetry('meridian-telemetry.mjs');
+          const dbPath = options.meridianDbPath || meridian.DEFAULT_MERIDIAN_DB;
+          let data;
+          if (pathname === '/api/reporting/meridian') {
+            data = meridian.collectMeridianTelemetry(dbPath);
+          } else if (pathname === '/api/reporting/meridian/day' || pathname === '/api/reporting/meridian/week') {
+            const isDay = pathname.endsWith('/day');
+            const day = reqUrl.searchParams.get(isDay ? 'date' : 'end') || formatLocalDay(new Date());
+            if (!DAY_PARAM.test(day)) {
+              res.writeHead(400);
+              res.end(JSON.stringify({ status: 'BAD_REQUEST', error: 'Expected YYYY-MM-DD' }));
+              return;
+            }
+            const commits = await countCommits(isDay ? day : shiftLocalDay(day, -6), day);
+            data = isDay
+              ? { meridian: meridian.collectMeridianDay(dbPath, day), commits: commits.days[day] || { count: 0, repos: {} } }
+              : { meridian: meridian.collectMeridianWeek(dbPath, day), commits };
+          } else {
+            res.writeHead(404);
+            res.end(JSON.stringify({ status: 'NOT_FOUND' }));
+            return;
+          }
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', data }));
         } catch (err) {
