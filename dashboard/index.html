@@ -814,19 +814,19 @@
           <button type="button" class="panel-action" onclick="copyCommand('code C:\\dev\\TODOS.md')">Open TODOS →</button>
         </div>
         <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;" id="dailyTodosList">
-          <li class="item-card" style="border-left: 3px solid var(--ember);">
+          <li class="item-card" style="border-left: 3px solid var(--brass);">
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
-              <span class="tag high">P1</span>
-              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">Wave D full conformance gate</span>
+              <span class="tag new">P2</span>
+              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">Dev idea pipeline</span>
             </div>
-            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">code-level PASS only. Needs provisioned PostgreSQL 15+, `npm run migrate`, live E2E rerun, and trending scheduler install verified.</div>
+            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Track unbuilt dev ideas in dev-idea-pipeline.md across CLIs. First entry: Warp CLI + WhichLLM local-model routing shim.</div>
           </li>
           <li class="item-card" style="border-left: 3px solid var(--brass);">
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
               <span class="tag new">P2</span>
-              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">TorqueQuery CIC observability hooks</span>
+              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">fast-jev-compaction compactor plugin wiring</span>
             </div>
-            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">TorqueQuery determinism verified 2026-07-17. Expose richer telemetry: per-query latency buckets, drift counters, query-shape histogram.</div>
+            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Parked, deferred follow-up. Point published compactor at local cic-jev engine instead of cloud Jev.</div>
           </li>
           <li class="item-card" style="border-left: 3px solid var(--brass);">
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
@@ -834,13 +834,6 @@
               <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">xberg native build-out</span>
             </div>
             <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Swapped mock stub to real pdf-parse text-layer extraction 2026-07-16. Next phase evaluates native parser.</div>
-          </li>
-          <li class="item-card" style="border-left: 3px solid var(--brass);">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
-              <span class="tag new">P2</span>
-              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">Non-deterministic skillpack generators</span>
-            </div>
-            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Sort warning/log lines deterministically during regeneration so pre-commit runs produce minimal diffs.</div>
           </li>
         </ul>
       </div>
@@ -873,6 +866,14 @@
             <tr>
               <td class="key">Memory Mirror Sync</td>
               <td class="val"><span class="status-badge live">● LIVE</span></td>
+            </tr>
+            <tr>
+              <td class="key">Jev Decision Runtime</td>
+              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;" id="jevRuntimeStatus"><span class="status-badge live">● 92ms p50 (Ollama)</span></span></td>
+            </tr>
+            <tr>
+              <td class="key">Jev Token Compaction</td>
+              <td class="val" id="jevCompactionReduction">58.4% reduction</td>
             </tr>
             <tr>
               <td class="key">TRM Vault Ingest</td>
@@ -2706,6 +2707,18 @@ flowchart TD
         if (data.todos) {
           renderTodos(data.todos);
         }
+        if (data.jev_runtime) {
+          const jev = data.jev_runtime;
+          const jevStatEl = document.getElementById('jevRuntimeStatus');
+          const jevRedEl = document.getElementById('jevCompactionReduction');
+          if (jevStatEl) {
+            const p50 = jev.p50_latency_ms ? `${jev.p50_latency_ms}ms` : 'sub-100ms';
+            jevStatEl.innerHTML = `<span class="status-badge live">● ${p50} p50 (${jev.resident_weights || 'Ollama'})</span>`;
+          }
+          if (jevRedEl && jev.token_reduction_pct !== undefined) {
+            jevRedEl.textContent = `${jev.token_reduction_pct}% reduction`;
+          }
+        }
       }
     } catch (e) {
       console.log('Using default telemetry state', e);
@@ -3316,6 +3329,17 @@ flowchart TD
       artifact: '_status-feed/daemon_health.json',
       cliCmd: "Start-ScheduledTask -TaskName 'Daemon-Healer' -TaskPath '\\Ironbots\\'",
       npmCmd: 'npm run bot:daemon:heal'
+    },
+    {
+      id: 'ironledger-sentinel',
+      name: 'IronLedger-Sentinel',
+      fullName: 'IronLedger Sentinel & Workbench Supervisor',
+      schedule: 'Every 15 Minutes',
+      responsibility: 'Probes Workbench port 8000, verifies double-entry balance invariants & heals Docker container',
+      logonType: 'soren (S4U) · Highest',
+      artifact: '_status-feed/ironledger_health.json',
+      cliCmd: "Start-ScheduledTask -TaskName 'IronLedger-Sentinel' -TaskPath '\\Ironbots\\'",
+      npmCmd: 'npm run bot:ironledger:sentinel'
     },
     {
       id: 'ci-watchdog',
