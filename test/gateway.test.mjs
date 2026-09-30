@@ -168,3 +168,39 @@ test('gateway serves native real-time SSE stream on /api/events with connected h
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('gateway serves Meridian focus telemetry without screen text', async () => {
+  const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+  const dir = await mkdtemp(join(tmpdir(), 'icf-meridian-'));
+  const dbPath = join(dir, 'meridian.db');
+  const sentinel = 'SENTINEL-SCREEN-TEXT-4242';
+  const now = new Date().toISOString();
+  const db = new DatabaseSync(dbPath);
+  db.exec(`CREATE TABLE app_sessions (app_name TEXT, started_at TEXT, duration_s INTEGER, category TEXT, session_text TEXT);
+    CREATE TABLE active_session (app_name TEXT, started_at TEXT, last_seen_at TEXT, category TEXT, session_text TEXT);`);
+  db.prepare('INSERT INTO active_session VALUES (?, ?, ?, ?, ?)').run('Code.exe', now, now, 'coding', sentinel);
+  db.close();
+
+  const server = createGatewayServer({ meridianDbPath: dbPath });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const response = await fetch(`${baseUrl}/api/reporting/meridian`);
+    assert.equal(response.status, 200);
+    const body = await response.text();
+    assert.ok(!body.includes(sentinel));
+    const payload = JSON.parse(body);
+    assert.equal(payload.status, 'SUCCESS');
+    assert.equal(payload.data.available, true);
+    assert.equal(payload.data.active.app_name, 'Code.exe');
+
+    const missing = createGatewayServer({ meridianDbPath: join(dir, 'nope.db') });
+    await new Promise((resolve) => missing.listen(0, '127.0.0.1', resolve));
+    try {
+      const res = await fetch(`http://127.0.0.1:${missing.address().port}/api/reporting/meridian`);
+      assert.deepEqual((await res.json()).data, { available: false, reason: 'db-missing' });
+    } finally { await new Promise((resolve) => missing.close(resolve)); }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

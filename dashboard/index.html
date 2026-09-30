@@ -692,6 +692,7 @@
     <div class="header-badges">
       <a class="status-badge live" id="docsMkdocsLink" href="http://127.0.0.1:8001/" target="_blank" rel="noopener noreferrer" title="Open local MkDocs (rewrite-docs on :8001)" style="text-decoration:none;">DOCS</a>
       <span class="status-badge live" id="sseLiveBadge" title="Real-time Server-Sent Events (SSE) Stream">● LIVE SSE</span>
+      <span class="status-badge soon" id="meridianFocusBadge" title="Operator focus from Meridian (local, read-only)">FOCUS …</span>
       <div class="synced-badge" id="reportTimestamp">SYNCED 1H AGO</div>
     </div>
   </header>
@@ -3406,6 +3407,44 @@ flowchart TD
     }
   ];
 
+  function formatMinutes(total) {
+    const h = Math.floor(total / 60);
+    return h ? `${h}h${String(total % 60).padStart(2, '0')}m` : `${total}m`;
+  }
+
+  async function loadMeridianFocus() {
+    const badge = document.getElementById('meridianFocusBadge');
+    if (!badge) return;
+    let data = null;
+    try {
+      const res = await fetch('/api/reporting/meridian', { cache: 'no-store' });
+      if (res.ok) data = (await res.json()).data;
+    } catch {}
+
+    if (!data || !data.available) {
+      badge.className = 'status-badge soon';
+      badge.textContent = 'FOCUS OFFLINE';
+      badge.title = `Meridian unavailable${data && data.reason ? ` (${data.reason})` : ''}`;
+      return;
+    }
+
+    const today = `today ${formatMinutes(data.today.total_minutes)}`;
+    const breakdown = Object.entries(data.today.minutes_by_category)
+      .sort((x, y) => y[1] - x[1])
+      .map(([category, minutes]) => `${category} ${formatMinutes(minutes)}`)
+      .join(' · ');
+    badge.title = `Meridian · ${data.today.session_count} sessions today${breakdown ? `\n${breakdown}` : ''}`;
+
+    if (data.daemon_fresh && data.active) {
+      const app = data.active.app_name.replace(/\.exe$/i, '');
+      badge.className = 'status-badge live';
+      badge.textContent = `● FOCUS ${app} · ${data.active.category} ${formatMinutes(data.active.elapsed_minutes)} · ${today}`;
+    } else {
+      badge.className = 'status-badge progress';
+      badge.textContent = `FOCUS IDLE · ${today}`;
+    }
+  }
+
   async function loadIronbotsDailyReport() {
     try {
       let data = null;
@@ -3734,6 +3773,7 @@ flowchart TD
   loadSkillsInventory();
   renderExecutionRuns();
   loadIronbotsDailyReport();
+  loadMeridianFocus();
   loadMobileOutbox();
   loadStorageAnalytics();
   handleHashRoute();
@@ -3742,6 +3782,7 @@ flowchart TD
   window.addEventListener('hashchange', handleHashRoute);
   setInterval(fetchHeadroomIcfMetrics, 15000);
   setInterval(loadIronbotsDailyReport, 30000);
+  setInterval(loadMeridianFocus, 60000);
   setInterval(loadMobileOutbox, 15000);
   setInterval(loadStorageAnalytics, 30000);
 </script>

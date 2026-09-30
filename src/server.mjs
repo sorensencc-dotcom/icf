@@ -220,6 +220,22 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
+      if (pathname === '/api/reporting/meridian') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Cache-Control', 'no-store');
+        try {
+          const collectorPath = resolve(ROOT, '../modules/telemetry/meridian-telemetry.mjs');
+          const { collectMeridianTelemetry, DEFAULT_MERIDIAN_DB } = await import(`file://${collectorPath.replace(/\\/g, '/')}`);
+          const data = collectMeridianTelemetry(options.meridianDbPath || DEFAULT_MERIDIAN_DB);
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', data }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
       if (pathname === '/api/reporting/trm/ingress' || pathname === '/api/reporting/trm-ingress') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
