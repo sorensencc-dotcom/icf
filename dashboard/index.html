@@ -722,7 +722,7 @@
     </button>
     <button type="button" class="tab-btn" id="btn-tab-ops" onclick="switchTab('tab-ops')">
       <span>06. Operations &amp; Automation</span>
-      <span class="tag date" id="tabOpsBadge">10 Tasks (4 Ironbots)</span>
+      <span class="tag date" id="tabOpsBadge">17 Tasks (10 Ironbots)</span>
     </button>
     <button type="button" class="tab-btn" id="btn-tab-headroom" onclick="switchTab('tab-headroom')">
       <span>07. Headroom Optimizer</span>
@@ -1526,7 +1526,7 @@ flowchart TD
         </div>
         <div>
           <div class="stat-block">
-            <div class="stat-number" id="ironbotsActiveCount" style="color: var(--white);">6 / 6</div>
+            <div class="stat-number" id="ironbotsActiveCount" style="color: var(--white);">10 / 10</div>
             <div class="stat-label">Active Ironbots</div>
           </div>
           <div class="stat-sub">S4U Unattended Schedulers</div>
@@ -1821,7 +1821,7 @@ flowchart TD
       <div class="panel-header">
         <div class="panel-title" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
           <span>Autonomous Background Robot Fleet</span>
-          <span class="status-badge live" id="ironbotsOpsActiveBadge">● 9 ACTIVE (UNATTENDED S4U)</span>
+          <span class="status-badge live" id="ironbotsOpsActiveBadge">● 10 ACTIVE (UNATTENDED S4U)</span>
           <span class="tag date">Zero Token Burn</span>
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -1887,6 +1887,15 @@ flowchart TD
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/daemon_health.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (200 OK)</span></td>
             <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Daemon-Healer\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">IronLedger-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
+            <td><span class="tag high">Every 15 Minutes</span></td>
+            <td>Probes Workbench port 8000, verifies double-entry balance invariants &amp; heals Docker container</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/ironledger_health.json</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (PORT 8000 OK)</span></td>
+            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'IronLedger-Sentinel\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">CI-Watchdog</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -3279,6 +3288,7 @@ flowchart TD
       id: 'notebook-ingester',
       name: 'Notebook-Ingester',
       fullName: 'NotebookLM & Knowledge Ingester',
+      category: '\\Ironbots\\',
       schedule: 'Daily 02:00 AM',
       responsibility: 'Ingests research accessions & wiki nodes into SQLite FTS5 index',
       logonType: 'soren (S4U) · Highest',
@@ -3290,6 +3300,7 @@ flowchart TD
       id: 'kb-sentinel',
       name: 'KB-Sentinel',
       fullName: 'KB-Sentinel Drift & Autoheal',
+      category: '\\Ironbots\\',
       schedule: 'Daily 03:00 AM',
       responsibility: 'Wiki frontmatter linting, broken wikilink check & autohealing',
       logonType: 'soren (S4U) · Highest',
@@ -3301,6 +3312,7 @@ flowchart TD
       id: 'trm-bot',
       name: 'TRM-Bot',
       fullName: 'TRM Gap Triage & RFC Drafter',
+      category: '\\Ironbots\\',
       schedule: 'Daily 04:00 AM',
       responsibility: 'Research gap triage, SQLite FTS5 matching & RFC note drafting',
       logonType: 'soren (S4U) · Highest',
@@ -3312,6 +3324,7 @@ flowchart TD
       id: 'watchlist-miner',
       name: 'Watchlist-Miner',
       fullName: 'Watchlist & Competitor Drift Miner',
+      category: '\\Ironbots\\',
       schedule: 'Daily 05:00 AM',
       responsibility: 'Tracks upstream model architecture baselines and flags competitor drift',
       logonType: 'soren (S4U) · Highest',
@@ -3323,6 +3336,7 @@ flowchart TD
       id: 'daemon-healer',
       name: 'Daemon-Healer',
       fullName: 'Daemon-Healer Port 8080 Supervisor',
+      category: '\\Ironbots\\',
       schedule: 'Every 15 Minutes',
       responsibility: 'Probes port 8080 health; auto-kills stale PIDs & restarts server from C:\\dev',
       logonType: 'soren (S4U) · Highest',
@@ -3334,6 +3348,7 @@ flowchart TD
       id: 'ironledger-sentinel',
       name: 'IronLedger-Sentinel',
       fullName: 'IronLedger Sentinel & Workbench Supervisor',
+      category: '\\Ironbots\\',
       schedule: 'Every 15 Minutes',
       responsibility: 'Probes Workbench port 8000, verifies double-entry balance invariants & heals Docker container',
       logonType: 'soren (S4U) · Highest',
@@ -3345,6 +3360,7 @@ flowchart TD
       id: 'ci-watchdog',
       name: 'CI-Watchdog',
       fullName: 'CI-Watchdog Workflow Failure Triage',
+      category: '\\Ironbots\\',
       schedule: 'Daily 06:00 AM',
       responsibility: 'Polls GitHub Actions for failures; extracts delivery-guard error logs',
       logonType: 'soren (S4U) · Highest',
@@ -3356,6 +3372,7 @@ flowchart TD
       id: 'ironbots-reporter',
       name: 'Ironbots-Reporter',
       fullName: 'Ironbots Fleet Reporter & Scorer',
+      category: '\\Ironbots\\',
       schedule: 'Daily 07:00 AM',
       responsibility: 'Aggregates 24h fleet telemetry, computes health score & renders daily digest',
       logonType: 'soren (S4U) · Highest',
@@ -3367,6 +3384,7 @@ flowchart TD
       id: 'storage-pruner',
       name: 'Storage-Pruner',
       fullName: 'Storage-Pruner SQLite & Telemetry Compactor',
+      category: '\\Ironbots\\',
       schedule: 'Weekly Sun 03:30 AM',
       responsibility: 'Vacuums SQLite databases, purges stale staging sandboxes & compacts telemetry',
       logonType: 'soren (S4U) · Highest',
@@ -3378,6 +3396,7 @@ flowchart TD
       id: 'trm-drive-sync',
       name: 'TRM-Drive-Sync',
       fullName: 'TRM-Drive-Sync Ingress Watcher',
+      category: '\\Ironbots\\',
       schedule: 'Continuous / On-Demand',
       responsibility: 'Syncs mobile research notes & triage cards between Drive and local repo',
       logonType: 'soren (S4U) · Highest',
@@ -3409,6 +3428,7 @@ flowchart TD
       const docsEl = document.getElementById('ironbotsDocsCount');
       const daemonEl = document.getElementById('ironbotsDaemonStatus');
       const opsBadge = document.getElementById('ironbotsOpsActiveBadge');
+      const tabOpsBadgeEl = document.getElementById('tabOpsBadge');
       const tbody = document.getElementById('ironbotsFleetTableBody');
       const opsTbody = document.getElementById('ironbotsOpsTableBody');
 
@@ -3425,6 +3445,9 @@ flowchart TD
       }
       if (opsBadge) {
         opsBadge.textContent = `● ${registeredCount} ACTIVE (UNATTENDED S4U)`;
+      }
+      if (tabOpsBadgeEl) {
+        tabOpsBadgeEl.textContent = `17 Tasks (${registeredCount} Ironbots)`;
       }
       if (docsEl && data.summaryMetrics) {
         docsEl.textContent = `${data.summaryMetrics.totalDocsIndexed || 0} Docs`;
@@ -3488,6 +3511,11 @@ flowchart TD
             statusText = ok ? 'SUPERVISED (200 OK)' : 'DEGRADED';
             badgeColor = ok ? '#5a9e6f' : 'var(--ember)';
             badgeBorder = ok ? 'rgba(90,158,111,0.4)' : 'rgba(196,80,26,0.4)';
+          } else if (def.id === 'ironledger-sentinel') {
+            const ok = telem.status === 'HEALTHY' || telem.workbench?.uiOk;
+            statusText = ok ? 'SUPERVISED (PORT 8000 OK)' : (telem.status || 'DEGRADED');
+            badgeColor = ok ? '#5a9e6f' : 'var(--ember)';
+            badgeBorder = ok ? 'rgba(90,158,111,0.4)' : 'rgba(196,80,26,0.4)';
           } else if (def.id === 'ci-watchdog') {
             const fails = telem.failureCount !== undefined ? telem.failureCount : (data.summaryMetrics?.ciFailures || 0);
             if (fails > 0) {
@@ -3547,6 +3575,8 @@ flowchart TD
             detailsHtml = `<div style="font-size:0.75rem; color:var(--ember); margin-top:0.3rem;">⚠️ <strong>Missing frontmatter:</strong> ${telem.recentIssues.map(i => escapeHtml(i.file.split(/[\\/]/).pop())).join(', ')}</div>`;
           } else if (def.id === 'daemon-healer') {
             detailsHtml = `<div style="font-size:0.75rem; color:#a78bfa; margin-top:0.3rem;">⚡ <strong>Probe Latency:</strong> ${telem.elapsedMs || 18}ms · Port 8080 OK</div>`;
+          } else if (def.id === 'ironledger-sentinel') {
+            detailsHtml = `<div style="font-size:0.75rem; color:#5eead4; margin-top:0.3rem;">🛡️ <strong>Ledger Invariants:</strong> ${telem.invariants?.passed ? 'PASS' : 'FAIL'} · Container: ${escapeHtml(telem.workbench?.container?.status || 'Active')}</div>`;
           }
 
           return `
