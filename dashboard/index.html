@@ -1614,16 +1614,16 @@ flowchart TD
         <div class="report-bars" id="reportWeekBars"></div>
         <div id="reportWeekDays"></div>
       </div>
+    </div>
 
-    <!-- Weekly Retro Telemetry Panel -->
-    <div class="panel">
+    <!-- Weekly Retro Telemetry Panel (shown in both Daily and Weekly views) -->
+    <div class="panel" style="margin-top: 2rem;">
       <div class="section-label">Weekly Telemetry</div>
       <div class="panel-header">
         <div class="panel-title">Weekly Retro Telemetry</div>
         <button type="button" class="panel-action" onclick="document.querySelector('weekly-reporting-dashboard').load()">Refresh →</button>
       </div>
       <weekly-reporting-dashboard src="/api/reporting/weekly-retro"></weekly-reporting-dashboard>
-    </div>
     </div>
   </section>
 
