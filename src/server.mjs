@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import os from 'node:os';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
 import { createReportingServer } from '../reporting/src/server.mjs';
@@ -11,6 +12,29 @@ import { validateWeeklyRetroReport } from '../reporting/src/weekly-retro-contrac
 import { weekRange, SUPPORTED_TREND_WINDOWS } from '../reporting/src/trend-summary.mjs';
 import { createMobileSnapshotService } from './mobile-snapshot.mjs';
 import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
+
+let prCache = { timestamp: 0, prs: [] };
+const PR_CACHE_TTL_MS = 60_000;
+
+export function getPullRequests() {
+  const now = Date.now();
+  if (now - prCache.timestamp < PR_CACHE_TTL_MS && prCache.prs.length > 0) {
+    return prCache.prs;
+  }
+  try {
+    const raw = execSync('gh pr list --repo sorensencc-dotcom/toolforge --limit 20 --state all --json number,title,state,url,createdAt,mergedAt,headRefName', {
+      cwd: resolve(ROOT, '..'),
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+    const parsed = JSON.parse(raw);
+    prCache = { timestamp: now, prs: parsed };
+    return parsed;
+  } catch {
+    return prCache.prs || [];
+  }
+}
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 process.stdout?.on?.('error', () => {});
@@ -373,7 +397,7 @@ export function createGatewayServer(options = {}) {
             resolve(ROOT, '../trm-drive/inbox/outbox'),
             resolve(ROOT, '../.trm/inbox/outbox')
           ];
-          const receipts = [];
+          const rawReceipts = [];
           for (const dir of outboxDirs) {
             if (existsSync(dir)) {
               try {
@@ -381,7 +405,7 @@ export function createGatewayServer(options = {}) {
                 for (const file of files) {
                   try {
                     const content = JSON.parse(readFileSync(join(dir, file), 'utf8'));
-                    receipts.push({
+                    rawReceipts.push({
                       file,
                       ...content
                     });
@@ -390,10 +414,85 @@ export function createGatewayServer(options = {}) {
               } catch {}
             }
           }
-          receipts.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-          const sliced = receipts.slice(0, 30);
+
+          // Deduplicate by normalized action_id or intent
+          const receiptMap = new Map();
+          for (const r of rawReceipts) {
+            const raw = r.action_id || r.intent || r.receipt_id || r.file || '';
+            const key = raw.replace(/-completed$/, '').replace(/^rcpt-\d+-done-/, '').replace(/^rcpt-\d+-/, '').replace(/^receipt-\d+-/, '').replace(/_/g, '-').toLowerCase().trim();
+            if (!key) continue;
+            const existing = receiptMap.get(key);
+            if (!existing) {
+              receiptMap.set(key, r);
+            } else {
+              const isCompleted = r.status === 'COMPLETED' || existing.status === 'COMPLETED';
+              receiptMap.set(key, {
+                ...existing,
+                ...r,
+                issue_url: existing.issue_url || r.issue_url,
+                pr_url: existing.pr_url || r.pr_url,
+                research_ref: existing.research_ref || r.research_ref,
+                status: isCompleted ? 'COMPLETED' : (r.status || existing.status),
+                summary: (r.status === 'COMPLETED' && r.summary) ? r.summary : (existing.summary || r.summary)
+              });
+            }
+          }
+
+          const receipts = Array.from(receiptMap.values());
+          const prs = getPullRequests();
+          for (const r of receipts) {
+            if (!r.pr_url) {
+              const matchedPr = prs.find(p => {
+                if (r.issue_url) {
+                  const issueNum = r.issue_url.split('/').pop();
+                  if (issueNum && (p.title.includes(`#${issueNum}`) || p.title.includes(`fixes #${issueNum}`) || p.title.includes(`closes #${issueNum}`))) {
+                    return true;
+                  }
+                }
+                if (r.action_id) {
+                  const slug = r.action_id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
+                  if (slug.length > 5 && p.title.toLowerCase().includes(slug)) return true;
+                }
+                if (r.intent) {
+                  const intentSlug = r.intent.replace(/_/g, ' ').toLowerCase();
+                  if (intentSlug.length > 5 && p.title.toLowerCase().includes(intentSlug)) return true;
+                }
+                return false;
+              });
+              if (matchedPr) {
+                r.pr_url = matchedPr.url;
+                r.pr_number = matchedPr.number;
+                r.pr_title = matchedPr.title;
+                r.pr_state = matchedPr.state;
+              }
+            }
+          }
+          receipts.sort((a, b) => {
+            const aPending = a.status !== 'COMPLETED';
+            const bPending = b.status !== 'COMPLETED';
+            if (aPending && !bPending) return -1;
+            if (!aPending && bPending) return 1;
+            const timeA = new Date(a.timestamp || a.completed_at || a.dispatched_at || 0).getTime();
+            const timeB = new Date(b.timestamp || b.completed_at || b.dispatched_at || 0).getTime();
+            return timeB - timeA;
+          });
+          const sliced = receipts.slice(0, 40);
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', total: receipts.length, count: sliced.length, receipts: sliced }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/pull-requests' || pathname === '/api/reporting/prs') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const prs = getPullRequests();
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', count: prs.length, prs }));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));

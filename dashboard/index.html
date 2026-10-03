@@ -2059,11 +2059,11 @@ flowchart TD
       </table>
     </div>
 
-    <!-- MOBILE OUTBOX & STORAGE COMPACTION 2-COL GRID -->
+    <!-- MOBILE OUTBOX & PULL REQUESTS 2-COL GRID -->
     <div class="grid-2col" style="margin-bottom: 2rem;">
       <!-- Left: Mobile Outbox Stream -->
       <div class="panel" style="border-top: 3px solid var(--ember);">
-        <div class="section-label">Mobile Outbox &amp; Receipts</div>
+        <div class="section-label">Mobile Outbox &amp; Action Receipts</div>
         <div class="panel-header">
           <div>
             <div class="panel-title" style="display: flex; align-items: center; gap: 0.6rem;">
@@ -2071,61 +2071,88 @@ flowchart TD
               <span class="status-badge live" id="outboxLiveStatus" style="font-size: 0.6rem;">● DISPATCH READY</span>
             </div>
             <div style="font-size: 0.8rem; color: var(--ash); margin-top: 0.2rem;">
-              Real-time receipts emitted for mobile voice/text action cards.
+              Real-time receipts emitted for mobile voice/text action cards with direct issue &amp; PR links.
             </div>
           </div>
-          <button type="button" class="panel-action" onclick="loadMobileOutbox()">Refresh ⟳</button>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="display: inline-flex; border: 1px solid rgba(154,144,136,0.25); background: rgba(10,8,6,0.6);">
+              <button type="button" id="btnOutboxFilterActive" class="tab-btn active" style="font-size: 0.65rem; padding: 0.2rem 0.55rem;" onclick="setOutboxFilter('active')">Active</button>
+              <button type="button" id="btnOutboxFilterAll" class="tab-btn" style="font-size: 0.65rem; padding: 0.2rem 0.55rem;" onclick="setOutboxFilter('all')">All</button>
+              <button type="button" id="btnOutboxFilterCompleted" class="tab-btn" style="font-size: 0.65rem; padding: 0.2rem 0.55rem;" onclick="setOutboxFilter('completed')">Completed</button>
+            </div>
+            <button type="button" class="panel-action" onclick="loadMobileOutbox()">Refresh ⟳</button>
+          </div>
         </div>
-        <div id="mobileOutboxStreamContainer" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding-right: 0.25rem;">
+        <div id="mobileOutboxStreamContainer" style="max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding-right: 0.25rem;">
           <div style="font-size: 0.85rem; color: var(--ash); font-style: italic;">Loading outbox stream...</div>
         </div>
       </div>
 
-      <!-- Right: Storage & Compaction Analytics -->
-      <div class="panel" style="border-top: 3px solid var(--brass);">
-        <div class="section-label">Storage Compaction &amp; Pruning</div>
+      <!-- Right: Pull Requests & Landing Feed -->
+      <div class="panel" style="border-top: 3px solid #5a9e6f;">
+        <div class="section-label">GitHub Pull Requests &amp; Landings</div>
         <div class="panel-header">
           <div>
             <div class="panel-title" style="display: flex; align-items: center; gap: 0.6rem;">
-              <span>SQLite &amp; Telemetry Compactor</span>
-              <span class="status-badge live" id="storageStatusBadge" style="font-size: 0.6rem;">● HEALTHY</span>
+              <span>Code Landings &amp; PRs</span>
+              <span class="status-badge live" id="prsLiveBadge" style="font-size: 0.6rem;">● TRACKED</span>
             </div>
             <div style="font-size: 0.8rem; color: var(--ash); margin-top: 0.2rem;">
-              Weekly VACUUM optimization, .gz telemetry archiving &amp; task pruning.
+              Merged and open pull requests across the ecosystem.
             </div>
           </div>
-          <button type="button" class="panel-action" onclick="loadStorageAnalytics()">Refresh ⟳</button>
+          <button type="button" class="panel-action" onclick="loadPullRequests()">Refresh ⟳</button>
         </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
-          <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
-            <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Total Space Freed</div>
-            <div id="storageTotalFreed" style="font-size: 1.15rem; font-weight: 700; color: #5eead4; font-family: monospace;">--</div>
-          </div>
-          <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
-            <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Databases Scanned</div>
-            <div id="storageDbCount" style="font-size: 1.15rem; font-weight: 700; color: var(--white); font-family: monospace;">--</div>
-          </div>
-          <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
-            <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Archives Compacted</div>
-            <div id="storageGzCount" style="font-size: 1.15rem; font-weight: 700; color: var(--brass); font-family: monospace;">--</div>
-          </div>
+        <div id="pullRequestsStreamContainer" style="max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding-right: 0.25rem;">
+          <div style="font-size: 0.85rem; color: var(--ash); font-style: italic;">Loading pull requests stream...</div>
         </div>
+      </div>
+    </div>
 
-        <div style="overflow-x: auto;">
-          <table class="table-clean" style="font-size: 0.8rem;">
-            <thead>
-              <tr>
-                <th>Database File</th>
-                <th>Size</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="storageDbTableBody">
-              <tr><td colspan="3" style="color: var(--ash); font-style: italic;">Loading storage analytics...</td></tr>
-            </tbody>
-          </table>
+    <!-- STORAGE COMPACTION & PRUNING -->
+    <div class="panel" style="border-top: 3px solid var(--brass); margin-bottom: 2rem;">
+      <div class="section-label">Storage Compaction &amp; Pruning</div>
+      <div class="panel-header">
+        <div>
+          <div class="panel-title" style="display: flex; align-items: center; gap: 0.6rem;">
+            <span>SQLite &amp; Telemetry Compactor</span>
+            <span class="status-badge live" id="storageStatusBadge" style="font-size: 0.6rem;">● HEALTHY</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--ash); margin-top: 0.2rem;">
+            Weekly VACUUM optimization, .gz telemetry archiving &amp; task pruning.
+          </div>
         </div>
+        <button type="button" class="panel-action" onclick="loadStorageAnalytics()">Refresh ⟳</button>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+        <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
+          <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Total Space Freed</div>
+          <div id="storageTotalFreed" style="font-size: 1.15rem; font-weight: 700; color: #5eead4; font-family: monospace;">--</div>
+        </div>
+        <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
+          <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Databases Scanned</div>
+          <div id="storageDbCount" style="font-size: 1.15rem; font-weight: 700; color: var(--white); font-family: monospace;">--</div>
+        </div>
+        <div style="background: rgba(44, 36, 32, 0.6); padding: 0.6rem; border: 1px solid rgba(196, 80, 26, 0.2);">
+          <div style="font-size: 0.7rem; color: var(--ash); text-transform: uppercase;">Archives Compacted</div>
+          <div id="storageGzCount" style="font-size: 1.15rem; font-weight: 700; color: var(--brass); font-family: monospace;">--</div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="table-clean" style="font-size: 0.8rem;">
+          <thead>
+            <tr>
+              <th>Database File</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="storageDbTableBody">
+            <tr><td colspan="3" style="color: var(--ash); font-style: italic;">Loading storage analytics...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -3981,39 +4008,127 @@ flowchart TD
     }
   }
 
-  async function loadMobileOutbox() {
+  let currentOutboxFilter = 'active'; // Default to active/pending to reduce noise!
+  let cachedOutboxReceipts = [];
+
+  function setOutboxFilter(filter) {
+    currentOutboxFilter = filter;
+    ['Active', 'All', 'Completed'].forEach(name => {
+      const btn = document.getElementById(`btnOutboxFilter${name}`);
+      if (btn) {
+        if (name.toLowerCase() === filter) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    });
+    renderOutboxReceipts();
+  }
+
+  function renderOutboxReceipts() {
     const container = document.getElementById('mobileOutboxStreamContainer');
     if (!container) return;
+
+    let filtered = cachedOutboxReceipts;
+    if (currentOutboxFilter === 'active') {
+      filtered = cachedOutboxReceipts.filter(r => r.status !== 'COMPLETED');
+    } else if (currentOutboxFilter === 'completed') {
+      filtered = cachedOutboxReceipts.filter(r => r.status === 'COMPLETED');
+    }
+
+    if (filtered.length === 0) {
+      const msg = currentOutboxFilter === 'active'
+        ? 'No active pending items in queue.'
+        : (currentOutboxFilter === 'completed' ? 'No completed receipts found.' : 'No receipts in outbox buffer.');
+      container.innerHTML = `<div style="font-size: 0.85rem; color: var(--ash); font-style: italic; padding: 0.5rem 0;">${msg}</div>`;
+      return;
+    }
+
+    container.innerHTML = filtered.map(r => {
+      const isQuarantined = r.status === 'QUARANTINED' || r.status === 'QUARANTINE_MOVE_FAILED';
+      const isCompleted = r.status === 'COMPLETED';
+      const badgeClass = isQuarantined ? 'high' : (isCompleted ? 'live' : 'progress');
+      const badgeText = isQuarantined ? 'QUARANTINED' : (r.status || 'PENDING');
+      const color = isQuarantined ? 'var(--ember)' : (isCompleted ? '#5a9e6f' : 'var(--brass)');
+      const timeStr = (r.timestamp || r.completed_at || r.dispatched_at) ? new Date(r.timestamp || r.completed_at || r.dispatched_at).toLocaleTimeString() : 'Just now';
+      const cardTitle = r.card_title || r.summary || r.action_id || r.file;
+      const handler = r.action_type || (r.execution_plan && r.execution_plan[0]?.handler) || 'ironbot';
+      const issueNumber = r.issue_url ? r.issue_url.split('/').pop() : null;
+      const prNumber = r.pr_number || (r.pr_url ? r.pr_url.split('/').pop() : null);
+
+      return `
+        <div style="background: rgba(44, 36, 32, 0.4); border-left: 3px solid ${color}; padding: 0.55rem 0.75rem; border-top: 1px solid rgba(154, 144, 136, 0.1); border-right: 1px solid rgba(154, 144, 136, 0.1); border-bottom: 1px solid rgba(154, 144, 136, 0.1);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <span class="status-badge ${badgeClass}" style="font-size: 0.55rem;">● ${escapeHtml(badgeText)}</span>
+            <span style="font-size: 0.7rem; color: var(--ash); font-family: monospace;">${escapeHtml(timeStr)}</span>
+          </div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--white); margin-bottom: 0.25rem;">${escapeHtml(cardTitle)}</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; font-size: 0.72rem; color: var(--ash); font-family: monospace; margin-bottom: 0.35rem;">
+            <span>Handler: <strong style="color:var(--bone);">${escapeHtml(handler)}</strong></span>
+            <span>·</span>
+            <span>Latency: <strong style="color:var(--bone);">${escapeHtml(String(r.duration_ms || 0))}ms</strong></span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 0.25rem;">
+            ${r.issue_url ? `<a href="${escapeHtml(r.issue_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(196,80,26,0.15); color:var(--ember); padding:0.15rem 0.45rem; border:1px solid rgba(196,80,26,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600;">Issue #${escapeHtml(issueNumber)} ↗</a>` : ''}
+            ${r.pr_url ? `<a href="${escapeHtml(r.pr_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.15rem 0.45rem; border:1px solid rgba(90,158,111,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600;">PR #${escapeHtml(String(prNumber))} (${escapeHtml(r.pr_state || 'MERGED')}) ↗</a>` : ''}
+            ${r.research_ref ? `<span style="display:inline-flex; align-items:center; background:rgba(184,146,42,0.15); color:var(--brass); padding:0.15rem 0.45rem; border:1px solid rgba(184,146,42,0.3); font-size:0.68rem; font-family:monospace;">RFC Note</span>` : ''}
+            ${(!r.issue_url && !r.pr_url && !r.research_ref) ? `<span style="display:inline-flex; align-items:center; color:var(--ash); font-size:0.68rem; font-family:monospace; font-style:italic;">⏳ Staged in backlog · No PR yet</span>` : ''}
+          </div>
+          ${r.error ? `<div style="font-size:0.72rem; color:var(--ember); margin-top:0.2rem; font-family:monospace;">${escapeHtml(r.error)}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function loadMobileOutbox() {
     try {
       const res = await fetch('/api/reporting/mobile-outbox', { cache: 'no-store' });
       if (!res.ok) return;
       const json = await res.json();
-      const receipts = json.receipts || [];
-      if (receipts.length === 0) {
-        container.innerHTML = `<div style="font-size: 0.85rem; color: var(--ash); font-style: italic; padding: 0.5rem 0;">No receipts in outbox buffer. Ready for mobile voice/text input.</div>`;
+      cachedOutboxReceipts = json.receipts || [];
+      renderOutboxReceipts();
+    } catch {}
+  }
+
+  async function loadPullRequests() {
+    const container = document.getElementById('pullRequestsStreamContainer');
+    const badge = document.getElementById('prsLiveBadge');
+    if (!container) return;
+    try {
+      const res = await fetch('/api/reporting/pull-requests', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json();
+      const prs = json.prs || [];
+      if (badge) {
+        badge.textContent = `● ${prs.length} TRACKED`;
+      }
+      if (prs.length === 0) {
+        container.innerHTML = `<div style="font-size: 0.85rem; color: var(--ash); font-style: italic; padding: 0.5rem 0;">No pull requests found.</div>`;
         return;
       }
-      container.innerHTML = receipts.map(r => {
-        const isQuarantined = r.status === 'QUARANTINED' || r.status === 'QUARANTINE_MOVE_FAILED';
-        const badgeClass = isQuarantined ? 'high' : 'live';
-        const badgeText = isQuarantined ? 'QUARANTINED' : 'COMPLETED';
-        const color = isQuarantined ? 'var(--ember)' : 'var(--sage)';
-        const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'Just now';
-        const cardTitle = r.card_title || r.summary || r.action_id || r.file;
-        const handler = r.action_type || (r.execution_plan && r.execution_plan[0]?.handler) || 'ironbot';
+      container.innerHTML = prs.map(p => {
+        const isMerged = p.state === 'MERGED' || p.mergedAt;
+        const isOpen = p.state === 'OPEN' || p.state === 'open';
+        const badgeClass = isMerged ? 'live' : (isOpen ? 'progress' : 'soon');
+        const badgeText = isMerged ? 'MERGED' : (isOpen ? 'OPEN' : p.state);
+        const color = isMerged ? '#5a9e6f' : (isOpen ? 'var(--brass)' : 'var(--ash)');
+        const timeStr = p.mergedAt ? new Date(p.mergedAt).toLocaleTimeString() : (p.createdAt ? new Date(p.createdAt).toLocaleTimeString() : '');
         return `
           <div style="background: rgba(44, 36, 32, 0.4); border-left: 3px solid ${color}; padding: 0.55rem 0.75rem; border-top: 1px solid rgba(154, 144, 136, 0.1); border-right: 1px solid rgba(154, 144, 136, 0.1); border-bottom: 1px solid rgba(154, 144, 136, 0.1);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
               <span class="status-badge ${badgeClass}" style="font-size: 0.55rem;">● ${escapeHtml(badgeText)}</span>
               <span style="font-size: 0.7rem; color: var(--ash); font-family: monospace;">${escapeHtml(timeStr)}</span>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 700; color: var(--white); margin-bottom: 0.2rem;">${escapeHtml(cardTitle)}</div>
-            <div style="display: flex; gap: 0.5rem; font-size: 0.72rem; color: var(--ash); font-family: monospace;">
-              <span>Handler: <strong style="color:var(--bone);">${escapeHtml(handler)}</strong></span>
-              <span>·</span>
-              <span>Latency: <strong style="color:var(--bone);">${escapeHtml(String(r.duration_ms || 0))}ms</strong></span>
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--white); margin-bottom: 0.25rem;">
+              <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" style="color:var(--white); text-decoration:none;">
+                <span style="color:var(--ember); font-family:monospace; margin-right:0.3rem;">#${escapeHtml(String(p.number))}</span>${escapeHtml(p.title)} ↗
+              </a>
             </div>
-            ${r.error ? `<div style="font-size:0.72rem; color:var(--ember); margin-top:0.2rem; font-family:monospace;">${escapeHtml(r.error)}</div>` : ''}
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--ash); font-family: monospace;">
+              <span>${p.headRefName ? `Branch: <code style="color:var(--bone);">${escapeHtml(p.headRefName)}</code>` : 'GitHub PR'}</span>
+              <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" style="color:var(--ember); text-decoration:underline;">View PR ↗</a>
+            </div>
           </div>
         `;
       }).join('');
@@ -4082,6 +4197,7 @@ flowchart TD
           } else if (payload.feed === 'daily_status.json' || payload.feed === 'trm_ingress_status.json') {
             loadDailyStatus();
             loadMobileOutbox();
+            loadPullRequests();
           } else if (payload.feed === 'storage_pruner_status.json') {
             loadStorageAnalytics();
           }
@@ -4114,6 +4230,7 @@ flowchart TD
   loadMeridianFocus();
   loadReportDay();
   loadMobileOutbox();
+  loadPullRequests();
   loadStorageAnalytics();
   handleHashRoute();
   initRealtimeEventStream();
@@ -4123,6 +4240,7 @@ flowchart TD
   setInterval(loadIronbotsDailyReport, 30000);
   setInterval(loadMeridianFocus, 60000);
   setInterval(loadMobileOutbox, 15000);
+  setInterval(loadPullRequests, 30000);
   setInterval(loadStorageAnalytics, 30000);
 </script>
 
