@@ -389,6 +389,35 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
+      if (pathname === '/api/reporting/cost-routing' || pathname === '/api/reporting/cost-routing-gateway') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const feedPath = resolve(ROOT, '../_status-feed/cost_routing_status.json');
+          const dashboardFeed = resolve(DASHBOARD_DIR, 'cost_routing_status.json');
+          let data = null;
+          if (existsSync(feedPath)) {
+            data = JSON.parse(readFileSync(feedPath, 'utf8'));
+          } else if (existsSync(dashboardFeed)) {
+            data = JSON.parse(readFileSync(dashboardFeed, 'utf8'));
+          }
+          if (data) {
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', ...data }));
+            return;
+          }
+          res.writeHead(200);
+          res.end(JSON.stringify({
+            status: 'STANDBY',
+            metrics: { totalRequests: 0, totalSavedVsFrontierUsd: 0, totalSpentUsd: 0, qualityEscalations: 0, averageLatencyMs: 0 }
+          }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
       if (pathname === '/api/reporting/mobile-outbox' || pathname === '/api/reporting/outbox') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');

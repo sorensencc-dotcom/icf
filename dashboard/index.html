@@ -2524,10 +2524,74 @@ flowchart TD
   </section>
 
   <!-- ================================================================= -->
-  <!-- TAB 5: HEADROOM OPTIMIZER -->
+  <!-- TAB 5: COST ROUTING & HEADROOM OPTIMIZER -->
   <!-- ================================================================= -->
-  <section id="tab-headroom" class="tab-pane" aria-label="Headroom Optimizer">
-    <!-- Top Control Bar -->
+  <section id="tab-headroom" class="tab-pane" aria-label="Cost Routing and Headroom Optimizer">
+    <!-- Multi-Model Cost-Routing Gateway Panel (ACT-03) -->
+    <div class="panel" style="margin-bottom: 1.5rem; border-color: rgba(196, 80, 26, 0.35);">
+      <div class="section-label">Multi-Model Substrate Routing (ACT-03)</div>
+      <div class="panel-header">
+        <div class="panel-title" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <span>Dynamic Cost-Routing Gateway &amp; FreeLLMAPI Unified Router</span>
+          <span class="status-badge live" id="costRoutingGatewayStatus">● GATEWAY ACTIVE</span>
+          <span class="tag date" id="costRoutingBaselineTag">Baseline: claude-3-5-sonnet ($3 / $15)</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="panel-action" onclick="fetchCostRoutingMetrics(true)">Refresh Gateway ↺</button>
+          <button type="button" class="panel-action" onclick="copyCommand('mcp call torquequery route_model_request')">Copy MCP Tool 📋</button>
+        </div>
+      </div>
+
+      <!-- Cost-Routing Key Metrics Grid -->
+      <div class="grid-metrics" style="margin-top: 1.25rem;">
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="crDetailSavedUsd" style="color: #5eead4;">$0.0000</div>
+            <div class="stat-label">Net Frontier Savings</div>
+          </div>
+          <div class="stat-sub" id="crDetailSavedSub">vs. Claude 3.5 Sonnet Baseline</div>
+        </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="crDetailTotalRequests" style="color: #fcd34d;">0</div>
+            <div class="stat-label">Total Requests Routed</div>
+          </div>
+          <div class="stat-sub" id="crDetailRequestsSub">Across 4 Tier Cascade</div>
+        </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="crDetailSpentUsd" style="color: var(--fg-primary);">$0.0000</div>
+            <div class="stat-label">Total Spent ($)</div>
+          </div>
+          <div class="stat-sub" id="crDetailSpentSub">Zero-Cost Tier Absorption</div>
+        </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="crDetailEscalations" style="color: #d8b4fe;">0</div>
+            <div class="stat-label">Quality Escalations</div>
+          </div>
+          <div class="stat-sub" id="crDetailAvgLatency">Avg Latency: 0 ms</div>
+        </div>
+      </div>
+
+      <!-- 4-Tier Substrate Matrix Table -->
+      <table class="table-clean" style="margin-top: 1.25rem;">
+        <thead>
+          <tr>
+            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: left; padding: 0.5rem;">Routing Tier &amp; Provider</th>
+            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: center; padding: 0.5rem;">SLA / Reliability</th>
+            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: center; padding: 0.5rem;">Circuit Breaker</th>
+            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: right; padding: 0.5rem;">Total Hits</th>
+            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: right; padding: 0.5rem;">Trips</th>
+          </tr>
+        </thead>
+        <tbody id="crTiersTableBody">
+          <!-- Populated dynamically via cost_routing_status.json -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top Control Bar (Headroom) -->
     <div class="panel" style="margin-bottom: 1.5rem;">
       <div class="section-label">Context Optimization</div>
       <div class="panel-header">
@@ -3492,6 +3556,101 @@ flowchart TD
     }
   }
 
+  async function fetchCostRoutingMetrics(isManual = false) {
+    try {
+      let data = null;
+      try {
+        const res = await fetch('/api/reporting/cost-routing', { cache: 'no-store' });
+        if (res.ok) data = await res.json();
+      } catch {}
+      if (!data) {
+        try {
+          const res = await fetch('cost_routing_status.json', { cache: 'no-store' });
+          if (res.ok) data = await res.json();
+        } catch {}
+      }
+      if (!data) {
+        try {
+          const res = await fetch('/cost_routing_status.json', { cache: 'no-store' });
+          if (res.ok) data = await res.json();
+        } catch {}
+      }
+      if (!data) throw new Error('Status feed unreachable');
+
+      const metrics = data.metrics || {};
+      const tiers = data.tiers || {};
+      const baseline = data.frontierPricingBaseline || {};
+
+      const totalReqs = metrics.totalRequests || 0;
+      const totalSaved = Number(metrics.totalSavedVsFrontierUsd || 0).toFixed(4);
+      const totalSpent = Number(metrics.totalSpentUsd || 0).toFixed(4);
+      const escalations = metrics.qualityEscalations || 0;
+      const avgLatency = Math.round(metrics.averageLatencyMs || 0);
+
+      const crSavedEl = document.getElementById('crDetailSavedUsd');
+      const crSpentEl = document.getElementById('crDetailSpentUsd');
+      const crReqsEl = document.getElementById('crDetailTotalRequests');
+      const crEscalationsEl = document.getElementById('crDetailEscalations');
+      const crAvgLatencyEl = document.getElementById('crDetailAvgLatency');
+      const crStatusBadge = document.getElementById('costRoutingGatewayStatus');
+      const crBaselineTag = document.getElementById('costRoutingBaselineTag');
+
+      if (crSavedEl) crSavedEl.textContent = `$${totalSaved}`;
+      if (crSpentEl) crSpentEl.textContent = `$${totalSpent}`;
+      if (crReqsEl) crReqsEl.textContent = `${totalReqs}`;
+      if (crEscalationsEl) crEscalationsEl.textContent = `${escalations}`;
+      if (crAvgLatencyEl) crAvgLatencyEl.textContent = `Avg Latency: ${avgLatency} ms`;
+      if (crBaselineTag && baseline.model) {
+        crBaselineTag.textContent = `Baseline: ${baseline.model.replace('anthropic/', '')} ($${baseline.inputCostPer1M}/$${baseline.outputCostPer1M})`;
+      }
+      if (crStatusBadge) {
+        crStatusBadge.className = 'status-badge live';
+        crStatusBadge.innerHTML = '● GATEWAY ACTIVE';
+      }
+
+      const tbody = document.getElementById('crTiersTableBody');
+      if (tbody) {
+        const tierKeys = ['tier_0_local', 'tier_0_5_freellmapi', 'tier_1_muscle', 'tier_2_frontier'];
+        tbody.innerHTML = tierKeys.map(k => {
+          const t = tiers[k] || {};
+          const hits = (metrics.tierHits && metrics.tierHits[k]) || 0;
+          const trips = (metrics.circuitBreakerTrips && metrics.circuitBreakerTrips[k]) || 0;
+          const cbState = t.circuitBreakerState || 'CLOSED';
+          const isClosed = cbState === 'CLOSED';
+
+          const cbBadge = isClosed
+            ? '<span class="badge-pill sage">● CLOSED (HEALTHY)</span>'
+            : '<span class="badge-pill terracotta">● OPEN (TRIPPED)</span>';
+
+          const relBadge = t.reliability === 'offline_local'
+            ? '<span class="tag date">OFFLINE LOCAL</span>'
+            : t.reliability === 'best_effort'
+              ? '<span class="tag date" style="background:rgba(184,146,42,0.15);color:var(--accent-brass);">BEST EFFORT (:3001)</span>'
+              : t.reliability === 'commercial_sla'
+                ? '<span class="tag date" style="background:rgba(61,107,79,0.15);color:var(--accent-sage);">COMMERCIAL SLA</span>'
+                : '<span class="tag date" style="background:rgba(196,80,26,0.15);color:var(--accent-terracotta);">FRONTIER</span>';
+
+          return `<tr>
+            <td class="key" style="font-weight:700; font-family:'Barlow Condensed',sans-serif; font-size:0.95rem;">${t.displayName || k}</td>
+            <td style="text-align:center;">${relBadge}</td>
+            <td style="text-align:center;">${cbBadge}</td>
+            <td class="val" style="text-align:right; font-family:'Geist Mono',monospace; font-weight:700;">${hits}</td>
+            <td class="val" style="text-align:right; font-family:'Geist Mono',monospace; color:var(--ash);">${trips}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      if (isManual) showToast('Cost-routing telemetry updated');
+    } catch {
+      const crStatusBadge = document.getElementById('costRoutingGatewayStatus');
+      if (crStatusBadge) {
+        crStatusBadge.className = 'status-badge soon';
+        crStatusBadge.innerHTML = '● STANDBY';
+      }
+      if (isManual) showToast('Cost-routing feed unreachable');
+    }
+  }
+
   // ============================================================
   // TOOLFORGE SKILLS & EXECUTION HISTORY LOGIC (TABS 07 & 08)
   // ============================================================
@@ -4445,6 +4604,8 @@ flowchart TD
             loadPullRequests();
           } else if (payload.feed === 'storage_pruner_status.json') {
             loadStorageAnalytics();
+          } else if (payload.feed === 'cost_routing_status.json') {
+            fetchCostRoutingMetrics();
           }
         } catch {}
       });
@@ -4550,6 +4711,7 @@ flowchart TD
   renderDomainsTable();
   loadDailyStatus();
   fetchHeadroomIcfMetrics();
+  fetchCostRoutingMetrics();
   loadSkillsInventory();
   renderExecutionRuns();
   loadIronbotsDailyReport();
@@ -4563,6 +4725,7 @@ flowchart TD
 
   window.addEventListener('hashchange', handleHashRoute);
   setInterval(fetchHeadroomIcfMetrics, 15000);
+  setInterval(fetchCostRoutingMetrics, 10000);
   setInterval(loadIronbotsDailyReport, 30000);
   setInterval(loadMeridianFocus, 60000);
   setInterval(loadMobileOutbox, 15000);
