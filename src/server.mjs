@@ -4,6 +4,7 @@ import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
+import zlib from 'node:zlib';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
 import { createReportingServer } from '../reporting/src/server.mjs';
 import { createSnapshotStore } from '../reporting/src/snapshot-store.mjs';
@@ -356,6 +357,62 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
+      if (pathname === '/api/reporting/trm/history' || pathname === '/api/reporting/trm-history') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const date = reqUrl.searchParams.get('date');
+          const dirs = [
+            resolve(ROOT, '../_status-feed/trm_history'),
+            resolve(DASHBOARD_DIR, 'trm_history')
+          ];
+          if (!date) {
+            const dateSet = new Set();
+            for (const d of dirs) {
+              if (existsSync(d)) {
+                for (const f of readdirSync(d)) {
+                  const m = f.match(/^(\d{4}-\d{2}-\d{2})\.json(\.gz)?$/);
+                  if (m) dateSet.add(m[1]);
+                }
+              }
+            }
+            const dates = Array.from(dateSet).sort().reverse();
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', dates }));
+            return;
+          }
+          if (!DAY_PARAM.test(date)) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ status: 'BAD_REQUEST', error: 'Expected YYYY-MM-DD' }));
+            return;
+          }
+          for (const d of dirs) {
+            const jsonPath = join(d, `${date}.json`);
+            if (existsSync(jsonPath)) {
+              const data = JSON.parse(readFileSync(jsonPath, 'utf8'));
+              res.writeHead(200);
+              res.end(JSON.stringify(data));
+              return;
+            }
+            const gzPath = join(d, `${date}.json.gz`);
+            if (existsSync(gzPath)) {
+              const buf = readFileSync(gzPath);
+              const unzipped = zlib.gunzipSync(buf).toString('utf8');
+              const data = JSON.parse(unzipped);
+              res.writeHead(200);
+              res.end(JSON.stringify(data));
+              return;
+            }
+          }
+          res.writeHead(404);
+          res.end(JSON.stringify({ status: 'NOT_FOUND', error: `Snapshot not found: ${date}` }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
       if (pathname === '/api/reporting/storage-pruner' || pathname === '/api/reporting/storage') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -583,29 +640,58 @@ export function createGatewayServer(options = {}) {
       ? 'index.html'
       : (pathname.startsWith('/dashboard/') ? pathname.slice('/dashboard/'.length) : pathname.replace(/^\/+/, ''));
 
-    // Resolve candidate strictly within dashboard directory
-    const targetPath = normalize(resolve(DASHBOARD_DIR, relativePath));
+    // Resolve candidates across dashboard directory, modules/wiki, and _status-feed
+    const candidatePaths = [
+      normalize(resolve(DASHBOARD_DIR, relativePath))
+    ];
 
-    const isInsideDashboard = targetPath === DASHBOARD_DIR || targetPath.startsWith(DASHBOARD_DIR + sep);
-
-    if (!isInsideDashboard) {
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
-      res.end('403 Forbidden: Invalid file path');
-      return;
+    if (pathname.startsWith('/modules/wiki/')) {
+      const stripped = pathname.slice('/modules/wiki/'.length);
+      candidatePaths.push(normalize(resolve(DASHBOARD_DIR, stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'modules', 'wiki', stripped)));
+    } else if (pathname.startsWith('/_status-feed/')) {
+      const stripped = pathname.slice('/_status-feed/'.length);
+      candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', stripped)));
+      candidatePaths.push(normalize(resolve(DASHBOARD_DIR, stripped)));
+    } else if (pathname.startsWith('/trm_history/')) {
+      const filename = pathname.split('/').pop();
+      candidatePaths.push(normalize(resolve(DASHBOARD_DIR, 'trm_history', filename)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', 'trm_history', filename)));
     }
 
-    if (existsSync(targetPath) && statSync(targetPath).isFile()) {
-      try {
-        const ext = extname(targetPath).toLowerCase();
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-        const fileContent = readFileSync(targetPath);
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(fileContent);
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end(`500 Internal Server Error: ${err.message}`);
+    for (const targetPath of candidatePaths) {
+      if (existsSync(targetPath) && statSync(targetPath).isFile()) {
+        try {
+          const ext = extname(targetPath).toLowerCase();
+          const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+          const fileContent = readFileSync(targetPath);
+          res.writeHead(200, { 'Content-Type': contentType });
+          res.end(fileContent);
+          return;
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end(`500 Internal Server Error: ${err.message}`);
+          return;
+        }
       }
-      return;
+
+      // If .json was requested but only .json.gz exists, gunzip transparently
+      if (targetPath.endsWith('.json')) {
+        const gzPath = targetPath + '.gz';
+        if (existsSync(gzPath) && statSync(gzPath).isFile()) {
+          try {
+            const buf = readFileSync(gzPath);
+            const unzipped = zlib.gunzipSync(buf);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(unzipped);
+            return;
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end(`500 Internal Server Error: ${err.message}`);
+            return;
+          }
+        }
+      }
     }
 
     res.writeHead(404, { 'Content-Type': 'text/plain' });

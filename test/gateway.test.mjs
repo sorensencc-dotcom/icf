@@ -32,7 +32,26 @@ test('ICF Gateway Server serves static dashboard and reporting routes', async ()
     assert.equal(categoriesData.status, 'SUCCESS');
     assert.ok(Array.isArray(categoriesData.data));
 
-    // 4. Path traversal prevention test with raw path
+    // 4. TRM history endpoint
+    const resTrmDates = await fetch(`${baseUrl}/api/reporting/trm/history`);
+    assert.equal(resTrmDates.status, 200);
+    const trmDatesData = await resTrmDates.json();
+    assert.equal(trmDatesData.status, 'SUCCESS');
+    assert.ok(Array.isArray(trmDatesData.dates));
+    assert.ok(trmDatesData.dates.length > 0);
+
+    const resTrmSnapshot = await fetch(`${baseUrl}/api/reporting/trm/history?date=${trmDatesData.dates[0]}`);
+    assert.equal(resTrmSnapshot.status, 200);
+    const snapshotData = await resTrmSnapshot.json();
+    assert.ok(snapshotData.topics_total !== undefined || snapshotData.notebooks !== undefined || snapshotData.notebook_findings !== undefined);
+
+    // 5. Static resolution fallback for /modules/wiki/daily_status.json
+    const resWikiDaily = await fetch(`${baseUrl}/modules/wiki/daily_status.json`);
+    assert.equal(resWikiDaily.status, 200);
+    const wikiDailyData = await resWikiDaily.json();
+    assert.ok(wikiDailyData.trm_intelligence !== undefined);
+
+    // 6. Path traversal prevention test with raw path
     const resTraversalStatus = await new Promise((resolve, reject) => {
       const req = request({
         host: '127.0.0.1',

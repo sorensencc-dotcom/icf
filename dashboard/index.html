@@ -3156,39 +3156,54 @@ flowchart TD
   }
 
   async function loadDailyStatus() {
-    try {
-      const res = await fetch('daily_status.json', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const tsStr = data.timestamp || data.generated_at;
-        if (tsStr) {
-          const ts = new Date(tsStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const repEl = document.getElementById('reportTimestamp');
-          if (repEl) repEl.textContent = `SYNCED AT ${ts}`;
+    const candidateUrls = [
+      'daily_status.json',
+      '/daily_status.json',
+      '_status-feed/daily_status.json',
+      '/_status-feed/daily_status.json',
+      '/modules/wiki/daily_status.json',
+      '../../_status-feed/daily_status.json',
+      '../_status-feed/daily_status.json'
+    ];
+
+    let data = null;
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) {
+          data = await res.json();
+          break;
         }
-        if (data.trm_intelligence) {
-          currentTrmData = data.trm_intelligence;
-          currentPipelineData = data.trm_pipeline || null;
-          renderTrmIntelligence(data.trm_intelligence, data.trm_pipeline);
+      } catch {}
+    }
+
+    if (data) {
+      const tsStr = data.timestamp || data.generated_at;
+      if (tsStr) {
+        const ts = new Date(tsStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const repEl = document.getElementById('reportTimestamp');
+        if (repEl) repEl.textContent = `SYNCED AT ${ts}`;
+      }
+      if (data.trm_intelligence) {
+        currentTrmData = data.trm_intelligence;
+        currentPipelineData = data.trm_pipeline || null;
+        renderTrmIntelligence(data.trm_intelligence, data.trm_pipeline);
+      }
+      if (data.todos) {
+        renderTodos(data.todos);
+      }
+      if (data.jev_runtime) {
+        const jev = data.jev_runtime;
+        const jevStatEl = document.getElementById('jevRuntimeStatus');
+        const jevRedEl = document.getElementById('jevCompactionReduction');
+        if (jevStatEl) {
+          const p50 = jev.p50_latency_ms ? `${jev.p50_latency_ms}ms` : 'sub-100ms';
+          jevStatEl.innerHTML = `<span class="status-badge live">● ${p50} p50 (${jev.resident_weights || 'Ollama'})</span>`;
         }
-        if (data.todos) {
-          renderTodos(data.todos);
-        }
-        if (data.jev_runtime) {
-          const jev = data.jev_runtime;
-          const jevStatEl = document.getElementById('jevRuntimeStatus');
-          const jevRedEl = document.getElementById('jevCompactionReduction');
-          if (jevStatEl) {
-            const p50 = jev.p50_latency_ms ? `${jev.p50_latency_ms}ms` : 'sub-100ms';
-            jevStatEl.innerHTML = `<span class="status-badge live">● ${p50} p50 (${jev.resident_weights || 'Ollama'})</span>`;
-          }
-          if (jevRedEl && jev.token_reduction_pct !== undefined) {
-            jevRedEl.textContent = `${jev.token_reduction_pct}% reduction`;
-          }
+        if (jevRedEl && jev.token_reduction_pct !== undefined) {
+          jevRedEl.textContent = `${jev.token_reduction_pct}% reduction`;
         }
       }
-    } catch (e) {
-      console.log('Using default telemetry state', e);
     }
   }
 
@@ -3214,7 +3229,7 @@ flowchart TD
     }).join('');
   }
 
-  function renderTrmIntelligence(trm, pipeline) {
+  function renderTrmIntelligence(trm, pipeline, activeDate) {
     if (!trm) return;
 
     // 1. KPIs
@@ -3248,21 +3263,30 @@ flowchart TD
     // 2. History Dates Selector
     if (trm.history_dates && trm.history_dates.length > 0) {
       currentTrmHistoryDates = trm.history_dates;
+    }
+    if (currentTrmHistoryDates && currentTrmHistoryDates.length > 0) {
       const historySelect = document.getElementById('trmHistoryDateSelector');
       if (historySelect) {
-        historySelect.innerHTML = trm.history_dates.map((d, i) => `
-          <option value="${d}" ${i === 0 ? 'selected' : ''}>${d} ${i === 0 ? '(Latest Snapshot)' : ''}</option>
+        const selectedDate = activeDate || historySelect.value || currentTrmHistoryDates[0];
+        historySelect.innerHTML = currentTrmHistoryDates.map((d, i) => `
+          <option value="${d}" ${d === selectedDate ? 'selected' : ''}>${d} ${i === 0 ? '(Latest Snapshot)' : ''}</option>
         `).join('');
+        historySelect.value = selectedDate;
       }
     }
 
-    // 3. Notebook Selector Population (if not populated)
-    if (trm.notebooks && trm.notebooks.length > 0) {
+    // 3. Notebook Selector Population
+    const notebookList = trm.notebooks || (trm.notebook_findings ? Object.entries(trm.notebook_findings).map(([id, f]) => ({ id, title: f.title || id })) : []);
+    if (notebookList.length > 0) {
       const nbSelect = document.getElementById('trmNotebookSelector');
       if (nbSelect) {
-        nbSelect.innerHTML = trm.notebooks.map(nb => `
+        if (!selectedTrmNotebookId || !notebookList.some(nb => nb.id === selectedTrmNotebookId)) {
+          selectedTrmNotebookId = notebookList[0].id;
+        }
+        nbSelect.innerHTML = notebookList.map(nb => `
           <option value="${nb.id}" ${nb.id === selectedTrmNotebookId ? 'selected' : ''}>${escapeHtml(nb.title || nb.id)} (${nb.id.substring(0, 8)}...)</option>
         `).join('');
+        nbSelect.value = selectedTrmNotebookId;
       }
     }
 
@@ -3347,12 +3371,72 @@ flowchart TD
     const titleEl = document.getElementById('trmSelectedNotebookTitle');
     const metaEl = document.getElementById('trmNotebookMeta');
 
-    const findings = (currentTrmData && currentTrmData.notebook_findings && currentTrmData.notebook_findings[notebookId]) || null;
+    let findings = (currentTrmData && currentTrmData.notebook_findings && currentTrmData.notebook_findings[notebookId]) || null;
 
-    if (findings) {
+    // Fallback: If findings object not pre-computed or empty, extract from questions_answered
+    if ((!findings || (!findings.contradictions?.length && !findings.undersourced?.length && !findings.adjacent?.length && !findings.followup?.length)) &&
+        currentTrmData && Array.isArray(currentTrmData.questions_answered)) {
+      const matchingQuestions = currentTrmData.questions_answered.filter(q => {
+        if (q.key && q.key.startsWith(notebookId + ':')) return true;
+        if (currentTrmData.notebooks) {
+          const matchNb = currentTrmData.notebooks.find(n => n.id === notebookId);
+          if (matchNb && matchNb.title && q.notebook === matchNb.title) return true;
+        }
+        return false;
+      });
+
+      if (matchingQuestions.length > 0) {
+        let nbTitle = notebookId;
+        if (currentTrmData.notebooks) {
+          const matchNb = currentTrmData.notebooks.find(n => n.id === notebookId);
+          if (matchNb && matchNb.title) nbTitle = matchNb.title;
+        }
+
+        const contradictions = [];
+        const undersourced = [];
+        const adjacent = [];
+        const followup = [];
+
+        matchingQuestions.forEach(q => {
+          const key = q.key || '';
+          const questionText = (q.question || '').toLowerCase();
+          const item = {
+            title: q.question || 'Vector Finding',
+            desc: q.excerpt || q.desc || q.text || '',
+            date: q.date || '',
+            key: q.key || ''
+          };
+
+          if (key.includes(':open-contradictions:') || questionText.includes('contradiction') || questionText.includes('open question')) {
+            contradictions.push(item);
+          } else if (key.includes(':under-sourced:') || questionText.includes('single-source') || questionText.includes('under-corroborated')) {
+            undersourced.push(item);
+          } else if (key.includes(':adjacent-topics:') || questionText.includes('adjacent')) {
+            adjacent.push(item);
+          } else if (key.includes(':follow-up:') || questionText.includes('follow-up') || questionText.includes('strengthen')) {
+            followup.push(item);
+          } else {
+            contradictions.push(item);
+          }
+        });
+
+        findings = {
+          title: nbTitle,
+          id: notebookId,
+          total_questions: matchingQuestions.length,
+          contradictions,
+          undersourced,
+          adjacent,
+          followup
+        };
+      }
+    }
+
+    if (findings && (findings.contradictions?.length || findings.undersourced?.length || findings.adjacent?.length || findings.followup?.length || findings.total_questions > 0)) {
       if (titleEl) titleEl.textContent = `Findings for ${findings.title || notebookId}`;
+      const vectorCount = findings.total_questions || ((findings.contradictions ? findings.contradictions.length : 0) + (findings.undersourced ? findings.undersourced.length : 0) + (findings.adjacent ? findings.adjacent.length : 0) + (findings.followup ? findings.followup.length : 0));
       if (metaEl) {
-        metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span style="color:#5a9e6f;">COMPLETE (${findings.total_questions || 0} Vectors Mined)</span>`;
+        metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span style="color:#5a9e6f;">COMPLETE (${vectorCount} Vectors Mined)</span>`;
       }
 
       renderSynthesisQuadrant('trmSynthContradictions', findings.contradictions);
@@ -3404,28 +3488,41 @@ flowchart TD
   }
 
   async function loadTrmHistory(dateStr) {
-    if (!dateStr || dateStr === 'today') {
-      loadDailyStatus();
+    if (!dateStr || dateStr === 'today' || (currentTrmHistoryDates[0] && dateStr === currentTrmHistoryDates[0])) {
+      await loadDailyStatus();
+      if (currentTrmHistoryDates[0]) {
+        const historySelect = document.getElementById('trmHistoryDateSelector');
+        if (historySelect) historySelect.value = currentTrmHistoryDates[0];
+      }
       showToast('Loaded latest TRM snapshot');
       return;
     }
 
-    try {
-      let res = await fetch(`trm_history/${dateStr}.json`, { cache: 'no-store' });
-      if (!res.ok) {
-        res = await fetch(`../../_status-feed/trm_history/${dateStr}.json`, { cache: 'no-store' });
-      }
-      if (res.ok) {
-        const histData = await res.json();
-        currentTrmData = histData;
-        renderTrmIntelligence(histData, currentPipelineData);
-        showToast(`Loaded TRM snapshot: ${dateStr}`);
-      } else {
-        showToast(`Snapshot not found: ${dateStr}`);
-      }
-    } catch (err) {
-      showToast(`Failed to load snapshot ${dateStr}`);
+    const candidateUrls = [
+      `/api/reporting/trm/history?date=${dateStr}`,
+      `trm_history/${dateStr}.json`,
+      `/trm_history/${dateStr}.json`,
+      `_status-feed/trm_history/${dateStr}.json`,
+      `/_status-feed/trm_history/${dateStr}.json`,
+      `/modules/wiki/trm_history/${dateStr}.json`,
+      `../../_status-feed/trm_history/${dateStr}.json`,
+      `../_status-feed/trm_history/${dateStr}.json`
+    ];
+
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) {
+          const histData = await res.json();
+          const trmData = histData.trm_intelligence || histData;
+          currentTrmData = trmData;
+          renderTrmIntelligence(trmData, currentPipelineData, dateStr);
+          showToast(`Loaded TRM snapshot: ${dateStr}`);
+          return;
+        }
+      } catch {}
     }
+    showToast(`Snapshot not found: ${dateStr}`);
   }
 
   function stepTrmHistory(delta) {
@@ -3437,7 +3534,7 @@ flowchart TD
     let idx = currentTrmHistoryDates.indexOf(currentVal);
     if (idx === -1) idx = 0;
 
-    let targetIdx = idx - delta; // reverse chronological: prev day is index + 1
+    let targetIdx = idx - delta; // reverse chronological: delta=-1 (prev day) moves to idx+1, delta=1 (next day) moves to idx-1
     if (targetIdx < 0) targetIdx = 0;
     if (targetIdx >= currentTrmHistoryDates.length) targetIdx = currentTrmHistoryDates.length - 1;
 
