@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import os from 'node:os';
 import zlib from 'node:zlib';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
@@ -254,6 +254,131 @@ export function createGatewayServer(options = {}) {
       if (!snapshot || !mobileSnapshot.verify(snapshot)) { res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' }); res.end(JSON.stringify({ status: 'UNAVAILABLE', freshness: 'unavailable', error: 'No valid snapshot available' })); return; }
       const payload = pathname === '/api/mobile/health' ? { status: 'SUCCESS', freshness: snapshot.freshness, age_ms: snapshot.age_ms, created_at: snapshot.manifest.created_at, last_failure: snapshot.last_failure } : { status: 'SUCCESS', freshness: snapshot.freshness, partial: false, manifest: snapshot.manifest, signature: snapshot.signature, data: snapshot.data };
       res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(payload)); return;
+    }
+
+    // Action Execution & Cache Clearing Endpoints (Loopback Only)
+    if (pathname === '/api/actions/clear-cache') {
+      if (!isLoopback(req.socket.remoteAddress)) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: loopback only' }));
+        return;
+      }
+      prCache = { timestamp: 0, prs: [] };
+      broadcastSseEvent('cache_cleared', { timestamp: new Date().toISOString() });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+      res.end(JSON.stringify({ ok: true, cleared: ['prCache', 'telemetry'] }));
+      return;
+    }
+
+    if (pathname === '/api/actions/run') {
+      if (!isLoopback(req.socket.remoteAddress)) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: loopback only' }));
+        return;
+      }
+      if (req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
+        return;
+      }
+
+      let body = '';
+      for await (const chunk of req) {
+        body += chunk;
+        if (body.length > 65536) {
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Payload too large' }));
+          return;
+        }
+      }
+
+      let payload = {};
+      try {
+        payload = JSON.parse(body || '{}');
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        return;
+      }
+
+      const { action, target } = payload;
+      const ACTION_WHITELIST = {
+        'run-bot': {
+          'kb-sentinel': ['node', [resolve(ROOT, '../scripts/kb-sentinel-bot.mjs')]],
+          'notebook-ingester': ['node', [resolve(ROOT, '../scripts/notebook-ingester-bot.mjs')]],
+          'trm-bot': ['node', [resolve(ROOT, '../scripts/trm-bot-runner.mjs')]],
+          'watchlist-miner': ['node', [resolve(ROOT, '../scripts/watchlist-miner-bot.mjs')]],
+          'daemon-healer': ['node', [resolve(ROOT, '../scripts/daemon-healer-bot.mjs')]],
+          'ironledger-sentinel': ['node', [resolve(ROOT, '../scripts/ironledger-sentinel-bot.mjs')]],
+          'ci-watchdog': ['node', [resolve(ROOT, '../scripts/ci-watchdog-bot.mjs')]],
+          'ironbots-reporter': ['node', [resolve(ROOT, '../scripts/ironbots-daily-reporter.mjs')]],
+          'storage-pruner': ['node', [resolve(ROOT, '../scripts/storage-pruner-bot.mjs')]],
+          'trm-drive-sync': ['powershell.exe', ['-NoProfile', '-File', resolve(ROOT, '../scripts/schedule-task-wrapper-TRM-Drive-Sync.ps1')]]
+        },
+        'run-task': (taskName) => {
+          const safeTasks = new Set([
+            'CI-Watchdog', 'Daemon-Healer', 'Ironbots-Reporter', 'IronLedger-Sentinel',
+            'KB-Sentinel', 'Notebook-Ingester', 'Storage-Pruner', 'TRM-Bot',
+            'TRM-Drive-Sync', 'Watchlist-Miner', 'CIC-Daily-Status', 'CIC-Mirror-ClaudeMemory',
+            'TRM-Notebooklm-Mine', 'KB-Sync-TRM-Triage'
+          ]);
+          if (!safeTasks.has(taskName)) return null;
+          return ['powershell.exe', ['-NoProfile', '-Command', `Start-ScheduledTask -TaskName '${taskName}'`]];
+        },
+        'run-skill': (skillName) => {
+          if (!/^[a-zA-Z0-9_-]+$/.test(skillName)) return null;
+          return ['pwsh.exe', ['-NoProfile', '-File', resolve(ROOT, '../toolforge.ps1'), 'run', skillName]];
+        },
+        'validate-wiki': () => ['node', [resolve(ROOT, '../modules/wiki/validate-staging-docs.mjs')]],
+        'autoheal-wiki': (subtype) => {
+          if (subtype === 'frontmatter') {
+            return ['node', [resolve(ROOT, '../scripts/fix-wiki-frontmatter.mjs'), 'wiki', '--allow-dirty']];
+          }
+          if (subtype === 'hygiene') {
+            return ['node', [resolve(ROOT, '../modules/wiki/validate-staging-docs.mjs'), '--fix', 'wiki']];
+          }
+          return ['node', [resolve(ROOT, '../modules/wiki/autoheal-sweeper.mjs'), '--fix', '--allow-dirty', '--target-dir', 'wiki']];
+        }
+      };
+
+      let runner = null;
+      if (action === 'run-bot') {
+        runner = ACTION_WHITELIST['run-bot'] && ACTION_WHITELIST['run-bot'][target];
+      } else if (action === 'run-task') {
+        runner = ACTION_WHITELIST['run-task'](target);
+      } else if (action === 'run-skill') {
+        runner = ACTION_WHITELIST['run-skill'](target);
+      } else if (action === 'validate-wiki') {
+        runner = ACTION_WHITELIST['validate-wiki']();
+      } else if (action === 'autoheal-wiki') {
+        runner = ACTION_WHITELIST['autoheal-wiki'](target);
+      }
+
+      if (!runner) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: `Invalid action or target: ${action}/${target}` }));
+        return;
+      }
+
+      const [cmd, cmdArgs] = runner;
+      try {
+        const proc = spawn(cmd, cmdArgs, {
+          cwd: resolve(ROOT, '..'),
+          detached: true,
+          stdio: 'ignore'
+        });
+        proc.unref();
+
+        broadcastSseEvent('action_dispatched', { action, target, pid: proc.pid, timestamp: new Date().toISOString() });
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: true, action, target, pid: proc.pid, status: 'DISPATCHED' }));
+        return;
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+        return;
+      }
     }
 
     // 1. API Projections & Reporting Routes
@@ -657,6 +782,11 @@ export function createGatewayServer(options = {}) {
       const filename = pathname.split('/').pop();
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, 'trm_history', filename)));
       candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', 'trm_history', filename)));
+    } else if (pathname.startsWith('/wiki/')) {
+      const stripped = pathname.slice('/wiki/'.length);
+      candidatePaths.push(normalize(resolve(ROOT, 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
     }
 
     for (const targetPath of candidatePaths) {

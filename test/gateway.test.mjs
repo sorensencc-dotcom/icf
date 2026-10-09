@@ -264,3 +264,43 @@ test('Meridian routes only answer loopback clients', () => {
   assert.ok(!isLoopback('::ffff:192.168.1.20'));
   assert.ok(!isLoopback(undefined));
 });
+
+test('Action execution routes dispatch valid tasks and reject invalid inputs', async () => {
+  const server = createGatewayServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    // 1. Clear cache
+    const clearRes = await fetch(`${baseUrl}/api/actions/clear-cache`, { method: 'POST' });
+    assert.equal(clearRes.status, 200);
+    const clearData = await clearRes.json();
+    assert.equal(clearData.ok, true);
+
+    // 2. Reject non-POST
+    const getRes = await fetch(`${baseUrl}/api/actions/run`, { method: 'GET' });
+    assert.equal(getRes.status, 405);
+
+    // 3. Reject invalid target
+    const invalidRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'run-bot', target: 'nonexistent-bot' })
+    });
+    assert.equal(invalidRes.status, 400);
+
+    // 4. Accept valid action
+    const validRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'validate-wiki', target: 'all' })
+    });
+    assert.equal(validRes.status, 200);
+    const validData = await validRes.json();
+    assert.equal(validData.ok, true);
+    assert.equal(validData.status, 'DISPATCHED');
+    assert.ok(typeof validData.pid === 'number');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

@@ -2,6 +2,39 @@
   "skills": [
     {
       "version": "1.0.0",
+      "description": "Aggregates active pull requests, recent landings, git worktrees, open backlog items, mobile ingress receipts, and daemon health into a structured report",
+      "timestamps": {
+        "created": "2026-10-08T18:55:00.0000000Z",
+        "lastValidation": "2026-10-08T18:55:00.0000000Z",
+        "lastRun": null
+      },
+      "tags": [
+        "overview",
+        "status",
+        "dashboard",
+        "worktrees",
+        "pull-requests"
+      ],
+      "status": "active",
+      "name": "active-work-overview",
+      "runtime": "node",
+      "id": "active-work-overview",
+      "entrypoint": "skills/active-work-overview/src/overview.mjs",
+      "owner": "soren",
+      "category": "observability",
+      "health": {
+        "canonical": true,
+        "runtime": "good",
+        "distributed": true,
+        "overall": "good"
+      },
+      "dependencies": {
+        "external": [],
+        "internal": []
+      }
+    },
+    {
+      "version": "1.0.0",
       "description": "Project month-end token costs and identify high-spend adapters",
       "timestamps": {
         "created": "2026-07-08T18:45:49.9964781Z",
@@ -46,6 +79,39 @@
       "health": {
         "canonical": true,
         "runtime": "untested",
+        "distributed": true,
+        "overall": "good"
+      },
+      "dependencies": {
+        "external": [],
+        "internal": []
+      }
+    },
+    {
+      "version": "1.0.0",
+      "description": "Benchmark and evaluation harness for Mistral Large on heavy codebase, large-context (chonk), and multi-file refactoring workloads",
+      "timestamps": {
+        "created": "2026-10-07T15:09:00Z",
+        "lastValidation": "2026-10-07T15:09:00Z",
+        "lastRun": null
+      },
+      "tags": [
+        "benchmarking",
+        "mistral-large",
+        "chonk-context",
+        "observability",
+        "cost-routing"
+      ],
+      "status": "active",
+      "name": "Benchmark Mistral Large Chonk",
+      "runtime": "typescript",
+      "id": "benchmark-mistral-large-chonk",
+      "entrypoint": "src/index.ts",
+      "owner": "soren",
+      "category": "testing",
+      "health": {
+        "canonical": true,
+        "runtime": "pass",
         "distributed": true,
         "overall": "good"
       },
@@ -735,6 +801,38 @@
         "canonical": true,
         "runtime": "untested",
         "distributed": false,
+        "overall": "good"
+      },
+      "dependencies": {
+        "external": [],
+        "internal": []
+      }
+    },
+    {
+      "version": "1.0.0",
+      "description": "Formal theorem proving, tactic validation, and invariant verification harness for Lean 4 and agent logic specs",
+      "timestamps": {
+        "created": "2026-10-07T14:27:00Z",
+        "lastValidation": "2026-10-07T14:27:00Z",
+        "lastRun": null
+      },
+      "tags": [
+        "formal-methods",
+        "lean4",
+        "verification",
+        "theorem-proving"
+      ],
+      "status": "active",
+      "name": "Lean Proof Verification Harness",
+      "runtime": "typescript",
+      "id": "lean-proof-verification-harness",
+      "entrypoint": "src/index.ts",
+      "owner": "soren",
+      "category": "validation",
+      "health": {
+        "canonical": true,
+        "runtime": "pass",
+        "distributed": true,
         "overall": "good"
       },
       "dependencies": {

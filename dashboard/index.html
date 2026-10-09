@@ -774,7 +774,7 @@
 
     <!-- Working Theme Switcher -->
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <a class="badge-pill sage" id="docsMkdocsLink" href="http://127.0.0.1:8001/" target="_blank" rel="noopener noreferrer" title="Open local MkDocs (rewrite-docs on :8001)" style="text-decoration:none;">DOCS ↗</a>
+      <a class="badge-pill sage" id="docsManualLink" href="/operations-manual.html" target="_blank" rel="noopener noreferrer" title="Open Iron Command Forge Operations Manual" style="text-decoration:none;">MANUAL ↗</a>
       <span class="badge-pill sage" id="sseLiveBadge" title="Real-time Server-Sent Events (SSE) Stream">● LIVE SSE</span>
       <div class="theme-switch-control" role="group" aria-label="Theme Switcher">
         <button id="btnParchment" class="theme-switch-btn active" type="button" aria-pressed="true" onclick="applyTheme('parchment')">
@@ -918,7 +918,7 @@
             Last Run: Daily 03:00 AM &bull; Duration: 312ms &bull; Token Burn: 0
           </div>
         </div>
-        <button class="btn-action" onclick="alert('Triggering KB-Sentinel...')">Run Bot 📋</button>
+        <button class="btn-action" onclick="executeAction('run-bot', 'kb-sentinel', this)">Run Bot 📋</button>
       </div>
 
       <!-- Task 2: Terracotta Active/Triage -->
@@ -1116,7 +1116,7 @@
     <!-- Controls -->
     <div style="display: flex; gap: 0.8rem; justify-content: center; margin: 1.5rem 0 0.75rem; flex-wrap: wrap;">
       <button type="button" class="btn-secondary" onclick="loadValidationReport()">Reload report JSON</button>
-      <button type="button" class="btn-secondary" onclick="copyCommand('node modules/wiki/validate-staging-docs.mjs --json=./.validation-report.json .')">Re-run validator</button>
+      <button type="button" class="btn-secondary" onclick="executeAction('validate-wiki', 'all', this)">Re-run validator ▶</button>
       <button type="button" class="btn-secondary" onclick="exportReportJson()">Export Report JSON</button>
       <button type="button" class="btn-secondary" onclick="clearCache()" style="border-color: rgba(196,80,26,0.55);">Clear Cache</button>
     </div>
@@ -1137,7 +1137,7 @@
           <div style="font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: var(--white);" id="countFrontiers">8</div>
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Forward-looking double-bracket links pointing to conceptual topics and entities not yet created on disk. This represents active knowledge graph growth in the Karpathy LLM-wiki workflow.</div>
-        <button type="button" class="btn-secondary" onclick="copyCommand('node modules/wiki/autoheal-sweeper.mjs --fix --allow-dirty --target-dir wiki')">Scaffold Concept Stubs</button>
+        <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'stubs', this)">Scaffold Concept Stubs ▶</button>
       </div>
 
       <div class="breakdown-card" style="border-left: 4px solid var(--brass);">
@@ -1146,7 +1146,7 @@
           <div style="font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: var(--white);" id="countStructural">27</div>
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Missing top-level # Title headings, heading level jumps (e.g. H1 to H3), or missing frontmatter properties that affect automated indexers and AST parsing.</div>
-        <button type="button" class="btn-secondary" onclick="copyCommand('node scripts/fix-wiki-frontmatter.mjs wiki --allow-dirty')">Standardize Headers</button>
+        <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'frontmatter', this)">Standardize Headers ▶</button>
       </div>
 
       <div class="breakdown-card" style="border-left: 4px solid var(--ash);">
@@ -1155,7 +1155,7 @@
           <div style="font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: var(--white);" id="countHygiene">23</div>
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Consecutive blank lines and trailing whitespace at the ends of lines. Completely safe to auto-format without semantic risk.</div>
-        <button type="button" class="btn-secondary" onclick="copyCommand('node modules/wiki/validate-staging-docs.mjs --fix --json=./.validation-report.json wiki')">Run Auto-Fixer</button>
+        <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'hygiene', this)">Run Auto-Fixer ▶</button>
       </div>
     </div>
 
@@ -2016,6 +2016,18 @@ flowchart TD
           <div class="stat-label">Background Watchdogs</div>
         </div>
         <div class="stat-sub">:8080 (ICF) · :8787 · :8000 · stdio</div>
+      </div>
+    </div>
+
+    <!-- OPERATIONS MANUAL BANNER -->
+    <div class="panel" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-main); padding: 1.25rem 1.5rem;">
+      <div>
+        <div style="font-family: 'Playfair Display', serif; font-size: 1.25rem; font-weight: 700;">Iron Command Forge Operations Manual</div>
+        <div style="font-size: 0.85rem; color: var(--ash); margin-top: 0.2rem;">Complete runbook, server lifecycle, scheduled tasks reference, and dual-action execution engine docs.</div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <a href="/operations-manual.html" target="_blank" class="btn" style="text-decoration: none; padding: 8px 16px; font-size: 0.85rem; font-weight: 700; background: var(--accent-terracotta); color: #fff; border: 1px solid var(--accent-terracotta);">OPEN MANUAL ↗</a>
+        <a href="/wiki/Operations-Guide.md" target="_blank" class="btn" style="text-decoration: none; padding: 8px 16px; font-size: 0.85rem; font-weight: 700; background: var(--iron); color: var(--bone); border: 1px solid var(--border-main);">RAW MARKDOWN ↗</a>
       </div>
     </div>
 
@@ -2998,7 +3010,7 @@ flowchart TD
 
   <!-- FOOTER -->
   <footer>
-    <p>Iron Command Forge (ICF) · KB-Sync v1.5.0 · Operations &amp; Knowledge Graph Suite</p>
+    <p>Iron Command Forge (ICF) · KB-Sync v1.5.0 · Operations &amp; Knowledge Graph Suite · <a href="/operations-manual.html" target="_blank" style="color: var(--accent-terracotta); text-decoration: none; font-weight: 700;">Operations Manual ↗</a></p>
   </footer>
 </div>
 
@@ -3055,8 +3067,44 @@ flowchart TD
     window._toastTimeout = setTimeout(() => t.classList.remove('show'), 3000);
   }
 
+  async function executeAction(actionType, target, btnElement) {
+    const origText = btnElement ? btnElement.innerHTML : '';
+    if (btnElement) {
+      btnElement.disabled = true;
+      btnElement.innerHTML = 'Running... ⏳';
+    }
+    try {
+      const res = await fetch('/api/actions/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: actionType, target })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast(`Triggered: ${target} ${data.pid ? '(PID ' + data.pid + ')' : ''}`);
+        if (btnElement) {
+          btnElement.innerHTML = 'Triggered ✓';
+          setTimeout(() => { btnElement.innerHTML = origText; btnElement.disabled = false; }, 3000);
+        }
+      } else {
+        showToast(`Action failed: ${data.error || 'Server error'}`);
+        if (btnElement) {
+          btnElement.innerHTML = origText;
+          btnElement.disabled = false;
+        }
+      }
+    } catch (err) {
+      showToast(`Error: ${err.message}`);
+      if (btnElement) {
+        btnElement.innerHTML = origText;
+        btnElement.disabled = false;
+      }
+    }
+  }
+  window.executeAction = executeAction;
+
   function copyCommand(cmd) {
-    const payload = cmd.startsWith(REPO_CD) ? cmd : REPO_CD + '\n' + cmd;
+    const payload = cmd;
     navigator.clipboard.writeText(payload)
       .then(() => showToast('Copied: ' + payload))
       .catch(() => showToast('Could not copy'));
@@ -3070,7 +3118,7 @@ flowchart TD
 
   function switchTab(tabId) {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => {
+    document.querySelectorAll('.tab-btn, .tab-item').forEach(b => {
       b.classList.remove('active');
       const tag = b.querySelector('.tag');
       if (tag) { tag.className = 'tag date'; }
@@ -3556,8 +3604,37 @@ flowchart TD
   }
 
   function exportReportJson() {
-    showToast('Export requires local node runner');
+    try {
+      const payload = currentTrmData || {};
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `icf-validation-report-${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Validation report JSON exported');
+    } catch (e) {
+      showToast('Export failed: ' + e.message);
+    }
   }
+  window.exportReportJson = exportReportJson;
+
+  async function clearCache() {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      try {
+        await fetch('/api/actions/clear-cache', { method: 'POST' });
+      } catch {}
+      await loadDailyStatus();
+      if (typeof fetchHeadroomIcfMetrics === 'function') await fetchHeadroomIcfMetrics();
+      showToast('Cache cleared & feeds reloaded');
+    } catch (e) {
+      showToast('Cache cleared');
+    }
+  }
+  window.clearCache = clearCache;
 
   async function fetchHeadroomIcfMetrics(isManual = false) {
     try {
@@ -3876,7 +3953,10 @@ flowchart TD
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span class="status-badge live" style="font-size: 0.55rem; padding: 0.2rem 0.6rem;">● OPERATIONAL</span>
-              <button type="button" class="btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.65rem;" onclick="copyCommand('toolforge run ${s.name}')">Run Skill →</button>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.65rem;" onclick="executeAction('run-skill', '${escapeHtml(s.name)}', this)">Run Skill ▶</button>
+                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.45rem; font-size: 0.65rem;" title="Copy CLI Command" onclick="copyCommand('pwsh -File C:\\dev\\toolforge.ps1 run ${escapeHtml(s.name)}')">📋</button>
+              </div>
             </div>
           </div>
         </div>
@@ -4453,7 +4533,12 @@ flowchart TD
               <td><code>${escapeHtml(def.logonType)}</code></td>
               <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">${escapeHtml(def.artifact)}</span></td>
               <td><span class="status-badge live" style="font-size:0.6rem; color:${badgeColor}; border-color:${badgeBorder};">● ${escapeHtml(statusText)}</span></td>
-              <td><button type="button" class="btn-secondary" onclick="copyCommand('${escapeHtml(def.cliCmd)}')">Run Task</button></td>
+              <td>
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.55rem; font-size:0.65rem;" onclick="executeAction('run-task', '${escapeHtml(def.name)}', this)">Run Task ▶</button>
+                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy Task Command" onclick="copyCommand('${escapeHtml(def.cliCmd)}')">📋</button>
+                </div>
+              </td>
             </tr>
           `;
         }).join('');
@@ -4499,7 +4584,12 @@ flowchart TD
                 ${detailsHtml}
               </td>
               <td><span class="status-badge live" style="font-size:0.6rem; color:${badgeColor}; border-color:${badgeBorder};">● ${escapeHtml(liveBot?.status || 'HEALTHY')}</span></td>
-              <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('${escapeHtml(def.npmCmd)}')">Run Bot</button></td>
+              <td>
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.55rem; font-size:0.65rem;" onclick="executeAction('run-bot', '${escapeHtml(def.id)}', this)">Run Bot ▶</button>
+                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy NPM Command" onclick="copyCommand('${escapeHtml(def.npmCmd)}')">📋</button>
+                </div>
+              </td>
             </tr>
           `;
         }).join('');
