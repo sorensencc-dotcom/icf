@@ -1,512 +1,468 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="parchment">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Iron Command Forge · Operations & Knowledge Graph</title>
+  <title>IRON COMMAND FORGE — Unified Operations & Knowledge Graph</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,400&family=Barlow+Condensed:wght@400;600;700;800&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@300;400;600;700;800&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_ds/cast-iron-charlie-design-system-019de132-e506-71df-a7ae-fb03115c075e/colors_and_type.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ============================================================
+       Cast Iron Charlie Design System — Colors & Typography Tokens
+       ============================================================ */
+    :root {
+      /* Core palette */
+      --black:  #0a0806;   /* primary background */
+      --forge:  #1a1410;   /* secondary bg */
+      --iron:   #2c2420;   /* raised surface bg */
+      --rust:   #8B3A1A;   /* hover/pressed accent */
+      --ember:  #C4501A;   /* primary accent — labels, CTAs, borders */
+      --brass:  #B8922A;   /* brand/logo, italic headline highlights */
+      --ash:    #9a9088;   /* secondary text, labels, muted */
+      --bone:   #e8e0d4;   /* primary body text */
+      --paper:  #f2ece2;   /* near-white warm */
+      --white:  #faf6f0;   /* headings, hero title */
 
-    /* =========================================================
-       THEME DEFINITIONS: WARM PARCHMENT (Default) vs DARK FORGE
-       ========================================================= */
-    :root, [data-theme="parchment"], html[data-theme="parchment"], body[data-theme="parchment"] {
-      --bg-canvas: #f2ece2;
-      --bg-surface: #ffffff;
-      --bg-card-hover: #faf6f0;
-      --bg-subtle: #ebe4d8;
-      --fg-primary: #2c2420;
-      --fg-secondary: #5c5349;
-      --fg-muted: #8c8278;
-      --border-main: #2c2420;
-      --border-subtle: rgba(44, 36, 32, 0.15);
-      
-      --accent-terracotta: #c4501a;
-      --accent-brass: #b8922a;
-      --accent-sage: #3d6b4f;
-      --accent-rust: #8b3a1a;
-      --ember: #c4501a;
-      --brass: #b8922a;
-      --sage: #3d6b4f;
-      --ash: #5c5349;
-      --bone: #2c2420;
-      --white: #2c2420;
-      --iron: #ebe4d8;
-      --forge: #ffffff;
-      --black: #f2ece2;
-      
-      --card-shadow: 0 4px 12px rgba(44, 36, 32, 0.05);
-      --card-shadow-hover: 0 6px 16px rgba(44, 36, 32, 0.1);
-      --toggle-active-bg: #2c2420;
-      --toggle-active-fg: #f2ece2;
-      --badge-sage-bg: rgba(61, 107, 79, 0.12);
-      --badge-terracotta-bg: rgba(196, 80, 26, 0.12);
-      --badge-brass-bg: rgba(184, 146, 42, 0.12);
-      --table-alt-row: rgba(44, 36, 32, 0.02);
+      /* Semantic color variables */
+      --color-bg-primary:       var(--black);
+      --color-bg-secondary:     var(--forge);
+      --color-bg-raised:        var(--iron);
+      --color-bg-card:          rgba(26, 20, 16, 0.6);
+      --color-bg-card-hover:    rgba(26, 20, 16, 0.9);
+
+      --color-fg-primary:       var(--white);
+      --color-fg-body:          var(--bone);
+      --color-fg-muted:         var(--ash);
+      --color-fg-accent:        var(--ember);
+      --color-fg-brand:         var(--brass);
+
+      --color-border-default:   rgba(154, 144, 136, 0.12);
+      --color-border-section:   rgba(139, 58, 26, 0.2);
+      --color-border-hover:     rgba(196, 80, 26, 0.4);
+      --color-border-focus:     var(--ember);
+      --color-border-accent:    var(--ember);
+
+      --color-accent-bg-tint:   rgba(139, 58, 26, 0.06);
+      --color-overlay-fade:     rgba(10, 8, 6, 0.88);
+
+      /* Status colors */
+      --color-status-live:      #5a9e6f;
+      --color-status-progress:  var(--brass);
+      --color-status-soon:      var(--ash);
+
+      /* Tag colors */
+      --color-tag-high:         var(--ember);
+      --color-tag-medium:       #7a9fbf;
+      --color-tag-new:          var(--brass);
+      --color-tag-corrected:    var(--ember);
+
+      /* Typography */
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Libre Baskerville', Georgia, serif;
+      --font-ui: 'Barlow Condensed', sans-serif;
+      --radius: 0;
     }
 
-    [data-theme="forge"], html[data-theme="forge"], body[data-theme="forge"] {
-      --bg-canvas: #0d0a08;
-      --bg-surface: #181310;
-      --bg-card-hover: #221a15;
-      --bg-subtle: #120e0b;
-      --fg-primary: #faf6f0;
-      --fg-secondary: #a39990;
-      --fg-muted: #736b63;
-      --border-main: rgba(250, 246, 240, 0.22);
-      --border-subtle: rgba(250, 246, 240, 0.12);
-      
-      --accent-terracotta: #d9622b;
-      --accent-brass: #cfa738;
-      --accent-sage: #5aa170;
-      --accent-rust: #9e4624;
-      --ember: #d9622b;
-      --brass: #cfa738;
-      --sage: #5aa170;
-      --ash: #a39990;
-      --bone: #faf6f0;
-      --white: #faf6f0;
-      --iron: #221a15;
-      --forge: #181310;
-      --black: #0d0a08;
-      
-      --card-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
-      --card-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.85);
-      --toggle-active-bg: #d9622b;
-      --toggle-active-fg: #ffffff;
-      --badge-sage-bg: rgba(90, 161, 112, 0.18);
-      --badge-terracotta-bg: rgba(217, 98, 43, 0.18);
-      --badge-brass-bg: rgba(207, 167, 56, 0.18);
-      --table-alt-row: rgba(250, 246, 240, 0.03);
-    }
-
+    /* Reset & Base */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
-      background-color: var(--bg-canvas);
-      color: var(--fg-primary);
-      font-family: 'Barlow Condensed', sans-serif;
-      padding: 36px 20px;
-      transition: background-color 0.2s ease, color 0.2s ease;
+      background: var(--black);
+      color: var(--bone);
+      font-family: var(--font-body);
       min-height: 100vh;
+      padding: 2rem;
+      position: relative;
+      overflow-x: hidden;
+      background-image: radial-gradient(circle at 50% 0%, rgba(196, 80, 26, 0.08) 0%, transparent 60%);
     }
 
-    .wrapper {
-      max-width: 1180px;
+    /* Film grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    a { color: var(--ember); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--white); }
+
+    .container {
+      max-width: 1320px;
       margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
+      position: relative;
+      z-index: 2;
     }
 
-    /* Top Command Header */
-    .command-header {
-      background: var(--bg-surface);
-      border: 1.5px solid var(--border-main);
-      padding: 22px 28px;
+    /* Header */
+    header {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-end;
       flex-wrap: wrap;
-      gap: 16px;
-      box-shadow: var(--card-shadow);
-      transition: all 0.2s ease;
+      gap: 1rem;
     }
 
-    .title-area h1 {
-      font-family: 'Playfair Display', Georgia, serif;
+    .brand-title {
+      font-family: var(--font-display);
       font-size: 2.2rem;
-      font-weight: 800;
-      color: var(--fg-primary);
-      line-height: 1.1;
-      letter-spacing: -0.01em;
-    }
-
-    .title-area p {
-      font-size: 0.8rem;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--fg-secondary);
-      margin-top: 5px;
-      font-weight: 700;
-    }
-
-    /* Functional Segmented Theme Toggle */
-    .theme-switch-control {
-      display: inline-flex;
-      align-items: center;
-      border: 1.5px solid var(--border-main);
-      background: var(--bg-canvas);
-      padding: 3px;
-      gap: 2px;
-    }
-
-    .theme-switch-btn {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      padding: 7px 15px;
-      border: none;
-      cursor: pointer;
-      background: transparent;
-      color: var(--fg-secondary);
-      transition: all 0.15s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .theme-switch-btn:hover {
-      color: var(--fg-primary);
-    }
-
-    .theme-switch-btn.active {
-      background: var(--toggle-active-bg);
-      color: var(--toggle-active-fg);
-      font-weight: 800;
-    }
-
-    /* Tab Strip */
-    .tab-strip {
-      display: flex;
-      gap: 6px;
-      border-bottom: 2px solid var(--accent-terracotta);
-      padding-bottom: 2px;
-      flex-wrap: wrap;
-    }
-
-    .tab-item {
-      padding: 9px 16px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      background: var(--bg-surface);
-      color: var(--fg-secondary);
-      cursor: pointer;
-      border: 1px solid var(--border-subtle);
-      border-bottom: none;
-      transition: all 0.15s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .tab-item:hover {
-      color: var(--fg-primary);
-      border-color: var(--border-main);
-    }
-
-    .tab-item.active {
-      background: var(--accent-terracotta);
-      color: #ffffff;
-      border-color: var(--accent-terracotta);
-      font-weight: 800;
-    }
-
-    .tab-badge {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.7rem;
-      padding: 1px 6px;
-      background: rgba(0, 0, 0, 0.15);
-      color: currentColor;
-    }
-    .tab-item.active .tab-badge {
-      background: rgba(255, 255, 255, 0.25);
-    }
-
-    /* Metric Cards with Micro-Sparklines */
-    .metrics-grid, .grid-metrics {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-    @media (max-width: 860px) { .metrics-grid, .grid-metrics { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 480px) { .metrics-grid, .grid-metrics { grid-template-columns: 1fr; } }
-
-    .flush-card, .stat-block {
-      background: var(--bg-surface);
-      padding: 20px 22px;
-      box-shadow: var(--card-shadow);
-      transition: all 0.2s ease;
-      border-left: 5px solid var(--fg-secondary);
-      border-top: 1px solid var(--border-subtle);
-      border-right: 1px solid var(--border-subtle);
-      border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .flush-card:hover, .stat-block:hover {
-      box-shadow: var(--card-shadow-hover);
-      transform: translateY(-2px);
-    }
-
-    .flush-card.sage-metric, .stat-block.stat-sage { border-left-color: var(--accent-sage); }
-    .flush-card.terracotta-metric, .stat-block.stat-ember { border-left-color: var(--accent-terracotta); }
-    .flush-card.brass-metric, .stat-block.stat-brass { border-left-color: var(--accent-brass); }
-    .flush-card.neutral-metric, .stat-block.stat-ash { border-left-color: var(--fg-secondary); }
-
-    .metric-value-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-    }
-
-    .metric-value, .stat-number {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 2.3rem;
-      font-weight: 800;
-      line-height: 1;
+      font-weight: 900;
+      color: var(--white);
       letter-spacing: -0.02em;
     }
 
-    .sparkline-micro {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.85rem;
-      letter-spacing: 0.1em;
-      opacity: 0.85;
+    .brand-subtitle {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--ash);
+      margin-top: 0.25rem;
     }
 
-    .metric-label, .stat-label {
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .synced-badge {
+      font-family: var(--font-ui);
       font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--bone);
+      padding: 0.4rem 0.9rem;
+      background: rgba(44, 36, 32, 0.6);
+      border: 1px solid rgba(196, 80, 26, 0.3);
+    }
+
+    /* Gradient Rule Divider */
+    .gradient-rule {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(139, 58, 26, 0.4), transparent);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Section Label Eyebrow */
+    .section-label {
+      font-family: var(--font-ui);
+      font-weight: 600;
+      font-size: 0.7rem;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--color-fg-accent);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      max-width: 60px;
+      height: 1px;
+      background: var(--ember);
+      display: inline-block;
+    }
+
+    /* Tab Navigation */
+    nav.tabs-nav {
+      display: flex;
+      gap: 0.5rem;
+      margin: 1.5rem 0 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--fg-secondary);
       font-weight: 700;
-      margin-top: 8px;
-    }
-    .metric-sub, .stat-sub {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.72rem;
-      color: var(--fg-muted);
-      margin-top: 10px;
-    }
-
-    /* Quick Filter Toolbar with Search Input */
-    .filter-toolbar {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      padding: 12px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      box-shadow: var(--card-shadow);
-      margin-bottom: 20px;
-    }
-
-    .filter-group {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .filter-pill {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 5px 12px;
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-subtle);
-      color: var(--fg-secondary);
+      border: 1px solid transparent;
+      padding: 0.85rem 1.4rem;
       cursor: pointer;
-      transition: all 0.15s;
-    }
-    .filter-pill.active {
-      background: var(--fg-primary);
-      color: var(--bg-surface);
-      border-color: var(--fg-primary);
-    }
-
-    .search-box {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.75rem;
-      padding: 6px 12px;
-      border: 1px solid var(--border-subtle);
-      background: var(--bg-canvas);
-      color: var(--fg-primary);
-      outline: none;
-      width: 220px;
-    }
-    .search-box:focus {
-      border-color: var(--accent-terracotta);
-    }
-
-    /* Operational Feed Cards (3B Flush Style) */
-    .feed-section {
       display: flex;
-      flex-direction: column;
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-
-    .feed-card {
-      background: var(--bg-surface);
-      padding: 18px 24px;
-      box-shadow: var(--card-shadow);
-      border-left: 5px solid var(--fg-secondary);
-      border-top: 1px solid var(--border-subtle);
-      border-right: 1px solid var(--border-subtle);
-      border-bottom: 1px solid var(--border-subtle);
-      transition: all 0.2s ease;
-      display: flex;
-      justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 14px;
-    }
-    .feed-card:hover {
-      box-shadow: var(--card-shadow-hover);
-      transform: translateX(4px);
+      gap: 0.6rem;
+      background: transparent;
+      color: var(--ash);
+      transition: all 0.2s;
     }
 
-    .feed-card.healthy-task { border-left-color: var(--accent-sage); }
-    .feed-card.active-task { border-left-color: var(--accent-terracotta); }
-    .feed-card.brass-task { border-left-color: var(--accent-brass); }
+    .tab-btn:hover {
+      color: var(--bone);
+      background: rgba(34, 27, 23, 0.4);
+    }
 
-    .badge-pill {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.72rem;
+    .tab-btn.active {
+      color: var(--white);
+      background: var(--forge);
+      border-bottom: 2px solid var(--ember);
+    }
+
+    /* Tags & Status Badges */
+    .tag {
+      font-family: var(--font-ui);
+      font-size: 0.6rem;
       font-weight: 600;
-      padding: 3px 9px;
-      letter-spacing: 0.05em;
-      display: inline-flex;
-      align-items: center;
-    }
-    .badge-pill.sage {
-      background: var(--badge-sage-bg);
-      color: var(--accent-sage);
-      border: 1px solid var(--accent-sage);
-    }
-    .badge-pill.terracotta {
-      background: var(--badge-terracotta-bg);
-      color: var(--accent-terracotta);
-      border: 1px solid var(--accent-terracotta);
-    }
-    .badge-pill.brass {
-      background: var(--badge-brass-bg);
-      color: var(--accent-brass);
-      border: 1px solid var(--accent-brass);
-    }
-
-    .btn-action {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.82rem;
-      font-weight: 700;
-      letter-spacing: 0.15em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      padding: 8px 16px;
-      background: var(--bg-canvas);
-      color: var(--fg-primary);
-      border: 1.5px solid var(--border-main);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .btn-action:hover {
-      background: var(--accent-terracotta);
-      color: #ffffff;
-      border-color: var(--accent-terracotta);
+      padding: 0.2rem 0.6rem;
+      border: 1px solid;
+      display: inline-block;
     }
 
-    /* Panels & Standard Structure */
+    .tag.high {
+      color: var(--ember);
+      border-color: rgba(196, 80, 26, 0.45);
+      background: rgba(196, 80, 26, 0.07);
+    }
+
+    .tag.medium {
+      color: var(--color-tag-medium);
+      border-color: rgba(122, 159, 191, 0.4);
+      background: rgba(122, 159, 191, 0.07);
+    }
+
+    .tag.new {
+      color: var(--brass);
+      border-color: rgba(184, 146, 42, 0.45);
+      background: rgba(184, 146, 42, 0.07);
+    }
+
+    .tag.date {
+      color: var(--ash);
+      border-color: rgba(154, 144, 136, 0.25);
+      background: transparent;
+    }
+
+    .tag.corrected {
+      color: var(--ember);
+      border-color: rgba(196, 80, 26, 0.35);
+      background: transparent;
+    }
+
+    .status-badge {
+      font-family: var(--font-ui);
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      padding: 0.4rem 1rem;
+      display: inline-block;
+    }
+
+    .status-badge.live {
+      color: var(--color-status-live);
+      border: 1px solid rgba(90, 158, 111, 0.4);
+      background: rgba(90, 158, 111, 0.08);
+    }
+
+    .status-badge.progress {
+      color: var(--brass);
+      border: 1px solid rgba(184, 146, 42, 0.4);
+      background: rgba(184, 146, 42, 0.08);
+    }
+
+    .status-badge.soon {
+      color: var(--ash);
+      border: 1px solid rgba(154, 144, 136, 0.25);
+      background: transparent;
+    }
+
+    /* StatBlock Pattern */
+    .stat-block {
+      border-left: 3px solid var(--ember);
+      padding: 1.25rem 1.5rem;
+      background: var(--color-accent-bg-tint);
+    }
+
+    .stat-number {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 2.5rem;
+      color: var(--white);
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+      font-family: var(--font-ui);
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--ash);
+    }
+
+    .stat-sub {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      color: var(--ash);
+      letter-spacing: 0.1em;
+      padding-left: 1.5rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Panels & Layout */
     .panel {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-left: 4px solid var(--accent-terracotta);
-      padding: 20px 24px;
-      box-shadow: var(--card-shadow);
-      margin-bottom: 20px;
+      background: var(--forge);
+      border: 1px solid rgba(154, 144, 136, 0.15);
+      padding: 1.5rem;
     }
 
     .panel-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 1.25rem;
+      margin-top: -0.5rem;
     }
 
     .panel-title {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.35rem;
+      font-family: var(--font-display);
+      font-size: 1.3rem;
       font-weight: 700;
-      color: var(--fg-primary);
+      color: var(--white);
     }
 
     .panel-action {
-      background: var(--bg-canvas);
-      color: var(--fg-primary);
-      border: 1px solid var(--border-subtle);
-      padding: 5px 12px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.78rem;
-      letter-spacing: 0.12em;
+      background: none;
+      border: none;
+      font-family: var(--font-ui);
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      font-weight: 700;
+      color: var(--ember);
       cursor: pointer;
-    }
-    .panel-action:hover {
-      background: var(--accent-terracotta);
-      color: #ffffff;
-      border-color: var(--accent-terracotta);
+      padding: 0;
     }
 
-    .section-label {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 700;
-      font-size: 0.72rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--accent-terracotta);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-label::after {
-      content: '';
-      flex: 1;
-      max-width: 60px;
-      height: 1px;
-      background: var(--accent-terracotta);
+    .grid-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
     }
 
     .grid-2col {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 1.5rem;
     }
-    @media (max-width: 768px) { .grid-2col { grid-template-columns: 1fr; } }
 
+    @media (max-width: 900px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .fleet-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .fleet-kpis .stat-number { font-size: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 900px) {
+      .fleet-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* Reporting */
+    .report-toggle { display: inline-flex; border: 1px solid rgba(154, 144, 136, 0.3); margin-bottom: 1.5rem; }
+    .report-toggle-btn { background: transparent; border: 0; color: var(--ash); font-family: var(--font-ui); font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.5rem 1.25rem; cursor: pointer; }
+    .report-toggle-btn.active { background: var(--ember); color: var(--white); }
+    .report-stepper { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .report-stepper .btn-secondary { padding: 0.3rem 0.6rem; }
+    .report-meta { font-size: 0.75rem; color: var(--ash); letter-spacing: 0.08em; }
+    .report-headline { font-family: var(--font-display, serif); font-size: 1.25rem; color: var(--bone); margin: 0.5rem 0 1.5rem; }
+    .report-day-grid { display: grid; grid-template-columns: 220px 1fr; gap: 1.5rem; align-items: start; }
+    .report-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .report-insight { background: rgba(34, 27, 23, 0.4); border: 1px solid rgba(154, 144, 136, 0.15); border-top: 3px solid var(--accent, var(--ember)); padding: 1rem; }
+    .report-insight h4 { margin: 0 0 0.4rem; font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent, var(--ember)); }
+    .report-insight p { margin: 0; font-size: 0.85rem; color: var(--bone); line-height: 1.45; }
+    .report-ring { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--ash); text-align: center; }
+    .report-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(154, 144, 136, 0.12); font-size: 0.85rem; color: var(--bone); }
+    .report-row .report-row-meta { color: var(--ash); white-space: nowrap; }
+    .report-row a { color: var(--brass); }
+    .report-standup { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--bone); line-height: 1.55; }
+    .report-bar { height: 6px; background: rgba(154, 144, 136, 0.15); margin-top: 0.3rem; }
+    .report-bar > span { display: block; height: 100%; background: var(--ember); }
+    .report-bars { display: flex; align-items: flex-end; gap: 0.75rem; height: 140px; margin: 0.5rem 0 1.5rem; }
+    .report-bars > div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 0.3rem; height: 100%; font-size: 0.7rem; color: var(--ash); }
+    .report-bars .report-col { width: 100%; background: var(--ember); min-height: 2px; }
+    .report-empty { color: var(--ash); font-size: 0.85rem; font-style: italic; }
+    .report-fleet-line { margin-top: 1rem; font-size: 0.85rem; color: var(--ash); }
+    .report-fleet-line a { color: var(--brass); cursor: pointer; }
+    @media (max-width: 900px) {
+      .report-day-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Tables */
+    .table-clean {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .table-clean th {
+      padding: 0.75rem 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(154, 144, 136, 0.15);
+      font-family: var(--font-ui);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #cbb8a8;
+      font-size: 0.75rem;
+    }
+
+    .table-clean td {
+      padding: 0.65rem 0.4rem;
+      border-bottom: 1px solid rgba(154, 144, 136, 0.1);
+    }
+
+    .table-clean td.key {
+      font-family: var(--font-ui);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--ash);
+      width: 45%;
+    }
+
+    .table-clean td.val {
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      color: var(--bone);
+      text-align: right;
+    }
+
+    /* Action items & cards */
     .item-card {
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-subtle);
-      padding: 14px 18px;
-      margin-bottom: 10px;
+      background: rgba(34, 27, 23, 0.4);
+      border: 1px solid rgba(154, 144, 136, 0.15);
+      padding: 1rem;
     }
 
     .breakdown-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      padding: 18px 22px;
+      background: rgba(26, 20, 16, 0.6);
+      border: 1px solid rgba(154, 144, 136, 0.12);
+      padding: 1.75rem;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 1rem;
     }
 
     .btn-secondary {
-      font-family: 'Barlow Condensed', sans-serif;
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-subtle);
-      color: var(--fg-primary);
-      padding: 6px 12px;
+      font-family: var(--font-ui);
+      background: rgba(44, 36, 32, 0.6);
+      border: 1px solid rgba(196, 80, 26, 0.3);
+      color: var(--ember);
+      padding: 0.65rem 1.25rem;
       cursor: pointer;
       font-size: 0.75rem;
       font-weight: 700;
@@ -514,58 +470,17 @@
       text-transform: uppercase;
       transition: all 0.2s;
     }
+
     .btn-secondary:hover {
-      background: var(--accent-terracotta);
-      color: #ffffff;
-      border-color: var(--accent-terracotta);
-    }
-
-    /* Tables */
-    .table-clean, .ledger-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      margin-top: 8px;
-    }
-
-    .table-clean th, .ledger-table th {
-      text-align: left;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--fg-secondary);
-      padding: 10px 14px;
-      border-bottom: 2px solid var(--border-main);
-      background: var(--bg-canvas);
-    }
-
-    .table-clean td, .ledger-table td {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border-subtle);
-      color: var(--fg-primary);
-    }
-
-    .table-clean td.key {
-      font-family: 'Barlow Condensed', sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      color: var(--fg-secondary);
-      font-weight: 600;
-    }
-    .table-clean td.val {
-      text-align: right;
-    }
-
-    .table-clean tr:hover td, .ledger-table tr:hover td {
-      background: var(--bg-card-hover);
+      border-color: rgba(196, 80, 26, 0.6);
+      background: rgba(196, 80, 26, 0.12);
+      color: var(--white);
     }
 
     /* Tab Panes */
     .tab-pane {
       display: none;
-      animation: fadeIn 0.2s ease-in-out;
+      animation: fadeIn 0.25s ease-in-out;
     }
     .tab-pane.active { display: block; }
 
@@ -574,388 +489,369 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* TRM Controls and Synthesis Cards */
+    /* Toast */
+    .toast {
+      pointer-events: none;
+      position: fixed;
+      right: 1.25rem;
+      bottom: 1.25rem;
+      z-index: 50;
+      padding: 0.9rem 1.2rem;
+      background: var(--iron);
+      border: 1px solid var(--ember);
+      color: var(--white);
+      font-family: var(--font-ui);
+      letter-spacing: 0.06em;
+      display: none;
+    }
+
+    .toast.show { display: block; }
+
+    /* TRM Intelligence & Deep Synthesis */
     .controls-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 12px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      padding: 14px 20px;
-      margin-bottom: 20px;
-      box-shadow: var(--card-shadow);
+      gap: 1rem;
+      background: var(--forge);
+      border: 1px solid rgba(154, 144, 136, 0.15);
+      padding: 0.85rem 1.25rem;
+      margin-bottom: 1.5rem;
     }
     .control-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 0.75rem;
       flex-wrap: wrap;
     }
     .control-label {
-      font-family: 'Barlow Condensed', sans-serif;
+      font-family: var(--font-ui);
       font-size: 0.75rem;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--fg-secondary);
-      font-weight: 700;
-    }
-    select, input[type="text"] {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.8rem;
-      padding: 6px 12px;
-      background: var(--bg-canvas);
-      color: var(--fg-primary);
-      border: 1px solid var(--border-subtle);
-      outline: none;
+      color: var(--ash);
     }
     .synthesis-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin-top: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
     }
     .synth-card {
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-subtle);
+      background: rgba(10, 8, 6, 0.6);
+      border: 1px solid rgba(154, 144, 136, 0.15);
       border-top: 3px solid;
-      padding: 16px;
+      padding: 1.25rem;
     }
-    .synth-card.contradictions { border-top-color: var(--accent-terracotta); }
-    .synth-card.undersourced { border-top-color: var(--accent-brass); }
-    .synth-card.adjacent { border-top-color: #4f7a9a; }
-    .synth-card.followup { border-top-color: var(--accent-sage); }
+    .synth-card.contradictions { border-top-color: var(--ember); }
+    .synth-card.undersourced { border-top-color: var(--brass); }
+    .synth-card.adjacent { border-top-color: #7a9fbf; }
+    .synth-card.followup { border-top-color: #5a9e6f; }
 
     .synth-head {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.82rem;
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
       font-weight: 700;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
-    .synth-card.contradictions .synth-head { color: var(--accent-terracotta); }
-    .synth-card.undersourced .synth-head { color: var(--accent-brass); }
-    .synth-card.adjacent .synth-head { color: #4f7a9a; }
-    .synth-card.followup .synth-head { color: var(--accent-sage); }
+    .synth-card.contradictions .synth-head { color: var(--ember); }
+    .synth-card.undersourced .synth-head { color: var(--brass); }
+    .synth-card.adjacent .synth-head { color: #7a9fbf; }
+    .synth-card.followup .synth-head { color: #5a9e6f; }
 
     .synth-item {
-      margin-bottom: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px dashed var(--border-subtle);
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px dashed rgba(154, 144, 136, 0.1);
     }
     .synth-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
     .synth-item-title {
-      font-family: 'Barlow Condensed', sans-serif;
+      font-family: var(--font-ui);
       font-size: 0.95rem;
       font-weight: 700;
-      color: var(--fg-primary);
-      margin-bottom: 4px;
+      color: var(--white);
+      margin-bottom: 0.25rem;
     }
     .synth-item-desc {
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       line-height: 1.5;
-      color: var(--fg-secondary);
+      color: var(--bone);
     }
-
-    .tag {
-      font-family: 'Geist Mono', monospace;
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 2px 7px;
+    .tag-pill {
+      font-family: monospace;
+      font-size: 0.75rem;
+      background: var(--iron);
+      color: var(--bone);
+      padding: 0.2rem 0.5rem;
+      border: 1px solid rgba(154, 144, 136, 0.15);
       display: inline-block;
-      border: 1px solid var(--border-subtle);
-      background: var(--bg-subtle);
-      color: var(--fg-primary);
+      margin: 0.2rem;
     }
-    .tag.high { border-color: var(--accent-terracotta); color: var(--accent-terracotta); background: var(--badge-terracotta-bg); }
-    .tag.new { border-color: var(--accent-brass); color: var(--accent-brass); background: var(--badge-brass-bg); }
-    .tag.corrected { border-color: var(--accent-terracotta); color: var(--accent-terracotta); }
-    .tag.date { color: var(--fg-secondary); }
-
-    .status-badge {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      padding: 3px 8px;
-      display: inline-block;
-      border: 1px solid;
-    }
-    .status-badge.live { color: var(--accent-sage); border-color: var(--accent-sage); background: var(--badge-sage-bg); }
-    .status-badge.progress { color: var(--accent-brass); border-color: var(--accent-brass); background: var(--badge-brass-bg); }
-    .status-badge.soon { color: var(--fg-muted); border-color: var(--border-subtle); }
-
     .history-btn {
-      background: var(--bg-canvas);
-      color: var(--fg-primary);
-      border: 1px solid var(--border-subtle);
-      padding: 6px 12px;
-      font-family: 'Barlow Condensed', sans-serif;
+      background: var(--iron);
+      color: var(--white);
+      border: 1px solid rgba(196, 80, 26, 0.4);
+      padding: 0.4rem 0.75rem;
+      font-family: var(--font-ui);
       font-size: 0.8rem;
+      letter-spacing: 0.05em;
       cursor: pointer;
     }
-
+    .vertical-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-top: 1rem;
+    }
     .step-row {
       display: grid;
       grid-template-columns: 200px 1fr;
       gap: 1.5rem;
       padding: 1.25rem;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-left: 4px solid var(--accent-terracotta);
-      margin-bottom: 10px;
+      background: var(--iron);
+      border: 1px solid rgba(154, 144, 136, 0.15);
+      border-left: 4px solid;
+      position: relative;
+    }
+    @media (max-width: 768px) {
+      .step-row { grid-template-columns: 1fr; gap: 0.75rem; }
+    }
+    .step-row.mine { border-left-color: var(--ember); }
+    .step-row.triage { border-left-color: #7a9fbf; }
+    .step-row.treatment { border-left-color: var(--brass); }
+    .step-row.memory { border-left-color: #a78bfa; }
+    .step-row.status { border-left-color: var(--sage); }
+
+    .step-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .step-time {
-      font-family: 'Geist Mono', monospace;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--fg-primary);
-    }
-    .step-duration {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.8rem;
-      color: var(--fg-secondary);
-    }
-    .step-name {
-      font-family: 'Playfair Display', Georgia, serif;
+      font-family: monospace;
       font-size: 1.15rem;
       font-weight: 700;
-      color: var(--fg-primary);
+      color: var(--white);
     }
-    .step-body {
-      font-size: 0.88rem;
-      color: var(--fg-secondary);
-      line-height: 1.5;
-      margin: 4px 0 8px;
+    .step-duration {
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      color: var(--ash);
+      margin-top: 0.2rem;
     }
 
-    /* Toast */
-    .toast {
-      pointer-events: none;
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      z-index: 999;
-      padding: 12px 18px;
-      background: var(--bg-surface);
-      border: 1.5px solid var(--accent-terracotta);
-      color: var(--fg-primary);
-      font-family: 'Barlow Condensed', sans-serif;
-      letter-spacing: 0.08em;
-      display: none;
-      box-shadow: var(--card-shadow-hover);
+    .step-right-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
     }
-    .toast.show { display: block; }
+    .step-name {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+    .step-body {
+      font-size: 0.9rem;
+      color: var(--bone);
+      line-height: 1.5;
+      margin-bottom: 0.6rem;
+    }
+    .step-footer {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      color: var(--ash);
+      padding-top: 0.5rem;
+      border-top: 1px dashed rgba(154, 144, 136, 0.12);
+    }
+
+    .step-connector {
+      display: flex;
+      align-items: center;
+      padding: 0.6rem 1.5rem;
+      gap: 1rem;
+      margin-left: 100px;
+    }
+    @media (max-width: 768px) {
+      .step-connector { margin-left: 20px; }
+    }
+    .connector-line {
+      width: 2px;
+      height: 24px;
+      background: rgba(196, 80, 26, 0.4);
+    }
+    .connector-badge {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ash);
+      background: rgba(10, 8, 6, 0.6);
+      padding: 0.2rem 0.6rem;
+      border: 1px solid rgba(154, 144, 136, 0.15);
+    }
+
 
     /* Footer */
     footer {
       text-align: center;
-      padding-top: 30px;
-      border-top: 1px solid var(--border-subtle);
-      color: var(--fg-muted);
+      padding-top: 2.5rem;
+      border-top: 1px solid rgba(154, 144, 136, 0.12);
+      color: var(--ash);
       font-size: 0.8rem;
+      font-family: var(--font-ui);
       letter-spacing: 0.15em;
-      margin-top: 30px;
+      margin-top: 3rem;
     }
   </style>
 </head>
 <body>
 
-<div class="wrapper">
-
-  <!-- COMMAND HEADER WITH THEME SWITCHER -->
-  <header class="command-header">
-    <div class="title-area">
-      <h1>Iron Command Forge</h1>
-      <p>UNIFIED OPERATIONS &bull; TELEMETRY MATRIX &bull; ZERO-TOKEN FLEET</p>
+<div class="container">
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="brand-title">IRON COMMAND FORGE</div>
+      <div class="brand-subtitle">Unified Operations, Knowledge Graph, MCP Infrastructure &amp; Status Feed</div>
     </div>
-
-    <!-- Working Theme Switcher -->
-    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <a class="badge-pill sage" id="docsManualLink" href="/operations-manual.html" target="_blank" rel="noopener noreferrer" title="Open Iron Command Forge Operations Manual" style="text-decoration:none;">MANUAL ↗</a>
-      <span class="badge-pill sage" id="sseLiveBadge" title="Real-time Server-Sent Events (SSE) Stream">● LIVE SSE</span>
-      <div class="theme-switch-control" role="group" aria-label="Theme Switcher">
-        <button id="btnParchment" class="theme-switch-btn active" type="button" aria-pressed="true" onclick="applyTheme('parchment')">
-          <span class="indicator">●</span> WARM PARCHMENT
-        </button>
-        <button id="btnForge" class="theme-switch-btn" type="button" aria-pressed="false" onclick="applyTheme('forge')">
-          <span class="indicator" style="display:none;">●</span> DARK FORGE
-        </button>
-      </div>
+    <div class="header-badges">
+      <a class="status-badge live" id="docsMkdocsLink" href="http://127.0.0.1:8001/" target="_blank" rel="noopener noreferrer" title="Open local MkDocs (rewrite-docs on :8001)" style="text-decoration:none;">DOCS</a>
+      <span class="status-badge live" id="sseLiveBadge" title="Real-time Server-Sent Events (SSE) Stream">● LIVE SSE</span>
+      <div class="synced-badge" id="reportTimestamp">SYNCED 1H AGO</div>
     </div>
   </header>
 
-  <!-- TAB STRIP WITH LIVE NUMERIC COUNTERS -->
-  <nav class="tab-strip" role="tablist">
-    <div class="tab-item active" id="btn-tab-daily" onclick="switchTab('tab-daily')">
-      01. DAILY COMMAND FEED <span class="tab-badge" id="tabDailyBadge">4</span>
-    </div>
-    <div class="tab-item" id="btn-tab-mcp" onclick="switchTab('tab-mcp')">
-      02. UNIFIED MCP MATRIX <span class="tab-badge" id="tabMcpBadge">13</span>
-    </div>
-    <div class="tab-item" id="btn-tab-kbsync" onclick="switchTab('tab-kbsync')">
-      03. KNOWLEDGE GRAPH <span class="tab-badge" id="tabKbBadge">Vault</span>
-    </div>
-    <div class="tab-item" id="btn-tab-trm" onclick="switchTab('tab-trm')">
-      04. TRM COGNITIVE <span class="tab-badge" id="tabTrmBadge">20</span>
-    </div>
-    <div class="tab-item" id="btn-tab-reporting" onclick="switchTab('tab-reporting')">
-      05. REPORTING
-    </div>
-    <div class="tab-item" id="btn-tab-fleet" onclick="switchTab('tab-fleet')">
-      06. IRONBOTS FLEET <span class="tab-badge" id="tabFleetBadge">10</span>
-    </div>
-    <div class="tab-item" id="btn-tab-ops" onclick="switchTab('tab-ops')">
-      07. OPERATIONS <span class="tab-badge" id="tabOpsBadge">17</span>
-    </div>
-    <div class="tab-item" id="btn-tab-headroom" onclick="switchTab('tab-headroom')">
-      08. HEADROOM OPTIMIZER
-    </div>
-    <div class="tab-item" id="btn-tab-graft" onclick="switchTab('tab-graft')">
-      09. GRAFT &amp; DRIFT
-    </div>
-    <div class="tab-item" id="btn-tab-skills" onclick="switchTab('tab-skills')">
-      10. TOOLFORGE SKILLS
-    </div>
-    <div class="tab-item" id="btn-tab-history" onclick="switchTab('tab-history')">
-      11. EXECUTION LOGS <span class="tab-badge" id="tabHistoryBadge">Live</span>
-    </div>
+  <div class="gradient-rule"></div>
+
+  <!-- TAB NAV -->
+  <nav class="tabs-nav" aria-label="Command Center Tabs">
+    <button type="button" class="tab-btn active" id="btn-tab-daily" onclick="switchTab('tab-daily')">
+      <span>01. Daily Command Feed</span>
+      <span class="tag high" id="tabDailyBadge">4 Open</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-mcp" onclick="switchTab('tab-mcp')">
+      <span>02. Unified MCP Matrix</span>
+      <span class="tag date" id="tabMcpBadge">13 Active</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-kbsync" onclick="switchTab('tab-kbsync')">
+      <span>03. Knowledge Graph &amp; Validation</span>
+      <span class="tag date" id="tabKbBadge">Vault Live</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-trm" onclick="switchTab('tab-trm')">
+      <span>04. TRM Cognitive Intelligence</span>
+      <span class="tag date" id="tabTrmBadge" style="background: rgba(196,80,26,0.15); color: var(--ember); border: 1px solid rgba(196,80,26,0.35);">11 Notebooks</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-reporting" onclick="switchTab('tab-reporting')">
+      <span>05. Reporting</span>
+      <span class="tag date">Daily · Weekly</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-fleet" onclick="switchTab('tab-fleet')">
+      <span>06. Ironbots Fleet</span>
+      <span class="tag date" id="tabFleetBadge">10 Bots</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-ops" onclick="switchTab('tab-ops')">
+      <span>07. Operations &amp; Automation</span>
+      <span class="tag date" id="tabOpsBadge">17 Tasks (10 Ironbots)</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-headroom" onclick="switchTab('tab-headroom')">
+      <span>08. Headroom Optimizer</span>
+      <span class="tag date" id="tabHeadroomBadge" style="background: rgba(196,80,26,0.15); color: var(--ember); border: 1px solid rgba(196,80,26,0.35);">● 2.1k Saved</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-graft" onclick="switchTab('tab-graft')">
+      <span>09. Graft &amp; Drift</span>
+      <span class="tag date" id="tabGraftBadge" style="background: rgba(94,234,212,0.15); color: #5eead4; border: 1px solid rgba(94,234,212,0.35);">● 94.8% Saved</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-skills" onclick="switchTab('tab-skills')">
+      <span>10. Toolforge Skills</span>
+      <span class="tag date" id="tabSkillsBadge">Inventory</span>
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-history" onclick="switchTab('tab-history')">
+      <span>11. Execution History &amp; Errors</span>
+      <span class="tag date" id="tabHistoryBadge">Telemetry Live</span>
+    </button>
   </nav>
 
   <!-- ================================================================= -->
   <!-- TAB 1: DAILY COMMAND FEED -->
   <!-- ================================================================= -->
   <section id="tab-daily" class="tab-pane active" aria-label="Daily Command Feed">
-    <!-- METRIC CARDS WITH INTEGRATED ASCII/MONO MICRO-SPARKLINES -->
-    <section class="metrics-grid">
-      <!-- Metric 1: Sage Health -->
-      <div class="flush-card sage-metric">
-        <div>
-          <div class="metric-value-row">
-            <div class="metric-value" style="color: var(--accent-sage);">99.2%</div>
-            <span class="sparkline-micro" style="color: var(--accent-sage);" title="7-day trend"> ▃▅▇▇█</span>
-          </div>
-          <div class="metric-label">Fleet Success Rate</div>
+    <div class="grid-metrics">
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyTodos">4 Items</div>
+          <div class="stat-label">Open Priorities</div>
         </div>
-        <div class="metric-sub">● PASS · 10/10 Bots Online</div>
-      </div>
-
-      <!-- Metric 2: Terracotta Priority -->
-      <div class="flush-card terracotta-metric">
-        <div>
-          <div class="metric-value-row">
-            <div class="metric-value" id="qDailyTodos" style="color: var(--accent-terracotta);">4 Items</div>
-            <span class="sparkline-micro" style="color: var(--accent-terracotta);" title="Priority burn-down">██▆▅▃</span>
-          </div>
-          <div class="metric-label">Active Backlog Priority</div>
-        </div>
-        <div class="metric-sub" id="qDailyTodosSub">1 P1 | 3 P2 Actionable</div>
-      </div>
-
-      <!-- Metric 3: Brass Headroom Savings -->
-      <div class="flush-card brass-metric">
-        <div>
-          <div class="metric-value-row">
-            <div class="metric-value" id="qDailyHeadroom" style="color: var(--accent-brass);">83.6k</div>
-            <span class="sparkline-micro" style="color: var(--accent-brass);" title="Token cache hit rate"> ▂▄▆██</span>
-          </div>
-          <div class="metric-label">Headroom Tokens Saved</div>
-        </div>
-        <div class="metric-sub" id="qDailyHeadroomSub">94.8% VFS Cache Hit Rate</div>
-      </div>
-
-      <!-- Metric 4: Neutral Performance Latency -->
-      <div class="flush-card neutral-metric">
-        <div>
-          <div class="metric-value-row">
-            <div class="metric-value" style="color: var(--fg-primary);">184 ms</div>
-            <span class="sparkline-micro" style="color: var(--fg-secondary);" title="P95 response time">▃▂ ▂▃ </span>
-          </div>
-          <div class="metric-label">Average Run Latency</div>
-        </div>
-        <div class="metric-sub">p95 &lt; 450ms · Zero Spillover</div>
-      </div>
-    </section>
-
-    <!-- QUICK STATUS FILTER & FAST SEARCH TOOLBAR -->
-    <div class="filter-toolbar">
-      <div class="filter-group">
-        <span style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--fg-secondary); margin-right: 4px;">FILTER:</span>
-        <button class="filter-pill active" onclick="filterFleetCards('all', this)">ALL (10)</button>
-        <button class="filter-pill" onclick="filterFleetCards('healthy', this)">● HEALTHY (8)</button>
-        <button class="filter-pill" onclick="filterFleetCards('triage', this)">● TRIAGE (1)</button>
-        <button class="filter-pill" onclick="filterFleetCards('supervised', this)">● SUPERVISED (1)</button>
+        <div class="stat-sub" id="qDailyTodosSub">1 P1 | 3 P2 | 0 P0</div>
       </div>
       <div>
-        <input type="text" class="search-box" id="fleetSearchInput" placeholder="Filter bots or logs... (/)" oninput="searchFleetCards(this.value)" />
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyMcp">13 / 13</div>
+          <div class="stat-label">MCP Health</div>
+        </div>
+        <div class="stat-sub">100% Servers Online</div>
+      </div>
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyHeadroom" style="color: #5eead4;">2,083 Tok</div>
+          <div class="stat-label">Headroom Savings</div>
+        </div>
+        <div class="stat-sub" id="qDailyHeadroomSub">69.6% Cache Hit | $0.03 Cut</div>
+      </div>
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyGraft" style="color: #5eead4;">94.8% Cut</div>
+          <div class="stat-label">Graft Graph Pruning</div>
+        </div>
+        <div class="stat-sub" id="qDailyGraftSub">91 tok/call | $2.73 / 10k</div>
+      </div>
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyDrift" style="color: #a78bfa;">0 Pending</div>
+          <div class="stat-label">Competitor Drift</div>
+        </div>
+        <div class="stat-sub" id="qDailyDriftSub">3 Watchers Monitored</div>
+      </div>
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailySyncStatus">Drift 2p</div>
+          <div class="stat-label">KB-Sync Status</div>
+        </div>
+        <div class="stat-sub" id="qDailySyncSub">Last Sync: 2h ago</div>
+      </div>
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyCoverage">100%</div>
+          <div class="stat-label">Link &amp; Graph Health</div>
+        </div>
+        <div class="stat-sub">Zero broken links</div>
+      </div>
+      <div>
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyBlockers">0 Blockers</div>
+          <div class="stat-label">Active Blockers</div>
+        </div>
+        <div class="stat-sub" id="qDailyBlockersSub">Handoff status clear</div>
+      </div>
+      <div title="Operator focus from Meridian (local, read-only)">
+        <div class="stat-block">
+          <div class="stat-number" id="qDailyFocus">—</div>
+          <div class="stat-label">Operator Focus</div>
+        </div>
+        <div class="stat-sub" id="qDailyFocusSub">Meridian …</div>
       </div>
     </div>
-
-    <!-- OPERATIONAL FEED SECTION (3B Flush Style) -->
-    <section class="feed-section">
-      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px;">
-        <h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 1.45rem; font-weight: 800; color: var(--fg-primary);">
-          Live Unattended Fleet Status (3B Flush Style)
-        </h2>
-        <span style="font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--fg-secondary); font-weight: 600;">
-          10 Autonomous Bots Registered
-        </span>
-      </div>
-
-      <!-- Task 1: Sage Pass -->
-      <div class="feed-card healthy-task" data-fleet-status="healthy">
-        <div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <strong style="font-size: 1.15rem; color: var(--fg-primary); letter-spacing: 0.02em;">KB-Sentinel</strong>
-            <span class="badge-pill sage">● PASS (HEALTH SCORE 92/100)</span>
-          </div>
-          <div style="font-size: 0.88rem; color: var(--fg-secondary); margin-top: 4px;">
-            Scanned 409 wiki files · 0 broken links · Autoheal verified
-          </div>
-          <div style="font-family: 'Geist Mono', monospace; font-size: 0.75rem; color: var(--fg-muted); margin-top: 6px;">
-            Last Run: Daily 03:00 AM &bull; Duration: 312ms &bull; Token Burn: 0
-          </div>
-        </div>
-        <button class="btn-action" onclick="executeAction('run-bot', 'kb-sentinel', this)">Run Bot 📋</button>
-      </div>
-
-      <!-- Task 2: Terracotta Active/Triage -->
-      <div class="feed-card active-task" data-fleet-status="triage">
-        <div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <strong style="font-size: 1.15rem; color: var(--fg-primary); letter-spacing: 0.02em;">TRM-Bot Drafter</strong>
-            <span class="badge-pill terracotta">● ACTIVE TRIAGE</span>
-          </div>
-          <div style="font-size: 0.88rem; color: var(--fg-primary); margin-top: 4px;">
-            2,056 research gaps tracked · 14 atomic RFC synthesis cards generated
-          </div>
-          <div style="font-family: 'Geist Mono', monospace; font-size: 0.75rem; color: var(--accent-terracotta); margin-top: 6px;">
-            wiki/research/rfc-gap-02--cic-daily-research.md
-          </div>
-        </div>
-        <button class="btn-action" onclick="switchTab('tab-trm')">Inspect RFCs →</button>
-      </div>
-
-      <!-- Task 3: Brass Supervised -->
-      <div class="feed-card brass-task" data-fleet-status="supervised">
-        <div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <strong style="font-size: 1.15rem; color: var(--fg-primary); letter-spacing: 0.02em;">Daemon-Healer Supervisor</strong>
-            <span class="badge-pill brass">● SUPERVISED (200 OK)</span>
-          </div>
-          <div style="font-size: 0.88rem; color: var(--fg-secondary); margin-top: 4px;">
-            Probing port 8080 health · Auto-recovers stale PIDs from C:\dev
-          </div>
-          <div style="font-family: 'Geist Mono', monospace; font-size: 0.75rem; color: var(--fg-muted); margin-top: 6px;">
-            Cadence: Every 15 Min &bull; Gateway PID: Active
-          </div>
-        </div>
-        <button class="btn-action" onclick="loadDailyStatus()">Probe Status</button>
-      </div>
-    </section>
 
     <div class="grid-2col">
       <!-- Left: Action Items -->
@@ -966,26 +862,26 @@
           <button type="button" class="panel-action" data-copy-command="code C:\dev\TODOS.md" onclick="copyCommand(this.dataset.copyCommand)">Open TODOS →</button>
         </div>
         <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;" id="dailyTodosList">
-          <li class="item-card" style="border-left: 3px solid var(--accent-brass);">
+          <li class="item-card" style="border-left: 3px solid var(--brass);">
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
               <span class="tag new">P2</span>
-              <span style="font-size: 0.95rem; font-weight: 700; color: var(--fg-primary);">Dev idea pipeline</span>
+              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">Dev idea pipeline</span>
             </div>
-            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--fg-secondary); font-style: italic;">Track unbuilt dev ideas in dev-idea-pipeline.md across CLIs. First entry: Warp CLI + WhichLLM local-model routing shim.</div>
+            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Track unbuilt dev ideas in dev-idea-pipeline.md across CLIs. First entry: Warp CLI + WhichLLM local-model routing shim.</div>
           </li>
-          <li class="item-card" style="border-left: 3px solid var(--accent-brass);">
+          <li class="item-card" style="border-left: 3px solid var(--brass);">
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
               <span class="tag new">P2</span>
-              <span style="font-size: 0.95rem; font-weight: 700; color: var(--fg-primary);">fast-jev-compaction compactor plugin wiring</span>
+              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">fast-jev-compaction compactor plugin wiring</span>
             </div>
-            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--fg-secondary); font-style: italic;">Parked, deferred follow-up. Point published compactor at local cic-jev engine instead of cloud Jev.</div>
+            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Parked, deferred follow-up. Point published compactor at local cic-jev engine instead of cloud Jev.</div>
           </li>
-          <li class="item-card" style="border-left: 3px solid var(--accent-brass);">
+          <li class="item-card" style="border-left: 3px solid var(--brass);">
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
               <span class="tag new">P2</span>
-              <span style="font-size: 0.95rem; font-weight: 700; color: var(--fg-primary);">xberg native build-out</span>
+              <span style="font-size: 0.95rem; font-weight: 700; color: var(--white);">xberg native build-out</span>
             </div>
-            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--fg-secondary); font-style: italic;">Swapped mock stub to real pdf-parse text-layer extraction 2026-07-16. Next phase evaluates native parser.</div>
+            <div style="font-size: 0.8rem; line-height: 1.5; color: var(--ash); font-style: italic;">Swapped mock stub to real pdf-parse text-layer extraction 2026-07-16. Next phase evaluates native parser.</div>
           </li>
         </ul>
       </div>
@@ -1001,11 +897,11 @@
           <tbody>
             <tr>
               <td class="key">MCP Infrastructure</td>
-              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;">13 <span class="badge-pill sage">● LIVE</span></span></td>
+              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;">13 <span class="status-badge live">● LIVE</span></span></td>
             </tr>
             <tr>
               <td class="key">KB-Sync Drift</td>
-              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;">2 files <span class="badge-pill brass">● PROGRESS</span></span></td>
+              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;">2 files <span class="status-badge progress">● PROGRESS</span></span></td>
             </tr>
             <tr>
               <td class="key">Vault Files Indexed</td>
@@ -1013,15 +909,15 @@
             </tr>
             <tr>
               <td class="key">Wiki Link Integrity</td>
-              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;">100% <span class="badge-pill sage">● LIVE</span></span></td>
+              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;">100% <span class="status-badge live">● LIVE</span></span></td>
             </tr>
             <tr>
               <td class="key">Memory Mirror Sync</td>
-              <td class="val"><span class="badge-pill sage">● LIVE</span></td>
+              <td class="val"><span class="status-badge live">● LIVE</span></td>
             </tr>
             <tr>
               <td class="key">Jev Decision Runtime</td>
-              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;" id="jevRuntimeStatus"><span class="badge-pill sage">● 92ms p50 (Ollama)</span></span></td>
+              <td class="val"><span style="display: inline-flex; align-items: center; gap: 0.5rem;" id="jevRuntimeStatus"><span class="status-badge live">● 92ms p50 (Ollama)</span></span></td>
             </tr>
             <tr>
               <td class="key">Jev Token Compaction</td>
@@ -1041,7 +937,7 @@
     </div>
   </section>
 
-<!-- ================================================================= -->
+  <!-- ================================================================= -->
   <!-- TAB 2: UNIFIED MCP MATRIX -->
   <!-- ================================================================= -->
   <section id="tab-mcp" class="tab-pane" aria-label="Unified MCP Matrix">
@@ -1117,8 +1013,7 @@
     <!-- Controls -->
     <div style="display: flex; gap: 0.8rem; justify-content: center; margin: 1.5rem 0 0.75rem; flex-wrap: wrap;">
       <button type="button" class="btn-secondary" onclick="loadValidationReport()">Reload report JSON</button>
-      <button type="button" class="btn-secondary" onclick="executeAction('validate-wiki', 'all', this)">Re-run validator ▶</button>
-      <button type="button" class="btn-secondary" title="Copy validator command" aria-label="Copy validator command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/validate-staging-docs.mjs' '--json=./.validation-report.json' '.' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
+      <button type="button" class="btn-secondary" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/validate-staging-docs.mjs' '--json=./.validation-report.json' '.' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">Re-run validator</button>
       <button type="button" class="btn-secondary" onclick="exportReportJson()">Export Report JSON</button>
       <button type="button" class="btn-secondary" onclick="clearCache()" style="border-color: rgba(196,80,26,0.55);">Clear Cache</button>
     </div>
@@ -1139,8 +1034,7 @@
           <div style="font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: var(--white);" id="countFrontiers">8</div>
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Forward-looking double-bracket links pointing to conceptual topics and entities not yet created on disk. This represents active knowledge graph growth in the Karpathy LLM-wiki workflow.</div>
-        <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'stubs', this)">Scaffold Concept Stubs ▶</button>
-        <button type="button" class="btn-secondary" title="Copy scaffold command" aria-label="Copy scaffold command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/autoheal-sweeper.mjs' '--fix' '--allow-dirty' '--target-dir' 'wiki' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
+        <button type="button" class="btn-secondary" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/autoheal-sweeper.mjs' '--fix' '--allow-dirty' '--target-dir' 'wiki' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">Scaffold Concept Stubs</button>
       </div>
 
       <div class="breakdown-card" style="border-left: 4px solid var(--brass);">
@@ -1149,8 +1043,7 @@
           <div style="font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: var(--white);" id="countStructural">27</div>
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Missing top-level # Title headings, heading level jumps (e.g. H1 to H3), or missing frontmatter properties that affect automated indexers and AST parsing.</div>
-        <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'frontmatter', this)">Standardize Headers ▶</button>
-        <button type="button" class="btn-secondary" title="Copy header command" aria-label="Copy header command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'scripts/fix-wiki-frontmatter.mjs' 'wiki' '--allow-dirty' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
+        <button type="button" class="btn-secondary" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'scripts/fix-wiki-frontmatter.mjs' 'wiki' '--allow-dirty' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">Standardize Headers</button>
       </div>
 
       <div class="breakdown-card" style="border-left: 4px solid var(--ash);">
@@ -1159,8 +1052,7 @@
           <div style="font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: var(--white);" id="countHygiene">23</div>
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Consecutive blank lines and trailing whitespace at the ends of lines. Completely safe to auto-format without semantic risk.</div>
-        <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'hygiene', this)">Run Auto-Fixer ▶</button>
-        <button type="button" class="btn-secondary" title="Copy auto-fixer command" aria-label="Copy auto-fixer command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/validate-staging-docs.mjs' '--fix' '--json=./.validation-report.json' 'wiki' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
+        <button type="button" class="btn-secondary" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/validate-staging-docs.mjs' '--fix' '--json=./.validation-report.json' 'wiki' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">Run Auto-Fixer</button>
       </div>
     </div>
 
@@ -1293,20 +1185,11 @@
           <option value="fd0e0e4e-6890-4fb9-89bf-b9e568295e7a">The Sorensen Photographic Archive (fd0e0e4e...)</option>
           <option value="6fd7c40b-df90-444b-9c7a-a64682925856">CIC - Willow Run &amp; Aviation Engineering (6fd7c40b...)</option>
           <option value="ef78168d-b7b9-4952-8e0f-fcb353a21181">Willow Run Videos (ef78168d...)</option>
-          <option value="9c469910-a900-43a4-877c-a43c9f545b5f">CIC - Post-War (9c469910...)</option>
-          <option value="fd4ebe29-9440-4f4b-97cf-0184ffbe29a0">CIC - Willys-Overland (fd4ebe29...)</option>
+          <option value="9c469910-a900-43a4-877c-a43c9f545b5f">CIC - Post-War &amp; Willys-Overland (9c469910...)</option>
           <option value="c8360946-dbee-4a2c-b622-7f89b05695b0">CIC - Cuban Seizures &amp; Retired Assets (c8360946...)</option>
-          <option value="64949154-5892-4fa4-9ad0-e48b2bf5cc6c">CIC - Miami Estate &amp; Florida Retirement (64949154...)</option>
-          <option value="70be0df3-c58a-4711-b4d3-1e4b8726faf7">CIC - Rouge, Model T &amp; Moving Assembly Line (70be0df3...)</option>
           <option value="0c8dc979-319f-4e6d-8136-22275932c236">CastIronCharlie-Facebook (0c8dc979...)</option>
           <option value="039e2c13-75b3-4bf2-b58d-9bbce8f73a4d">CIC-Reddit (039e2c13...)</option>
           <option value="679b8bab-2d87-42cb-a726-6dc54c83acc2">CIC-KB (679b8bab...)</option>
-          <option value="76e1932c-054a-4520-9e83-5e882dffc938">IronLedger Architecture (76e1932c...)</option>
-          <option value="26eacb85-2c97-443d-9d81-3bd99cc98412">Sigil Protocol &amp; Federation (26eacb85...)</option>
-          <option value="359b346c-6af7-4ba3-baef-b985c9e6e1af">Agent Harnesses &amp; Local Execution (359b346c...)</option>
-          <option value="140119ae-3496-45c9-bf0c-71c955136afc">Rewrite Labs SSG/Redesign Platform (140119ae...)</option>
-          <option value="cb0498ce-1ea5-4668-9f65-ac368753404e">Open Dev Issues (CI/CD Triage Buffer) (cb0498ce...)</option>
-          <option value="9724e682-c5ea-4693-8e21-caf8de68611e">Personal OS (Household, Utilities, Florida Logistics) (9724e682...)</option>
         </select>
         <a id="trmExtNotebookLink" href="https://notebooklm.google.com/notebook/0caf6707-f8f2-4d2a-acd2-020acead55ba" target="_blank" class="tag high" style="text-decoration: none;">Open in NotebookLM ↗</a>
       </div>
@@ -1423,7 +1306,7 @@
     <div class="panel">
       <div class="section-label">Registry Surface</div>
       <div class="panel-header">
-        <div class="panel-title">Monitored NotebookLM Notebooks (20 Active)</div>
+        <div class="panel-title">Monitored NotebookLM Notebooks (11 Active)</div>
       </div>
       <table class="table-clean">
         <thead>
@@ -1471,7 +1354,9 @@
               <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
               <stop offset="100%" stop-color="#faf6f0" stop-opacity="1"/>
             </linearGradient>
-            
+            <filter id="cardShadowWarm" x="-5%" y="-5%" width="110%" height="115%">
+              <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#2c2420" flood-opacity="0.12"/>
+            </filter>
             <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#c4501a"/>
             </marker>
@@ -1488,7 +1373,7 @@
 
           <!-- STAGE 1: INGESTION -->
           <g transform="translate(40, 80)">
-            <rect x="0" y="0" width="200" height="230" rx="4" fill="#ffffff" stroke="#c4501a" stroke-width="1.5"/>
+            <rect x="0" y="0" width="200" height="230" rx="4" fill="url(#cardGradWarm)" stroke="#c4501a" stroke-width="1.5" filter="url(#cardShadowWarm)"/>
             <rect x="0" y="0" width="200" height="34" fill="#c4501a" rx="4 4 0 0"/>
             <text x="100" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">01. MULTIMODAL INGEST</text>
             <text x="15" y="60" font-size="13" font-weight="700" fill="#2c2420">Primary Sources</text>
@@ -1497,7 +1382,7 @@
             <rect x="12" y="110" width="176" height="42" rx="3" fill="#f2ece2" stroke="rgba(196,80,26,0.3)"/>
             <text x="20" y="127" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#c4501a">trm ingest-notebooklm</text>
             <text x="20" y="142" font-size="10" fill="#5c5349">Pulls Studio notes &amp; sources</text>
-            <text x="15" y="175" font-size="12" font-weight="700" fill="#b8922a">20 Active Notebooks</text>
+            <text x="15" y="175" font-size="12" font-weight="700" fill="#b8922a">11 Active Notebooks</text>
             <text x="15" y="193" font-size="11" fill="#5c5349">Automated Quarantine check</text>
             <text x="15" y="210" font-size="11" fill="#5c5349">Hash Registry Verification</text>
           </g>
@@ -1507,7 +1392,7 @@
 
           <!-- STAGE 2: DEEP QUESTION MINING -->
           <g transform="translate(280, 80)">
-            <rect x="0" y="0" width="210" height="230" rx="4" fill="#ffffff" stroke="#b8922a" stroke-width="1.5"/>
+            <rect x="0" y="0" width="210" height="230" rx="4" fill="url(#cardGradWarm)" stroke="#b8922a" stroke-width="1.5" filter="url(#cardShadowWarm)"/>
             <rect x="0" y="0" width="210" height="34" fill="#b8922a" rx="4 4 0 0"/>
             <text x="105" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">02. QUESTION MINING</text>
             <text x="15" y="58" font-size="12" font-weight="700" fill="#2c2420">4 Canonical Query Vectors</text>
@@ -1527,7 +1412,7 @@
 
           <!-- STAGE 3: TRIAGE & COGNITIVE CACHE -->
           <g transform="translate(530, 80)">
-            <rect x="0" y="0" width="210" height="230" rx="4" fill="#ffffff" stroke="#2c2420" stroke-width="1.5"/>
+            <rect x="0" y="0" width="210" height="230" rx="4" fill="url(#cardGradWarm)" stroke="#2c2420" stroke-width="1.5" filter="url(#cardShadowWarm)"/>
             <rect x="0" y="0" width="210" height="34" fill="#2c2420" rx="4 4 0 0"/>
             <text x="105" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">03. COGNITIVE TRIAGE</text>
             <text x="15" y="58" font-size="12" font-weight="700" fill="#2c2420">Gaps Matrix Registry</text>
@@ -1547,7 +1432,7 @@
 
           <!-- STAGE 4: VAULT FACT EXTRACTION & CORROBORATION -->
           <g transform="translate(780, 80)">
-            <rect x="0" y="0" width="200" height="230" rx="4" fill="#ffffff" stroke="#b8922a" stroke-width="1.5"/>
+            <rect x="0" y="0" width="200" height="230" rx="4" fill="url(#cardGradWarm)" stroke="#b8922a" stroke-width="1.5" filter="url(#cardShadowWarm)"/>
             <rect x="0" y="0" width="200" height="34" fill="#b8922a" rx="4 4 0 0"/>
             <text x="100" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">04. CORROBORATION</text>
             <text x="15" y="58" font-size="12" font-weight="700" fill="#2c2420">Topic Fact Vault</text>
@@ -1566,7 +1451,7 @@
 
           <!-- STAGE 5: IRON COMMAND FORGE TELEMETRY -->
           <g transform="translate(1020, 80)">
-            <rect x="0" y="0" width="140" height="230" rx="4" fill="#ffffff" stroke="#c4501a" stroke-width="2"/>
+            <rect x="0" y="0" width="140" height="230" rx="4" fill="url(#cardGradWarm)" stroke="#c4501a" stroke-width="2" filter="url(#cardShadowWarm)"/>
             <rect x="0" y="0" width="140" height="34" fill="#c4501a" rx="4 4 0 0"/>
             <text x="70" y="22" font-size="12" font-weight="700" letter-spacing="1" text-anchor="middle" fill="#ffffff">05. COMMAND FORGE</text>
             <text x="12" y="60" font-size="11" font-weight="700" fill="#2c2420">Daily Telemetry</text>
@@ -1587,7 +1472,7 @@
 
           <!-- BOTTOM CALLOUT BOX -->
           <g transform="translate(40, 390)">
-            <rect x="0" y="0" width="1120" height="260" rx="4" fill="#ffffff" stroke="#2c2420" stroke-width="1.5"/>
+            <rect x="0" y="0" width="1120" height="260" rx="4" fill="#ffffff" stroke="#2c2420" stroke-width="1.5" filter="url(#cardShadowWarm)"/>
             <rect x="0" y="0" width="1120" height="34" fill="#2c2420" rx="4 4 0 0"/>
             <text x="20" y="22" font-family="'Playfair Display', Georgia, serif" font-size="14" font-weight="700" fill="#f2ece2">GRANULAR SYNTHESIS &amp; RECONCILIATION CONTRACT</text>
             <g transform="translate(30, 50)">
@@ -2024,18 +1909,6 @@ flowchart TD
       </div>
     </div>
 
-    <!-- OPERATIONS MANUAL BANNER -->
-    <div class="panel" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-main); padding: 1.25rem 1.5rem;">
-      <div>
-        <div style="font-family: 'Playfair Display', serif; font-size: 1.25rem; font-weight: 700;">Iron Command Forge Operations Manual</div>
-        <div style="font-size: 0.85rem; color: var(--ash); margin-top: 0.2rem;">Complete runbook, server lifecycle, scheduled tasks reference, and dual-action execution engine docs.</div>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <a href="/operations-manual.html" target="_blank" class="btn" style="text-decoration: none; padding: 8px 16px; font-size: 0.85rem; font-weight: 700; background: var(--accent-terracotta); color: #fff; border: 1px solid var(--accent-terracotta);">OPEN MANUAL ↗</a>
-        <a href="/wiki/Operations-Guide.md" target="_blank" class="btn" style="text-decoration: none; padding: 8px 16px; font-size: 0.85rem; font-weight: 700; background: var(--iron); color: var(--bone); border: 1px solid var(--border-main);">RAW MARKDOWN ↗</a>
-      </div>
-    </div>
-
     <!-- PIPELINE ORDER & TIMING BUFFERS (CLEAN VERTICAL STEPPER) -->
     <div class="panel" style="margin-bottom: 2rem;">
       <div class="section-label">Morning Execution Architecture</div>
@@ -2064,7 +1937,7 @@ flowchart TD
               <span style="font-family: monospace; font-size: 0.75rem; color: var(--ash);">Task Path: \TRM\</span>
             </div>
             <div class="step-body">
-              Pulls Studio notes and new attachments across all <strong>20 NotebookLM notebooks</strong> into <code>trm-vault/</code>, executes the 4 canonical query vectors (Contradictions, Under-Sourced claims, Adjacent leads, Follow-up tracks), and appends atomic inquiry items with SHA-256 keys to <code>trm-research-gaps.md</code>.
+              Pulls Studio notes and new attachments across all <strong>11 NotebookLM notebooks</strong> into <code>trm-vault/</code>, executes the 4 canonical query vectors (Contradictions, Under-Sourced claims, Adjacent leads, Follow-up tracks), and appends atomic inquiry items with SHA-256 keys to <code>trm-research-gaps.md</code>.
             </div>
             <div class="step-footer">
               <span>Principal: <strong style="color:var(--white);">soren (Password)</strong></span>
@@ -2541,74 +2414,10 @@ flowchart TD
   </section>
 
   <!-- ================================================================= -->
-  <!-- TAB 5: COST ROUTING & HEADROOM OPTIMIZER -->
+  <!-- TAB 5: HEADROOM OPTIMIZER -->
   <!-- ================================================================= -->
-  <section id="tab-headroom" class="tab-pane" aria-label="Cost Routing and Headroom Optimizer">
-    <!-- Multi-Model Cost-Routing Gateway Panel (ACT-03) -->
-    <div class="panel" style="margin-bottom: 1.5rem; border-color: rgba(196, 80, 26, 0.35);">
-      <div class="section-label">Multi-Model Substrate Routing (ACT-03)</div>
-      <div class="panel-header">
-        <div class="panel-title" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-          <span>Dynamic Cost-Routing Gateway &amp; FreeLLMAPI Unified Router</span>
-          <span class="status-badge live" id="costRoutingGatewayStatus">● GATEWAY ACTIVE</span>
-          <span class="tag date" id="costRoutingBaselineTag">Baseline: claude-3-5-sonnet ($3 / $15)</span>
-        </div>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="panel-action" onclick="fetchCostRoutingMetrics(true)">Refresh Gateway ↺</button>
-          <button type="button" class="panel-action" data-copy-command="code 'C:\dev\CIC-GOVERNANCE\WRAPPERS\torquequery_routing_runtime.py'" onclick="copyCommand(this.dataset.copyCommand)">Copy Routing Source 📋</button>
-        </div>
-      </div>
-
-      <!-- Cost-Routing Key Metrics Grid -->
-      <div class="grid-metrics" style="margin-top: 1.25rem;">
-        <div>
-          <div class="stat-block">
-            <div class="stat-number" id="crDetailSavedUsd" style="color: #5eead4;">$0.0000</div>
-            <div class="stat-label">Net Frontier Savings</div>
-          </div>
-          <div class="stat-sub" id="crDetailSavedSub">vs. Claude 3.5 Sonnet Baseline</div>
-        </div>
-        <div>
-          <div class="stat-block">
-            <div class="stat-number" id="crDetailTotalRequests" style="color: #fcd34d;">0</div>
-            <div class="stat-label">Total Requests Routed</div>
-          </div>
-          <div class="stat-sub" id="crDetailRequestsSub">Across 4 Tier Cascade</div>
-        </div>
-        <div>
-          <div class="stat-block">
-            <div class="stat-number" id="crDetailSpentUsd" style="color: var(--fg-primary);">$0.0000</div>
-            <div class="stat-label">Total Spent ($)</div>
-          </div>
-          <div class="stat-sub" id="crDetailSpentSub">Zero-Cost Tier Absorption</div>
-        </div>
-        <div>
-          <div class="stat-block">
-            <div class="stat-number" id="crDetailEscalations" style="color: #d8b4fe;">0</div>
-            <div class="stat-label">Quality Escalations</div>
-          </div>
-          <div class="stat-sub" id="crDetailAvgLatency">Avg Latency: 0 ms</div>
-        </div>
-      </div>
-
-      <!-- 4-Tier Substrate Matrix Table -->
-      <table class="table-clean" style="margin-top: 1.25rem;">
-        <thead>
-          <tr>
-            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: left; padding: 0.5rem;">Routing Tier &amp; Provider</th>
-            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: center; padding: 0.5rem;">SLA / Reliability</th>
-            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: center; padding: 0.5rem;">Circuit Breaker</th>
-            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: right; padding: 0.5rem;">Total Hits</th>
-            <th style="font-family: var(--font-ui); font-size: 0.75rem; color: var(--ash); text-align: right; padding: 0.5rem;">Trips</th>
-          </tr>
-        </thead>
-        <tbody id="crTiersTableBody">
-          <!-- Populated dynamically via cost_routing_status.json -->
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Top Control Bar (Headroom) -->
+  <section id="tab-headroom" class="tab-pane" aria-label="Headroom Optimizer">
+    <!-- Top Control Bar -->
     <div class="panel" style="margin-bottom: 1.5rem;">
       <div class="section-label">Context Optimization</div>
       <div class="panel-header">
@@ -3015,7 +2824,7 @@ flowchart TD
 
   <!-- FOOTER -->
   <footer>
-    <p>Iron Command Forge (ICF) · KB-Sync v1.5.0 · Operations &amp; Knowledge Graph Suite · <a href="/operations-manual.html" target="_blank" style="color: var(--accent-terracotta); text-decoration: none; font-weight: 700;">Operations Manual ↗</a></p>
+    <p>Iron Command Forge (ICF) · KB-Sync v1.5.0 · Operations &amp; Knowledge Graph Suite</p>
   </footer>
 </div>
 
@@ -3072,44 +2881,9 @@ flowchart TD
     window._toastTimeout = setTimeout(() => t.classList.remove('show'), 3000);
   }
 
-  async function executeAction(actionType, target, btnElement) {
-    const origText = btnElement ? btnElement.innerHTML : '';
-    if (btnElement) {
-      btnElement.disabled = true;
-      btnElement.innerHTML = 'Running... ⏳';
-    }
-    try {
-      const res = await fetch('/api/actions/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: actionType, target })
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast(`Triggered: ${target} ${data.pid ? '(PID ' + data.pid + ')' : ''}`);
-        if (btnElement) {
-          btnElement.innerHTML = 'Triggered ✓';
-          setTimeout(() => { btnElement.innerHTML = origText; btnElement.disabled = false; }, 3000);
-        }
-      } else {
-        showToast(`Action failed: ${data.error || 'Server error'}`);
-        if (btnElement) {
-          btnElement.innerHTML = origText;
-          btnElement.disabled = false;
-        }
-      }
-    } catch (err) {
-      showToast(`Error: ${err.message}`);
-      if (btnElement) {
-        btnElement.innerHTML = origText;
-        btnElement.disabled = false;
-      }
-    }
-  }
-  window.executeAction = executeAction;
-
   function copyCommand(cmd) {
-    const payload = String(cmd || '').trim();
+    const command = String(cmd || '').trim();
+    const payload = command;
     return Promise.resolve().then(() => navigator.clipboard.writeText(payload))
       .then(() => { showToast('Copied: ' + payload); return true; })
       .catch(() => { showToast('Could not copy'); return false; });
@@ -3123,7 +2897,7 @@ flowchart TD
 
   function switchTab(tabId) {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn, .tab-item').forEach(b => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
       b.classList.remove('active');
       const tag = b.querySelector('.tag');
       if (tag) { tag.className = 'tag date'; }
@@ -3213,54 +2987,39 @@ flowchart TD
   }
 
   async function loadDailyStatus() {
-    const candidateUrls = [
-      'daily_status.json',
-      '/daily_status.json',
-      '_status-feed/daily_status.json',
-      '/_status-feed/daily_status.json',
-      '/modules/wiki/daily_status.json',
-      '../../_status-feed/daily_status.json',
-      '../_status-feed/daily_status.json'
-    ];
-
-    let data = null;
-    for (const url of candidateUrls) {
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (res.ok) {
-          data = await res.json();
-          break;
+    try {
+      const res = await fetch('daily_status.json', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const tsStr = data.timestamp || data.generated_at;
+        if (tsStr) {
+          const ts = new Date(tsStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const repEl = document.getElementById('reportTimestamp');
+          if (repEl) repEl.textContent = `SYNCED AT ${ts}`;
         }
-      } catch {}
-    }
-
-    if (data) {
-      const tsStr = data.timestamp || data.generated_at;
-      if (tsStr) {
-        const ts = new Date(tsStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const repEl = document.getElementById('reportTimestamp');
-        if (repEl) repEl.textContent = `SYNCED AT ${ts}`;
-      }
-      if (data.trm_intelligence) {
-        currentTrmData = data.trm_intelligence;
-        currentPipelineData = data.trm_pipeline || null;
-        renderTrmIntelligence(data.trm_intelligence, data.trm_pipeline);
-      }
-      if (data.todos) {
-        renderTodos(data.todos);
-      }
-      if (data.jev_runtime) {
-        const jev = data.jev_runtime;
-        const jevStatEl = document.getElementById('jevRuntimeStatus');
-        const jevRedEl = document.getElementById('jevCompactionReduction');
-        if (jevStatEl) {
-          const p50 = jev.p50_latency_ms ? `${jev.p50_latency_ms}ms` : 'sub-100ms';
-          jevStatEl.innerHTML = `<span class="status-badge live">● ${p50} p50 (${jev.resident_weights || 'Ollama'})</span>`;
+        if (data.trm_intelligence) {
+          currentTrmData = data.trm_intelligence;
+          currentPipelineData = data.trm_pipeline || null;
+          renderTrmIntelligence(data.trm_intelligence, data.trm_pipeline);
         }
-        if (jevRedEl && jev.token_reduction_pct !== undefined) {
-          jevRedEl.textContent = `${jev.token_reduction_pct}% reduction`;
+        if (data.todos) {
+          renderTodos(data.todos);
+        }
+        if (data.jev_runtime) {
+          const jev = data.jev_runtime;
+          const jevStatEl = document.getElementById('jevRuntimeStatus');
+          const jevRedEl = document.getElementById('jevCompactionReduction');
+          if (jevStatEl) {
+            const p50 = jev.p50_latency_ms ? `${jev.p50_latency_ms}ms` : 'sub-100ms';
+            jevStatEl.innerHTML = `<span class="status-badge live">● ${p50} p50 (${jev.resident_weights || 'Ollama'})</span>`;
+          }
+          if (jevRedEl && jev.token_reduction_pct !== undefined) {
+            jevRedEl.textContent = `${jev.token_reduction_pct}% reduction`;
+          }
         }
       }
+    } catch (e) {
+      console.log('Using default telemetry state', e);
     }
   }
 
@@ -3286,7 +3045,7 @@ flowchart TD
     }).join('');
   }
 
-  function renderTrmIntelligence(trm, pipeline, activeDate) {
+  function renderTrmIntelligence(trm, pipeline) {
     if (!trm) return;
 
     // 1. KPIs
@@ -3320,30 +3079,21 @@ flowchart TD
     // 2. History Dates Selector
     if (trm.history_dates && trm.history_dates.length > 0) {
       currentTrmHistoryDates = trm.history_dates;
-    }
-    if (currentTrmHistoryDates && currentTrmHistoryDates.length > 0) {
       const historySelect = document.getElementById('trmHistoryDateSelector');
       if (historySelect) {
-        const selectedDate = activeDate || historySelect.value || currentTrmHistoryDates[0];
-        historySelect.innerHTML = currentTrmHistoryDates.map((d, i) => `
-          <option value="${d}" ${d === selectedDate ? 'selected' : ''}>${d} ${i === 0 ? '(Latest Snapshot)' : ''}</option>
+        historySelect.innerHTML = trm.history_dates.map((d, i) => `
+          <option value="${d}" ${i === 0 ? 'selected' : ''}>${d} ${i === 0 ? '(Latest Snapshot)' : ''}</option>
         `).join('');
-        historySelect.value = selectedDate;
       }
     }
 
-    // 3. Notebook Selector Population
-    const notebookList = trm.notebooks || (trm.notebook_findings ? Object.entries(trm.notebook_findings).map(([id, f]) => ({ id, title: f.title || id })) : []);
-    if (notebookList.length > 0) {
+    // 3. Notebook Selector Population (if not populated)
+    if (trm.notebooks && trm.notebooks.length > 0) {
       const nbSelect = document.getElementById('trmNotebookSelector');
       if (nbSelect) {
-        if (!selectedTrmNotebookId || !notebookList.some(nb => nb.id === selectedTrmNotebookId)) {
-          selectedTrmNotebookId = notebookList[0].id;
-        }
-        nbSelect.innerHTML = notebookList.map(nb => `
+        nbSelect.innerHTML = trm.notebooks.map(nb => `
           <option value="${nb.id}" ${nb.id === selectedTrmNotebookId ? 'selected' : ''}>${escapeHtml(nb.title || nb.id)} (${nb.id.substring(0, 8)}...)</option>
         `).join('');
-        nbSelect.value = selectedTrmNotebookId;
       }
     }
 
@@ -3428,72 +3178,12 @@ flowchart TD
     const titleEl = document.getElementById('trmSelectedNotebookTitle');
     const metaEl = document.getElementById('trmNotebookMeta');
 
-    let findings = (currentTrmData && currentTrmData.notebook_findings && currentTrmData.notebook_findings[notebookId]) || null;
+    const findings = (currentTrmData && currentTrmData.notebook_findings && currentTrmData.notebook_findings[notebookId]) || null;
 
-    // Fallback: If findings object not pre-computed or empty, extract from questions_answered
-    if ((!findings || (!findings.contradictions?.length && !findings.undersourced?.length && !findings.adjacent?.length && !findings.followup?.length)) &&
-        currentTrmData && Array.isArray(currentTrmData.questions_answered)) {
-      const matchingQuestions = currentTrmData.questions_answered.filter(q => {
-        if (q.key && q.key.startsWith(notebookId + ':')) return true;
-        if (currentTrmData.notebooks) {
-          const matchNb = currentTrmData.notebooks.find(n => n.id === notebookId);
-          if (matchNb && matchNb.title && q.notebook === matchNb.title) return true;
-        }
-        return false;
-      });
-
-      if (matchingQuestions.length > 0) {
-        let nbTitle = notebookId;
-        if (currentTrmData.notebooks) {
-          const matchNb = currentTrmData.notebooks.find(n => n.id === notebookId);
-          if (matchNb && matchNb.title) nbTitle = matchNb.title;
-        }
-
-        const contradictions = [];
-        const undersourced = [];
-        const adjacent = [];
-        const followup = [];
-
-        matchingQuestions.forEach(q => {
-          const key = q.key || '';
-          const questionText = (q.question || '').toLowerCase();
-          const item = {
-            title: q.question || 'Vector Finding',
-            desc: q.excerpt || q.desc || q.text || '',
-            date: q.date || '',
-            key: q.key || ''
-          };
-
-          if (key.includes(':open-contradictions:') || questionText.includes('contradiction') || questionText.includes('open question')) {
-            contradictions.push(item);
-          } else if (key.includes(':under-sourced:') || questionText.includes('single-source') || questionText.includes('under-corroborated')) {
-            undersourced.push(item);
-          } else if (key.includes(':adjacent-topics:') || questionText.includes('adjacent')) {
-            adjacent.push(item);
-          } else if (key.includes(':follow-up:') || questionText.includes('follow-up') || questionText.includes('strengthen')) {
-            followup.push(item);
-          } else {
-            contradictions.push(item);
-          }
-        });
-
-        findings = {
-          title: nbTitle,
-          id: notebookId,
-          total_questions: matchingQuestions.length,
-          contradictions,
-          undersourced,
-          adjacent,
-          followup
-        };
-      }
-    }
-
-    if (findings && (findings.contradictions?.length || findings.undersourced?.length || findings.adjacent?.length || findings.followup?.length || findings.total_questions > 0)) {
+    if (findings) {
       if (titleEl) titleEl.textContent = `Findings for ${findings.title || notebookId}`;
-      const vectorCount = findings.total_questions || ((findings.contradictions ? findings.contradictions.length : 0) + (findings.undersourced ? findings.undersourced.length : 0) + (findings.adjacent ? findings.adjacent.length : 0) + (findings.followup ? findings.followup.length : 0));
       if (metaEl) {
-        metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span style="color:#5a9e6f;">COMPLETE (${vectorCount} Vectors Mined)</span>`;
+        metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span style="color:#5a9e6f;">COMPLETE (${findings.total_questions || 0} Vectors Mined)</span>`;
       }
 
       renderSynthesisQuadrant('trmSynthContradictions', findings.contradictions);
@@ -3545,41 +3235,28 @@ flowchart TD
   }
 
   async function loadTrmHistory(dateStr) {
-    if (!dateStr || dateStr === 'today' || (currentTrmHistoryDates[0] && dateStr === currentTrmHistoryDates[0])) {
-      await loadDailyStatus();
-      if (currentTrmHistoryDates[0]) {
-        const historySelect = document.getElementById('trmHistoryDateSelector');
-        if (historySelect) historySelect.value = currentTrmHistoryDates[0];
-      }
+    if (!dateStr || dateStr === 'today') {
+      loadDailyStatus();
       showToast('Loaded latest TRM snapshot');
       return;
     }
 
-    const candidateUrls = [
-      `/api/reporting/trm/history?date=${dateStr}`,
-      `trm_history/${dateStr}.json`,
-      `/trm_history/${dateStr}.json`,
-      `_status-feed/trm_history/${dateStr}.json`,
-      `/_status-feed/trm_history/${dateStr}.json`,
-      `/modules/wiki/trm_history/${dateStr}.json`,
-      `../../_status-feed/trm_history/${dateStr}.json`,
-      `../_status-feed/trm_history/${dateStr}.json`
-    ];
-
-    for (const url of candidateUrls) {
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (res.ok) {
-          const histData = await res.json();
-          const trmData = histData.trm_intelligence || histData;
-          currentTrmData = trmData;
-          renderTrmIntelligence(trmData, currentPipelineData, dateStr);
-          showToast(`Loaded TRM snapshot: ${dateStr}`);
-          return;
-        }
-      } catch {}
+    try {
+      let res = await fetch(`trm_history/${dateStr}.json`, { cache: 'no-store' });
+      if (!res.ok) {
+        res = await fetch(`../../_status-feed/trm_history/${dateStr}.json`, { cache: 'no-store' });
+      }
+      if (res.ok) {
+        const histData = await res.json();
+        currentTrmData = histData;
+        renderTrmIntelligence(histData, currentPipelineData);
+        showToast(`Loaded TRM snapshot: ${dateStr}`);
+      } else {
+        showToast(`Snapshot not found: ${dateStr}`);
+      }
+    } catch (err) {
+      showToast(`Failed to load snapshot ${dateStr}`);
     }
-    showToast(`Snapshot not found: ${dateStr}`);
   }
 
   function stepTrmHistory(delta) {
@@ -3591,7 +3268,7 @@ flowchart TD
     let idx = currentTrmHistoryDates.indexOf(currentVal);
     if (idx === -1) idx = 0;
 
-    let targetIdx = idx - delta; // reverse chronological: delta=-1 (prev day) moves to idx+1, delta=1 (next day) moves to idx-1
+    let targetIdx = idx - delta; // reverse chronological: prev day is index + 1
     if (targetIdx < 0) targetIdx = 0;
     if (targetIdx >= currentTrmHistoryDates.length) targetIdx = currentTrmHistoryDates.length - 1;
 
@@ -3613,37 +3290,8 @@ flowchart TD
   }
 
   function exportReportJson() {
-    try {
-      const payload = currentTrmData || {};
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `icf-validation-report-${new Date().toISOString().slice(0, 10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-      showToast('Validation report JSON exported');
-    } catch (e) {
-      showToast('Export failed: ' + e.message);
-    }
+    showToast('Export requires local node runner');
   }
-  window.exportReportJson = exportReportJson;
-
-  async function clearCache() {
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-      try {
-        await fetch('/api/actions/clear-cache', { method: 'POST' });
-      } catch {}
-      await loadDailyStatus();
-      if (typeof fetchHeadroomIcfMetrics === 'function') await fetchHeadroomIcfMetrics();
-      showToast('Cache cleared & feeds reloaded');
-    } catch (e) {
-      showToast('Cache cleared');
-    }
-  }
-  window.clearCache = clearCache;
 
   async function fetchHeadroomIcfMetrics(isManual = false) {
     try {
@@ -3739,101 +3387,6 @@ flowchart TD
     }
   }
 
-  async function fetchCostRoutingMetrics(isManual = false) {
-    try {
-      let data = null;
-      try {
-        const res = await fetch('/api/reporting/cost-routing', { cache: 'no-store' });
-        if (res.ok) data = await res.json();
-      } catch {}
-      if (!data) {
-        try {
-          const res = await fetch('cost_routing_status.json', { cache: 'no-store' });
-          if (res.ok) data = await res.json();
-        } catch {}
-      }
-      if (!data) {
-        try {
-          const res = await fetch('/cost_routing_status.json', { cache: 'no-store' });
-          if (res.ok) data = await res.json();
-        } catch {}
-      }
-      if (!data) throw new Error('Status feed unreachable');
-
-      const metrics = data.metrics || {};
-      const tiers = data.tiers || {};
-      const baseline = data.frontierPricingBaseline || {};
-
-      const totalReqs = metrics.totalRequests || 0;
-      const totalSaved = Number(metrics.totalSavedVsFrontierUsd || 0).toFixed(4);
-      const totalSpent = Number(metrics.totalSpentUsd || 0).toFixed(4);
-      const escalations = metrics.qualityEscalations || 0;
-      const avgLatency = Math.round(metrics.averageLatencyMs || 0);
-
-      const crSavedEl = document.getElementById('crDetailSavedUsd');
-      const crSpentEl = document.getElementById('crDetailSpentUsd');
-      const crReqsEl = document.getElementById('crDetailTotalRequests');
-      const crEscalationsEl = document.getElementById('crDetailEscalations');
-      const crAvgLatencyEl = document.getElementById('crDetailAvgLatency');
-      const crStatusBadge = document.getElementById('costRoutingGatewayStatus');
-      const crBaselineTag = document.getElementById('costRoutingBaselineTag');
-
-      if (crSavedEl) crSavedEl.textContent = `$${totalSaved}`;
-      if (crSpentEl) crSpentEl.textContent = `$${totalSpent}`;
-      if (crReqsEl) crReqsEl.textContent = `${totalReqs}`;
-      if (crEscalationsEl) crEscalationsEl.textContent = `${escalations}`;
-      if (crAvgLatencyEl) crAvgLatencyEl.textContent = `Avg Latency: ${avgLatency} ms`;
-      if (crBaselineTag && baseline.model) {
-        crBaselineTag.textContent = `Baseline: ${baseline.model.replace('anthropic/', '')} ($${baseline.inputCostPer1M}/$${baseline.outputCostPer1M})`;
-      }
-      if (crStatusBadge) {
-        crStatusBadge.className = 'status-badge live';
-        crStatusBadge.innerHTML = '● GATEWAY ACTIVE';
-      }
-
-      const tbody = document.getElementById('crTiersTableBody');
-      if (tbody) {
-        const tierKeys = ['tier_0_local', 'tier_0_5_freellmapi', 'tier_1_muscle', 'tier_2_frontier'];
-        tbody.innerHTML = tierKeys.map(k => {
-          const t = tiers[k] || {};
-          const hits = (metrics.tierHits && metrics.tierHits[k]) || 0;
-          const trips = (metrics.circuitBreakerTrips && metrics.circuitBreakerTrips[k]) || 0;
-          const cbState = t.circuitBreakerState || 'CLOSED';
-          const isClosed = cbState === 'CLOSED';
-
-          const cbBadge = isClosed
-            ? '<span class="badge-pill sage">● CLOSED (HEALTHY)</span>'
-            : '<span class="badge-pill terracotta">● OPEN (TRIPPED)</span>';
-
-          const relBadge = t.reliability === 'offline_local'
-            ? '<span class="tag date">OFFLINE LOCAL</span>'
-            : t.reliability === 'best_effort'
-              ? '<span class="tag date" style="background:rgba(184,146,42,0.15);color:var(--accent-brass);">BEST EFFORT (:3001)</span>'
-              : t.reliability === 'commercial_sla'
-                ? '<span class="tag date" style="background:rgba(61,107,79,0.15);color:var(--accent-sage);">COMMERCIAL SLA</span>'
-                : '<span class="tag date" style="background:rgba(196,80,26,0.15);color:var(--accent-terracotta);">FRONTIER</span>';
-
-          return `<tr>
-            <td class="key" style="font-weight:700; font-family:'Barlow Condensed',sans-serif; font-size:0.95rem;">${t.displayName || k}</td>
-            <td style="text-align:center;">${relBadge}</td>
-            <td style="text-align:center;">${cbBadge}</td>
-            <td class="val" style="text-align:right; font-family:'Geist Mono',monospace; font-weight:700;">${hits}</td>
-            <td class="val" style="text-align:right; font-family:'Geist Mono',monospace; color:var(--ash);">${trips}</td>
-          </tr>`;
-        }).join('');
-      }
-
-      if (isManual) showToast('Cost-routing telemetry updated');
-    } catch {
-      const crStatusBadge = document.getElementById('costRoutingGatewayStatus');
-      if (crStatusBadge) {
-        crStatusBadge.className = 'status-badge soon';
-        crStatusBadge.innerHTML = '● STANDBY';
-      }
-      if (isManual) showToast('Cost-routing feed unreachable');
-    }
-  }
-
   // ============================================================
   // TOOLFORGE SKILLS & EXECUTION HISTORY LOGIC (TABS 07 & 08)
   // ============================================================
@@ -3922,7 +3475,7 @@ flowchart TD
     document.getElementById('skCategoriesCount').textContent = new Set(allSkills.map(s => s.category || 'general')).size;
 
     if (filtered.length === 0) {
-      container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--ash);">${allSkills.length ? 'No matching skills' : 'Skill inventory unavailable'}</div>`;
+      container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--ash);">No skills found matching "${skillSearchTerm}"</div>`;
       return;
     }
 
@@ -3951,10 +3504,8 @@ flowchart TD
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span class="status-badge ${s.runnable ? 'live' : 'soon'}" title="${escapeHtml(s.reason || '')}" style="font-size: 0.55rem; padding: 0.2rem 0.6rem;">${escapeHtml((s.availability || 'unavailable').toUpperCase())}</span>
-              <div style="display: flex; gap: 4px; align-items: center;">
-                ${s.inputInvocation?.available ? `<button type="button" class="btn-secondary" data-toolforge-configure="${escapeHtml(id)}">Configure</button>` : `<button type="button" class="btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.65rem;" ${s.runnable ? '' : 'disabled'} title="${escapeHtml(s.reason || 'Run skill CLI')}" data-target="${escapeHtml(id)}" onclick="executeAction('run-skill', this.dataset.target, this)">Run Skill ▶</button>`}
-                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.45rem; font-size: 0.65rem;" ${command ? '' : 'disabled'} title="${s.runnable ? 'Copy CLI Command' : 'Copy Instructions Command'}" data-copy-command="${escapeHtml(command)}" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
-              </div>
+              ${s.inputInvocation?.available ? `<button type="button" class="btn-secondary" data-toolforge-configure="${escapeHtml(id)}">Configure</button>` : ''}
+              <button type="button" class="btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.65rem;" ${command ? '' : 'disabled'} title="${s.runnable ? 'Copy CLI Command' : 'Copy Instructions Command'}" data-target="${escapeHtml(id)}" data-copy-command="${escapeHtml(command)}" onclick="copyCommand(this.dataset.copyCommand)">Copy ${s.runnable ? 'CLI' : 'Instructions'}</button>
             </div>
           </div>
         </div>
@@ -4536,12 +4087,7 @@ flowchart TD
               <td><code>${escapeHtml(def.logonType)}</code></td>
               <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">${escapeHtml(def.artifact)}</span></td>
               <td><span class="status-badge live" style="font-size:0.6rem; color:${badgeColor}; border-color:${badgeBorder};">● ${escapeHtml(statusText)}</span></td>
-              <td>
-                <div style="display:flex; gap:4px; align-items:center;">
-                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.55rem; font-size:0.65rem;" onclick="executeAction('run-task', '${escapeHtml(def.name)}', this)">Run Task ▶</button>
-                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy Task Command" data-copy-command="${escapeHtml(def.cliCmd)}" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
-                </div>
-              </td>
+              <td><button type="button" class="btn-secondary" data-copy-command="${escapeHtml(def.cliCmd)}" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
             </tr>
           `;
         }).join('');
@@ -4587,12 +4133,7 @@ flowchart TD
                 ${detailsHtml}
               </td>
               <td><span class="status-badge live" style="font-size:0.6rem; color:${badgeColor}; border-color:${badgeBorder};">● ${escapeHtml(liveBot?.status || 'HEALTHY')}</span></td>
-              <td>
-                <div style="display:flex; gap:4px; align-items:center;">
-                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.55rem; font-size:0.65rem;" onclick="executeAction('run-bot', '${escapeHtml(def.id)}', this)">Run Bot ▶</button>
-                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy NPM Command" data-copy-command="${escapeHtml(def.npmCmd)}" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
-                </div>
-              </td>
+              <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="${escapeHtml(def.npmCmd)}" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
             </tr>
           `;
         }).join('');
@@ -4794,8 +4335,6 @@ flowchart TD
             loadPullRequests();
           } else if (payload.feed === 'storage_pruner_status.json') {
             loadStorageAnalytics();
-          } else if (payload.feed === 'cost_routing_status.json') {
-            fetchCostRoutingMetrics();
           }
         } catch {}
       });
@@ -4815,93 +4354,11 @@ flowchart TD
     } catch {}
   }
 
-  // Theme Switching Logic (Warm Parchment / Dark Forge)
-  
-  // Filter & Search Functions for Fleet Cards
-  function filterFleetCards(type, btn) {
-    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    const cards = document.querySelectorAll('.feed-card');
-    cards.forEach(card => {
-      if (type === 'all') {
-        card.style.display = 'flex';
-      } else {
-        const st = card.getAttribute('data-fleet-status');
-        card.style.display = (st === type) ? 'flex' : 'none';
-      }
-    });
-  }
-
-  function searchFleetCards(query) {
-    const q = (query || '').toLowerCase().trim();
-    const cards = document.querySelectorAll('.feed-card');
-    cards.forEach(card => {
-      const text = card.textContent.toLowerCase();
-      card.style.display = text.includes(q) ? 'flex' : 'none';
-    });
-  }
-
-  // Enhanced Theme Switching
-  function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    document.body.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('icf-theme', theme);
-    } catch (e) {}
-
-    const btnP = document.getElementById('btnParchment');
-    const btnF = document.getElementById('btnForge');
-    const isParchment = (theme === 'parchment');
-
-    if (btnP) {
-      btnP.classList.toggle('active', isParchment);
-      btnP.setAttribute('aria-pressed', isParchment ? 'true' : 'false');
-      const ind = btnP.querySelector('.indicator');
-      if (ind) ind.style.display = isParchment ? 'inline' : 'none';
-    }
-    if (btnF) {
-      btnF.classList.toggle('active', !isParchment);
-      btnF.setAttribute('aria-pressed', !isParchment ? 'true' : 'false');
-      const ind = btnF.querySelector('.indicator');
-      if (ind) ind.style.display = !isParchment ? 'inline' : 'none';
-    }
-  }
-
-  function old_applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    document.body.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('icf-theme', theme);
-    } catch (e) {}
-
-    const btnP = document.getElementById('btnThemeParchment');
-    const btnF = document.getElementById('btnThemeForge');
-    if (btnP && btnF) {
-      btnP.classList.toggle('active', theme === 'parchment');
-      btnF.classList.toggle('active', theme === 'forge');
-    }
-  }
-
-  function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') || 'parchment';
-    applyTheme(current === 'parchment' ? 'forge' : 'parchment');
-  }
-
-  window.applyTheme = applyTheme;
-  window.toggleTheme = toggleTheme;
-  window.switchTab = switchTab;
-
-  // Initialize Theme
-  const savedTheme = (function() {
-    try { return localStorage.getItem('icf-theme'); } catch(e) { return null; }
-  })() || 'parchment';
-  applyTheme(savedTheme);
-
+  // Initialize
   renderMcpCards();
   renderDomainsTable();
   loadDailyStatus();
   fetchHeadroomIcfMetrics();
-  fetchCostRoutingMetrics();
   loadSkillsInventory();
   renderExecutionRuns();
   loadIronbotsDailyReport();
@@ -4915,7 +4372,6 @@ flowchart TD
 
   window.addEventListener('hashchange', handleHashRoute);
   setInterval(fetchHeadroomIcfMetrics, 15000);
-  setInterval(fetchCostRoutingMetrics, 10000);
   setInterval(loadIronbotsDailyReport, 30000);
   setInterval(loadMeridianFocus, 60000);
   setInterval(loadMobileOutbox, 15000);

@@ -4,7 +4,7 @@ import { request } from 'node:http';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createGatewayServer } from '../src/server.mjs';
+import { createGatewayServer, isLoopback } from '../src/server.mjs';
 import { createMobileSnapshotService } from '../src/mobile-snapshot.mjs';
 import { createSnapshotStore } from '../reporting/src/snapshot-store.mjs';
 
@@ -32,7 +32,26 @@ test('ICF Gateway Server serves static dashboard and reporting routes', async ()
     assert.equal(categoriesData.status, 'SUCCESS');
     assert.ok(Array.isArray(categoriesData.data));
 
-    // 4. Path traversal prevention test with raw path
+    // 4. TRM history endpoint
+    const resTrmDates = await fetch(`${baseUrl}/api/reporting/trm/history`);
+    assert.equal(resTrmDates.status, 200);
+    const trmDatesData = await resTrmDates.json();
+    assert.equal(trmDatesData.status, 'SUCCESS');
+    assert.ok(Array.isArray(trmDatesData.dates));
+    assert.ok(trmDatesData.dates.length > 0);
+
+    const resTrmSnapshot = await fetch(`${baseUrl}/api/reporting/trm/history?date=${trmDatesData.dates[0]}`);
+    assert.equal(resTrmSnapshot.status, 200);
+    const snapshotData = await resTrmSnapshot.json();
+    assert.ok(snapshotData.topics_total !== undefined || snapshotData.notebooks !== undefined || snapshotData.notebook_findings !== undefined);
+
+    // 5. Static resolution fallback for /modules/wiki/daily_status.json
+    const resWikiDaily = await fetch(`${baseUrl}/modules/wiki/daily_status.json`);
+    assert.equal(resWikiDaily.status, 200);
+    const wikiDailyData = await resWikiDaily.json();
+    assert.ok(wikiDailyData.trm_intelligence !== undefined);
+
+    // 6. Path traversal prevention test with raw path
     const resTraversalStatus = await new Promise((resolve, reject) => {
       const req = request({
         host: '127.0.0.1',
@@ -166,5 +185,122 @@ test('gateway serves native real-time SSE stream on /api/events with connected h
     assert.match(sseChunks, /"status":"CONNECTED"/);
   } finally {
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('gateway serves Meridian focus telemetry without screen text', async () => {
+  const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+  const dir = await mkdtemp(join(tmpdir(), 'icf-meridian-'));
+  const dbPath = join(dir, 'meridian.db');
+  const sentinel = 'SENTINEL-SCREEN-TEXT-4242';
+  const now = new Date().toISOString();
+  const db = new DatabaseSync(dbPath);
+  db.exec(`CREATE TABLE app_sessions (app_name TEXT, started_at TEXT, duration_s INTEGER, category TEXT, session_text TEXT);
+    CREATE TABLE active_session (app_name TEXT, started_at TEXT, last_seen_at TEXT, category TEXT, session_text TEXT);`);
+  db.prepare('INSERT INTO active_session VALUES (?, ?, ?, ?, ?)').run('Code.exe', now, now, 'coding', sentinel);
+  db.close();
+
+  const server = createGatewayServer({ meridianDbPath: dbPath });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const response = await fetch(`${baseUrl}/api/reporting/meridian`);
+    assert.equal(response.status, 200);
+    const body = await response.text();
+    assert.ok(!body.includes(sentinel));
+    const payload = JSON.parse(body);
+    assert.equal(payload.status, 'SUCCESS');
+    assert.equal(payload.data.available, true);
+    assert.equal(payload.data.active.app_name, 'Code.exe');
+
+    const missing = createGatewayServer({ meridianDbPath: join(dir, 'nope.db') });
+    await new Promise((resolve) => missing.listen(0, '127.0.0.1', resolve));
+    try {
+      const res = await fetch(`http://127.0.0.1:${missing.address().port}/api/reporting/meridian`);
+      assert.deepEqual((await res.json()).data, { available: false, reason: 'db-missing' });
+    } finally { await new Promise((resolve) => missing.close(resolve)); }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('gateway serves Meridian day and week reports with commit counts', async () => {
+  const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+  const dir = await mkdtemp(join(tmpdir(), 'icf-meridian-day-'));
+  const dbPath = join(dir, 'meridian.db');
+  const db = new DatabaseSync(dbPath);
+  db.exec(`CREATE TABLE app_sessions (app_name TEXT, started_at TEXT, duration_s INTEGER, category TEXT);
+    CREATE TABLE active_session (app_name TEXT, started_at TEXT, last_seen_at TEXT, category TEXT);
+    CREATE TABLE day_summaries (day_local TEXT, insights_json TEXT, headline TEXT, plan_json TEXT, adherence_json TEXT,
+      standup_json TEXT, fallback INTEGER, generated_at TEXT);
+    CREATE TABLE day_tasks (day_local TEXT, task_id TEXT, title TEXT, minutes INTEGER);`);
+  db.prepare(`INSERT INTO day_summaries VALUES ('2026-09-29', '[]', 'Plan cleared', '[]', '{"planned":3,"done":3}', '[]', 0, '2026-09-30T01:00:00Z')`).run();
+  db.close();
+
+  const server = createGatewayServer({ meridianDbPath: dbPath, commitRepos: [], gitAuthor: 'Nobody' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const day = await (await fetch(`${baseUrl}/api/reporting/meridian/day?date=2026-09-29`)).json();
+    assert.equal(day.status, 'SUCCESS');
+    assert.equal(day.data.meridian.summary.headline, 'Plan cleared');
+    assert.deepEqual(day.data.commits, { count: 0, repos: {} });
+
+    const week = await (await fetch(`${baseUrl}/api/reporting/meridian/week?end=2026-09-30`)).json();
+    assert.equal(week.data.meridian.days.length, 7);
+    assert.deepEqual(week.data.commits, { days: {}, total: 0 });
+
+    assert.equal((await fetch(`${baseUrl}/api/reporting/meridian/day?date=../etc`)).status, 400);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('Meridian routes only answer loopback clients', () => {
+  assert.ok(isLoopback('127.0.0.1'));
+  assert.ok(isLoopback('::1'));
+  assert.ok(isLoopback('::ffff:127.0.0.1'));
+  assert.ok(!isLoopback('192.168.1.20'));
+  assert.ok(!isLoopback('::ffff:192.168.1.20'));
+  assert.ok(!isLoopback(undefined));
+});
+
+test('Action execution routes dispatch valid tasks and reject invalid inputs', async () => {
+  const server = createGatewayServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    // 1. Clear cache
+    const clearRes = await fetch(`${baseUrl}/api/actions/clear-cache`, { method: 'POST' });
+    assert.equal(clearRes.status, 200);
+    const clearData = await clearRes.json();
+    assert.equal(clearData.ok, true);
+
+    // 2. Reject non-POST
+    const getRes = await fetch(`${baseUrl}/api/actions/run`, { method: 'GET' });
+    assert.equal(getRes.status, 405);
+
+    // 3. Reject invalid target
+    const invalidRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'run-bot', target: 'nonexistent-bot' })
+    });
+    assert.equal(invalidRes.status, 400);
+
+    // 4. Accept valid action
+    const validRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'validate-wiki', target: 'all' })
+    });
+    assert.equal(validRes.status, 200);
+    const validData = await validRes.json();
+    assert.equal(validData.ok, true);
+    assert.equal(validData.status, 'DISPATCHED');
+    assert.ok(typeof validData.pid === 'number');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
