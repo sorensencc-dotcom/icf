@@ -21,6 +21,7 @@ class Node {
     this.tagName = tag.toUpperCase(); this.ownerDocument = doc;
     this.children = []; this.listeners = {}; this.attributes = {};
     this.value = ''; this.textContent = ''; this.disabled = false;
+    this.tabIndex = ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(this.tagName) ? 0 : -1;
   }
   append(node) { node.parent = this; this.children.push(node); }
   replaceChildren() { this.children = []; }
@@ -33,6 +34,16 @@ class Node {
     for (const handler of this.listeners[key] || []) await handler(event);
   }
   focus() { this.ownerDocument.activeElement = this; }
+  querySelectorAll() {
+    const descendants = [];
+    const walk = node => { node.children.forEach(child => { descendants.push(child); walk(child); }); };
+    walk(this);
+    return descendants.filter(node => ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(node.tagName) || node.attributes.tabindex !== undefined);
+  }
+  getClientRects() {
+    for (let node = this; node; node = node.parent) if (node.hidden) return [];
+    return [{}];
+  }
   showModal() { this.open = true; }
   close() { this.open = false; this.fire('close'); }
 }
@@ -195,6 +206,38 @@ test('Retro revalidation clears aria-invalid on every dynamic path row', async (
   rows[0].value = 'C:\\work\\a.json'; await rows[0].parent.parent.parent.fire('input');
   assert.equal(h.button('Run').disabled, false);
   for (const row of rows) assert.equal(row.attributes['aria-invalid'], undefined);
+  h.mounted.dispose();
+});
+
+test('dialog Tab boundaries wrap both directions and skip hidden/disabled controls', async () => {
+  const h = harness(); await configurePilot(h, 'agent-drift-detector');
+  const dialog = h.tag('dialog');
+  async function tab(from, shiftKey, expected, trapped = true) {
+    from.focus();
+    let prevented = false;
+    await dialog.fire('keydown', { key: 'Tab', shiftKey, preventDefault() { prevented = true; } });
+    assert.equal(prevented, trapped);
+    assert.equal(h.doc.activeElement, expected);
+  }
+  await tab(h.button('Close'), false, h.button('Inputs'));
+  await tab(h.button('Inputs'), true, h.button('Close'));
+  await tab(h.field('agentName'), false, h.field('agentName'), false);
+  await h.button('Result').fire('click');
+  await tab(h.button('Close'), false, h.button('Result'));
+  await tab(h.button('Result'), true, h.button('Close'));
+  h.button('Close').disabled = true;
+  await tab(h.button('Result'), false, h.button('Result'));
+  await tab(h.button('Result'), true, h.button('Result'));
+  h.button('Close').disabled = false;
+  await configurePilot(h, 'retro-schema-validator');
+  await h.button('Add file').fire('click');
+  const paths = h.nodes().filter(node => node.tagName === 'INPUT');
+  paths[1].value = 'C:\\work\\b.json'; await paths[1].parent.parent.parent.fire('input');
+  h.button('Close').disabled = true;
+  await tab(h.button('Run'), false, h.button('Inputs'));
+  await tab(h.button('Inputs'), true, h.button('Run'));
+  await tab(paths[1], false, paths[1], false);
+  await dialog.fire('keydown', { key: 'Enter', preventDefault() { assert.fail('Non-Tab intercepted'); } });
   h.mounted.dispose();
 });
 

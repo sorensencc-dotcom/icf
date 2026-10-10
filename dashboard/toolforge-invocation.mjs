@@ -348,6 +348,16 @@ export function mountToolforgeInvocation({ inventory, rootElement, copyCommand, 
   }
   dialog.addEventListener('close', () => { if (!dialog.open) clear(); });
   dialog.addEventListener('cancel', event => { event.preventDefault(); dialog.close(); });
+  dialog.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const tabbable = [...dialog.querySelectorAll('button,input,textarea,select,a[href],[tabindex]')]
+      .filter(node => !node.disabled && node.tabIndex >= 0 && node.getClientRects().length > 0);
+    const first = tabbable[0], last = tabbable.at(-1);
+    if (first && ((event.shiftKey && doc.activeElement === first) || (!event.shiftKey && doc.activeElement === last))) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    }
+  });
   return {
     open(skillId, source) {
       if (disposed) return false;
