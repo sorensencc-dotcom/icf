@@ -1,6 +1,6 @@
 # Toolforge Read-Only Pilot: Final Acceptance
 
-Date: 2026-10-10. Operational delivery. Approved three-skill pilot complete in isolated worktrees; no merge or push.
+Date: 2026-10-10. Operational delivery. Approved three-skill pilot complete in isolated worktrees. Human authorized scoped push/PR and security-gate remediation; no merge.
 
 ## Findings Closed
 
@@ -53,7 +53,7 @@ Browser harness limits: renewed sessions required ownership restoration; backgro
 
 ## Changed Files
 
-Toolforge owner: C:/dev; isolated checkout C:/dev/dev-sandbox/toolforge-read-only-pilot. Thirteen files from base de310f24:
+Toolforge owner: C:/dev; isolated checkout C:/dev/dev-sandbox/toolforge-read-only-pilot. Eighteen files from base de310f24, including approved delivery/security remediation:
 
 - skills/agent-drift-detector/SKILL.md
 - skills/retro-schema-validator/src/index.js
@@ -61,6 +61,11 @@ Toolforge owner: C:/dev; isolated checkout C:/dev/dev-sandbox/toolforge-read-onl
 - skills/toolforge-cli/README.md
 - skills/toolforge-cli/SKILL.md
 - skills/toolforge-cli/docs/USAGE.md
+- skills/toolforge-cli/docs/acceptance.md
+- skills/parallel-search/package.json
+- skills/parallel-search/scripts/assert-test-count.mjs
+- skills/parallel-search/scripts/assert-test-count.test.mjs
+- skills/parallel-search/scripts/README.md
 - skills/toolforge-cli/src/invocation-contracts.mjs
 - skills/toolforge-cli/src/invocation-reviewed.json
 - skills/toolforge-cli/src/invocation-worker.mjs
@@ -69,11 +74,13 @@ Toolforge owner: C:/dev; isolated checkout C:/dev/dev-sandbox/toolforge-read-onl
 - skills/toolforge-cli/tests/invocation-contracts.test.mjs
 - skills/toolforge-cli/tests/invocation-worker.test.mjs
 
-ICF owner: C:/dev/icf; isolated checkout C:/dev/dev-sandbox/icf-read-only-pilot. Twelve files from approved-spec base 351f666, including carried-forward scoped command-audit baseline:
+ICF owner: C:/dev/icf; isolated checkout C:/dev/dev-sandbox/icf-read-only-pilot. Fourteen files from approved-spec base 351f666, including carried-forward scoped command-audit baseline and delivery evidence:
 
 - dashboard/index.html
 - dashboard/preview-enhanced.html
 - dashboard/toolforge-invocation.mjs
+- docs/superpowers/acceptance/README.md
+- docs/superpowers/acceptance/2026-10-10-toolforge-read-only-pilot.md
 - docs/superpowers/plans/2026-10-09-toolforge-read-only-pilot.md
 - docs/superpowers/specs/2026-10-09-toolforge-read-only-pilot-design.md
 - src/server.mjs
@@ -84,7 +91,7 @@ ICF owner: C:/dev/icf; isolated checkout C:/dev/dev-sandbox/icf-read-only-pilot.
 - test/toolforge-invocation-ui.test.mjs
 - test/toolforge-skill-command.test.mjs
 
-No package/lockfile, registry permission, or governance policy changes. Existing unrelated Toolforge audit dirt preserved. Synthetic history untracked, not committed. Canonical prior command-audit changes preserved; pilot runtime edits only isolated. Ledger and review artifacts retained.
+Only parallel-search package test scripts changed in explicitly approved security remediation; no dependency/lockfile, registry permission, or governance policy changes. Existing unrelated Toolforge audit dirt preserved. Synthetic history untracked, not committed. Canonical prior command-audit changes preserved; pilot runtime edits only isolated. Ledger and review artifacts retained.
 
 ## Rulings and Costs
 
@@ -99,10 +106,28 @@ No package/lockfile, registry permission, or governance policy changes. Existing
 
 ## Delivery and Limits
 
-Branch in both repositories: feat/toolforge-read-only-pilot-20261009. Worktrees remain preserved, unmerged, unpushed. Canonical current branches are not automatically integration targets; confirm original base branches before merge.
+Branch in both repositories: feat/toolforge-read-only-pilot-20261009. Worktrees remain preserved and unmerged. ICF PR targets fix/dashboard-docs-button-8001; Toolforge PR targets parkd821-20260908. Default branches lag these baselines; scoped targets exclude unrelated history.
 
 Live isolated QA: http://127.0.0.1:8082/modules/wiki/dashboard.html#category-governance and http://127.0.0.1:8082/dashboard/preview-enhanced.html#category-governance.
 
 Host configuration currently allows only synthetic chat fixture root. Real C:/dev inputs require separately reviewed host configuration/integration. Node 24 and PowerShell 7 required. Deadline 5 seconds, two concurrent workers, 64 KiB input, 128 KiB combined output, 1 MiB per selected file, 1-32 Retro files.
 
-No remote CI, merge, push, production activation, real mutating wiki scripts, bot/task starts, new dependencies, or all-skill input-aware rollout. Native Node permissions/source fingerprints are not an OS sandbox or network firewall; hostile concurrent filesystem replacement and an owner replacing both source and trust anchor remain outside guarantee.
+No merge, production activation, real mutating wiki scripts, bot/task starts, new dependencies, or all-skill input-aware rollout. Remote checks are reported separately below. Native Node permissions/source fingerprints are not an OS sandbox or network firewall; hostile concurrent filesystem replacement and an owner replacing both source and trust anchor remain outside guarantee.
+
+## Approved Security-Gate Remediation and Delivery
+
+Initial Toolforge push failed unchanged pre-push scanner on pilot subprocess import and pre-existing parallel-search shell-based launcher. Human explicitly approved scoped repair and requested regression tests. No hook, scanner policy, upstream scope, or gate changed.
+
+Parallel launcher now invokes installed tsx/cli with process.execPath, literal argument array and shell:false. No npx/download fallback. Regression suite intended RED6/6 before repair, GREEN6/6 after; original non-live suite35/35. Missing runtime/tests, count underflow, literal shell-like filenames, native failure and signal are covered. Existing installed dependencies reused through isolated ignored junction; no downloads.
+
+Pilot runner changed only import-line documentation for existing auditor exception, justified by fixed reviewed Node worker, shell:false, exact read flags and restricted environment. New actual-spawn regression pins boundary. Managed/Retro suite now48/48, zero skips. Full ICF rerun151/151 after explicit consumer-anchor update, zero skips. Both affected skills pass unchanged auditor. Fifteen source pins match; current anchor SHA-2565a0873f6cf6b8f157490318ab9873810dcba09f2be267ad964372d3140ad639a supersedes historical digest above. Eight fixture hashes/listing unchanged.
+
+ICF PR: https://github.com/sorensencc-dotcom/icf/pull/4. Initial remote headba69639 security check passed. Independent remediation reviewer hit account usage limit without verdict; controller manually reviewed complete scoped production/test diff and explicit fingerprints. No fresh independent remediation review claimed. Prior pilot independent reviews remain historical evidence. Owned isolated QA server reloaded updated anchor on8082; all three available and actual Agent POST completed/pass.
+
+## Final Delivery Record - 2026-10-10
+
+Original ICF [PR #4](https://github.com/sorensencc-dotcom/icf/pull/4) merged externally by repository owner at2026-10-10T18:03:30Z (merge976ca4d); subsequent owner merge#5 carried it into codex/weekly-retro-reporting. Controller did not merge. Follow-up [PR #7](https://github.com/sorensencc-dotcom/icf/pull/7) targets that now-current default baseline, preserving concurrent backend work. Anchor remediation heade6c6814 is remotely published; documentation-only status updates follow. Earlier unmerged/unpushed statements record pre-authorization history.
+
+Toolforge code head9519353c and operator/acceptance documentation remain local. Full unchanged pre-push audit still blocks publication on three baseline files unchanged fromde310f24: skills/slop-grader-sweep/src/file-list.ts, skills/slop-grader-sweep/src/slop-grader-runner.ts, skills/trm-devops-triage/src/index.ts. Approved Parallel/pilot findings pass; six new launcher tests, original35 tests, managed48 and full ICF151 pass. No Toolforge remote branch or PR created; remote operator docs therefore cannot yet be claimed current. Further skill remediation requires separate approval; no hook/upstream/scanner manipulation or bypass performed.
+
+Fresh independent remediation review unavailable due account usage limit; no verdict claimed. Current local and ICF remote evidence explicitly records this limitation. No controller merge/deploy or canonical8080 restart. QA8082 uses matching local reviewed sources, PID74800. Final remote checks are an inspection snapshot, not a production approval.
