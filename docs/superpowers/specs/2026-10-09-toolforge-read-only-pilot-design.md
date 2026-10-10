@@ -59,6 +59,8 @@ Do not silently translate docs-only observedOutput, ignore strict, or fabricate 
 
 Preserve selected order and native status, verdict, filesValidated, violations, and timestamp. No directory autodetection, --all expansion, or new interpretation of canonical schema v1.0. Existing CLI flags verbose/failOnWarning are not this adapter's input fields.
 
+Before enabling this pilot, guard the real validator's document root: null, arrays, strings, numbers, and booleans produce a root-object schema violation through the existing result format, not a thrown TypeError. Preserve existing object-field rules and canonical schema v1.0. Malformed JSON retains its existing validation finding.
+
 ### Path and Size Rules
 
 - Workspace roots come from trusted host configuration, never HTTP input. ICF defaults to its own ROOT. Additional roots require explicit host configuration. CLI supplies context through repeatable --workspace-root arguments.
@@ -76,12 +78,13 @@ Extend existing managed toolforge-cli skill; do not create an unregistered platf
 - skills/toolforge-cli/tests/: adapter, worker, CLI parity, and read-only coverage.
 - Existing toolforge-cli README/SKILL.md/docs/USAGE.md: invocation documentation; existing PowerShell CLI entrypoint remains unchanged.
 - Existing agent-drift-detector SKILL.md: contract correction, with algorithm/API unchanged.
+- Existing retro-schema-validator src/index.js and tests/: root-object guard and regression coverage; canonical schema remains unchanged.
 
 ICF imports the managed API from configured Toolforge root. Missing/incompatible runner retains instructions behavior. Consumer logic remains in existing server/inventory, both dashboards, and focused tests.
 
 Descriptors contain contract version 1, ID, reviewed relative entrypoint/export, read-only classification, form field metadata, and explicit validation/normalization functions. Use ordinary validators, not a new JSON Schema interpreter or dependency.
 
-Requests cannot specify entrypoints/exports. Installed registry must resolve the pilot IDs. Unexpected entrypoint/runtime drift disables the affected pilot until reviewed. Do not auto-select exports from source text.
+Requests cannot specify entrypoints/exports. Installed registry must resolve the pilot IDs. Descriptors pin reviewed SHA-256 fingerprints for each entrypoint and its complete local import closure, including runner files and package metadata affecting resolution. Built-in imports are explicitly allowlisted; dynamic imports and unreviewed dependencies are unavailable. Verify these fingerprints before every spawn and again in the worker before importing. Any source/import, entrypoint, export, or runtime mismatch disables the affected pilot until explicit review updates its descriptor; never regenerate trusted fingerprints at startup. Do not auto-select exports from source text. Fingerprints detect changed installed code, not concurrent hostile filesystem mutation.
 
 ## Runtime and Read-Only Boundary
 
@@ -115,19 +118,19 @@ Envelope: contractVersion (1), skillId (or null for invalid target), state, outc
 
 Roadmap SKILL_ERROR is execution failure; other returned validation errors/warnings are completed/findings. Agent driftDetected true means findings. Retro GREEN means pass; YELLOW/RED mean findings. Thrown handler, malformed result/protocol, unexpected stdout, abnormal exit, or missing export means execution failure, not successful validation.
 
-Copied PowerShell command invokes the same CLI with the same normalized input and workspace roots. Pipe compact JSON from a single-quoted literal, doubling apostrophes; quote all executable/script/argument paths. Never interpolate raw input into executable shell text. Independently executed results must match semantic native fields/outcome/error codes; timestamps, durations, and diagnostic formatting need not be byte-identical.
+Copied commands require PowerShell 7 or newer and reject Windows PowerShell 5.1 before invoking Node. Set $OutputEncoding to a BOM-less UTF-8 encoding for the JSON pipe and restore its prior value in finally, including on errors. Invoke the same CLI with the same normalized input and workspace roots. Pipe compact JSON from a single-quoted literal, doubling apostrophes; quote all executable/script/argument paths. Never interpolate raw input into executable shell text. Independently executed results must match semantic native fields/outcome/error codes; timestamps, durations, and diagnostic formatting need not be byte-identical. Document this shell requirement alongside Copy Command; do not silently substitute ASCII input.
 
 ## ICF HTTP Integration
 
 GET /api/toolforge/skills adds optional inputInvocation metadata for the three pilots: contract version, fields, runtime availability, and unavailable reason. Preserve runnable's current standalone-CLI meaning. Input invocation is a separate capability, not inferred from source markers.
 
-Extend existing POST /api/actions/run with action invoke-skill, target pilot ID, and input object. Preserve all legacy action contracts. Example:
+Add dedicated POST /api/toolforge/invoke with skillId and input object. Leave existing /api/actions/run parsing, actions, and response contracts unchanged. Route selection occurs before body parsing, so malformed pilot JSON still receives the pilot envelope. Example:
 
 ```json
-{"action":"invoke-skill","target":"agent-drift-detector","input":{"agentName":"example-agent","expectedSchema":{"status":"string"},"actualSchema":{"status":"success"}}}
+{"skillId":"agent-drift-detector","input":{"agentName":"example-agent","expectedSchema":{"status":"string"},"actualSchema":{"status":"success"}}}
 ```
 
-New branch rejects unknown envelope fields, enforces UTF-8 byte cap, application/json Content-Type, and loopback remote address. Browser Origin must match configured same-origin dashboard URL; reject other origins/preflights. CLI uses managed API directly, not HTTP.
+New route rejects unknown envelope fields, enforces UTF-8 byte cap, application/json Content-Type, and loopback remote address. Browser Origin must match configured same-origin dashboard URL; reject other origins/preflights. CLI uses managed API directly, not HTTP. Pre-parse failures use the same envelope with skillId null, result/outcome null, and stable error codes; malformed JSON is rejected/400.
 
 Wait for bounded completion and return envelope, never DISPATCHED. Do not publish input/result to existing SSE/action-history storage.
 
@@ -155,15 +158,15 @@ Use existing Cast Iron Charlie styling and compact controls. No landing page, ge
 
 1. Exercise real Roadmap handler on valid, missing/reversed-marker, strict-warning, and verbose fixtures; preserve native optional-data behavior. Missing/unreadable/oversized paths reject before invocation.
 2. Exercise real Agent handler on aligned/missing/extra keys, empty objects, wrong types, and unknown fields. Freeze actual documented contract; no invented nested-schema validation.
-3. Exercise real Retro handler on valid/warning/error/malformed JSON fixtures and explicit ordered multiple files. Preserve canonical schema v1.0.
-4. Import real TypeScript modules under production worker flags without downloading dependencies or creating build output. Verify missing runtime/export/contract-drift errors.
+3. Exercise real Retro handler on valid/warning/error/malformed JSON fixtures and explicit ordered multiple files. Include null, array, string, number, and boolean roots; each valid non-object JSON root must return completed/findings with a root-object violation, not worker failure. Preserve canonical schema v1.0 and existing object-field behavior.
+4. Import real TypeScript modules under production worker flags without downloading dependencies or creating build output. Verify missing runtime/export/contract-drift errors. Mutate an entrypoint, local imported module, runner, and resolution metadata without changing registry entrypoint/runtime; each must disable invocation before handler execution. Test parent/worker fingerprint checks and rejection of unreviewed imports.
 5. Test timeout, cancellation/disconnect, output overflow, exceptions, malformed protocol, saturation, and resource recovery using controlled fixtures.
 6. Compare file hashes and directory listings before/after real runs. Verify write/child/native-addon probes denied; reject traversal, symlink/junction escape, directory/UNC/device/ADS paths, and size violations.
 7. Review all pilot import paths and test no network requests. Absence of file writes is not evidence of no external calls.
 8. CLI/HTTP semantic parity covers pass, findings, and stable failures. Existing legacy dispatch responses remain unchanged.
-9. HTTP tests cover content type/origin/loopback/method rules, byte limits, unknown fields/IDs, malformed bodies, concurrency, and absence of input/result persistence/SSE disclosure.
+9. HTTP tests cover dedicated pilot routing, content type/origin/loopback/method rules, byte limits, unknown fields/IDs, malformed bodies, concurrency, and absence of input/result persistence/SSE disclosure. Verify malformed pilot bodies return the pilot envelope while malformed legacy bodies retain their existing response shape.
 10. BrowserOS Neo verifies both surfaces: forms, toggles/errors, exact clipboard payload, actual copied-command execution against fixtures, result/cancel states, focus/keyboard, desktop/mobile wrapping, and unavailable fallback.
-11. Treat apostrophes, quotes, backslashes, dollar signs, backticks, and HTML as data. Copied commands preserve input and never execute injected commands.
+11. Treat apostrophes, quotes, backslashes, dollar signs, backticks, and HTML as data. Execute copied commands under PowerShell 7 with non-ASCII names, keys, and file paths, plus non-default initial $OutputEncoding; verify exact input parity and encoding restoration on success/failure. Verify PowerShell 5.1 rejects without invoking Node. Copied commands preserve input and never execute injected commands.
 12. Run managed runner/skill tests and full ICF npm test. Report focused/full-suite/live-browser/real-handler evidence separately.
 
 Use disposable fixtures and isolated reporting storage. Never run production bots/tasks/pipelines or modify canonical inputs to obtain evidence.

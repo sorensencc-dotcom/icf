@@ -962,7 +962,7 @@
         <div class="section-label">Action Items</div>
         <div class="panel-header">
           <div class="panel-title">Top Open Action Items (TODOS.md)</div>
-          <button type="button" class="panel-action" onclick="copyCommand('code C:\\dev\\TODOS.md')">Open TODOS →</button>
+          <button type="button" class="panel-action" data-copy-command="code C:\dev\TODOS.md" onclick="copyCommand(this.dataset.copyCommand)">Open TODOS →</button>
         </div>
         <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;" id="dailyTodosList">
           <li class="item-card" style="border-left: 3px solid var(--accent-brass);">
@@ -1178,7 +1178,7 @@
               <li>+11 more</li>
             </ul>
           </div>
-          <button type="button" class="btn-secondary" onclick="copyCommand('code -g README.md schemas/kb_sync_trm_architecture.md')">Copy paths</button>
+          <button type="button" class="btn-secondary" data-copy-command="code 'C:\dev\kb-sync\README.md' 'C:\dev\kb-sync\schemas\kb_sync_trm_architecture.md'" onclick="copyCommand(this.dataset.copyCommand)">Copy paths</button>
         </div>
       </div>
     </div>
@@ -1397,7 +1397,7 @@
       <div class="section-label">Active Research Gaps Matrix</div>
       <div class="panel-header">
         <div class="panel-title">Open, Triaged, and Corroborated Gaps</div>
-        <button type="button" class="panel-action" onclick="copyCommand('npm run test:trm:triage')">Run Gap Triage →</button>
+        <button type="button" class="panel-action" data-copy-command="node 'C:\dev\scripts\trm-bot-runner.mjs'" onclick="copyCommand(this.dataset.copyCommand)">Run Gap Triage →</button>
       </div>
       <table class="table-clean">
         <thead>
@@ -1752,7 +1752,7 @@ flowchart TD
           </div>
         </div>
         <div style="display: flex; gap: 0.75rem; align-items: center;">
-          <button type="button" class="btn-secondary" onclick="copyCommand('npm run bot:all')">Run Full Fleet 📋</button>
+          <button type="button" class="btn-secondary" data-copy-command="npm --prefix 'C:\dev\icf' run bot:all" onclick="copyCommand(this.dataset.copyCommand)">Run Full Fleet 📋</button>
           <button type="button" class="panel-action" onclick="loadIronbotsDailyReport()">Refresh Telemetry →</button>
         </div>
       </div>
@@ -1806,42 +1806,42 @@ flowchart TD
             <td><span class="tag date">Daily 02:00 AM</span></td>
             <td>459 documents indexed into SQLite FTS5 (0 token burn)</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
-            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:notebook:ingest')">Run Bot</button></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="npm --prefix 'C:\dev\icf' run bot:notebook:ingest" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">KB-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
             <td><span class="tag date">Daily 03:00 AM</span></td>
             <td>Health Score: 92/100 (409 files scanned, 0 broken links)</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● PASS (92/100)</span></td>
-            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:kb:sentinel')">Run Bot</button></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="npm --prefix 'C:\dev\icf' run bot:kb:sentinel" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">TRM-Bot Drafter</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
             <td><span class="tag date">Daily 04:00 AM</span></td>
             <td>2,056 total research gaps tracked and RFCs drafted</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● PASS</span></td>
-            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:trm:triage')">Run Bot</button></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="npm --prefix 'C:\dev\icf' run bot:trm:triage" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Watchlist Drift Miner</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
             <td><span class="tag date">Daily 05:00 AM</span></td>
             <td>3 competitor models evaluated (Google SAM, Anthropic, OpenAI)</td>
             <td><span class="status-badge live" style="font-size:0.6rem; color:#a78bfa; border-color:rgba(167,139,250,0.4);">● DRIFT MONITORED</span></td>
-            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:watchlist:mine')">Run Bot</button></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="npm --prefix 'C:\dev\icf' run bot:watchlist:mine" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Daemon-Healer</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
             <td><span class="tag high">Every 15 Min</span></td>
             <td>Probes port 8080 health; auto-recovers dead server from C:\dev</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (200 OK)</span></td>
-            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:daemon:heal')">Run Bot</button></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="npm --prefix 'C:\dev\icf' run bot:daemon:heal" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">CI-Watchdog</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
             <td><span class="tag date">Daily 06:00 AM</span></td>
             <td>Polls GitHub Actions for failures; extracts delivery-guard error logs</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● ACTIVE</span></td>
-            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCommand('npm run bot:ci:watchdog')">Run Bot</button></td>
+            <td><button type="button" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.65rem;" data-copy-command="npm --prefix 'C:\dev\icf' run bot:ci:watchdog" onclick="copyCommand(this.dataset.copyCommand)">Run Bot</button></td>
           </tr>
         </tbody>
       </table>
@@ -2041,7 +2041,7 @@ flowchart TD
             Sequential execution chain scheduled in Windows Task Scheduler (06:00 AM – 07:00 AM ET) with inter-stage isolation buffers.
           </div>
         </div>
-        <button type="button" class="btn-secondary" onclick="copyCommand('powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\soren\\OneDrive\\Documents\\Claude\\Projects\\CIC\\scripts\\Run-DailyStatus.ps1')">Run Daily Pipeline 📋</button>
+        <button type="button" class="btn-secondary" data-copy-command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\soren\OneDrive\Documents\Claude\Projects\CIC\scripts\Run-DailyStatus.ps1" onclick="copyCommand(this.dataset.copyCommand)">Run Daily Pipeline 📋</button>
       </div>
 
       <!-- Vertical Stepper Container -->
@@ -2204,8 +2204,8 @@ flowchart TD
           <span class="tag date">Zero Token Burn</span>
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="btn-secondary" onclick="copyCommand('npm run bot:all')">Run Entire Fleet (CLI) 📋</button>
-          <button type="button" class="btn-secondary" onclick="copyCommand('Get-ScheduledTask -TaskPath \'\\Ironbots\\\'')">Inspect \Ironbots\ Tasks 📋</button>
+          <button type="button" class="btn-secondary" data-copy-command="npm --prefix 'C:\dev\icf' run bot:all" onclick="copyCommand(this.dataset.copyCommand)">Run Entire Fleet (CLI) 📋</button>
+          <button type="button" class="btn-secondary" data-copy-command="Get-ScheduledTask -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Inspect \Ironbots\ Tasks 📋</button>
         </div>
       </div>
 
@@ -2229,7 +2229,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/notebook_ingester_report.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Notebook-Ingester\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'Notebook-Ingester' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">KB-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2238,7 +2238,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/kb_sentinel_report.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'KB-Sentinel\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sentinel' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">TRM-Bot</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2247,7 +2247,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/trm_bot_report.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● READY</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'TRM-Bot\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'TRM-Bot' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Watchlist-Miner</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2256,7 +2256,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/watchlist_miner_report.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem; color:#a78bfa; border-color:rgba(167,139,250,0.4);">● DRIFT MONITORED</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Watchlist-Miner\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'Watchlist-Miner' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Daemon-Healer</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2265,7 +2265,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/daemon_health.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (200 OK)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Daemon-Healer\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'Daemon-Healer' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">IronLedger-Sentinel</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2274,7 +2274,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/ironledger_health.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUPERVISED (PORT 8000 OK)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'IronLedger-Sentinel\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'IronLedger-Sentinel' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">CI-Watchdog</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2283,7 +2283,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/ci_alerts.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● ACTIVE (CI GREEN)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'CI-Watchdog\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'CI-Watchdog' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Ironbots-Reporter</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2292,7 +2292,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/ironbots_daily_report.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Ironbots-Reporter\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'Ironbots-Reporter' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">Storage-Pruner</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2301,7 +2301,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/storage_pruner_status.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'Storage-Pruner\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'Storage-Pruner' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">TRM-Drive-Sync</strong><br><span style="font-size:0.75rem; color:var(--ember); font-family:monospace;">\Ironbots\</span></td>
@@ -2310,7 +2310,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span style="font-family:monospace; font-size:0.75rem; color:var(--bone);">_status-feed/trm_ingress_status.json</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● HEALTHY</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \'TRM-Drive-Sync\' -TaskPath \'\\Ironbots\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'TRM-Drive-Sync' -TaskPath '\Ironbots\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
         </tbody>
       </table>
@@ -2418,7 +2418,7 @@ flowchart TD
       <div class="section-label">Windows Task Scheduler Registry</div>
       <div class="panel-header">
         <div class="panel-title">Registered Scheduled Tasks &amp; Execution Policies</div>
-        <button type="button" class="btn-secondary" onclick="copyCommand('Get-ScheduledTask | Where-Object { $_.TaskPath -like \\'*\\CIC\\*\\' -or $_.TaskPath -like \\'*\\TRM\\*\\' -or $_.TaskPath -like \\'*\\KB-SYNC\\*\\' }')">Copy Inspection PowerShell 📋</button>
+        <button type="button" class="btn-secondary" data-copy-command="Get-ScheduledTask | Where-Object { $_.TaskPath -like '*\CIC\*' -or $_.TaskPath -like '*\TRM\*' -or $_.TaskPath -like '*\KB-SYNC\*' }" onclick="copyCommand(this.dataset.copyCommand)">Copy Inspection PowerShell 📋</button>
       </div>
 
       <table class="table-clean">
@@ -2441,7 +2441,7 @@ flowchart TD
             <td><code>soren (Password)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● WAKE ENABLED</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'TRM-Notebooklm-Mine\\' -TaskPath \\'\\TRM\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'TRM-Notebooklm-Mine' -TaskPath '\TRM\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">KB-Sync-TRM-Triage</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
@@ -2450,7 +2450,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'KB-Sync-TRM-Triage\\' -TaskPath \\'\\KB-SYNC\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-TRM-Triage' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">toolforge-trm-sync-treatment</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\TRM\</span></td>
@@ -2459,7 +2459,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'toolforge-trm-sync-treatment\\' -TaskPath \\'\\TRM\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'toolforge-trm-sync-treatment' -TaskPath '\TRM\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">CIC-Mirror-ClaudeMemory</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\CIC\</span></td>
@@ -2468,7 +2468,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'CIC-Mirror-ClaudeMemory\\' -TaskPath \\'\\CIC\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'CIC-Mirror-ClaudeMemory' -TaskPath '\CIC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">CIC-Daily-Status</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\CIC\</span></td>
@@ -2477,7 +2477,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'CIC-Daily-Status\\' -TaskPath \\'\\CIC\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'CIC-Daily-Status' -TaskPath '\CIC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">KB-Sync-Master-Pipeline</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
@@ -2486,7 +2486,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'KB-Sync-Master-Pipeline\\' -TaskPath \\'\\\\KB-SYNC\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-Master-Pipeline' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
             <td><strong style="color:var(--white);">TRM-Notebooklm-Chat-Archive</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\TRM\</span></td>
@@ -2495,7 +2495,7 @@ flowchart TD
             <td><code>soren (S4U)</code> · Highest</td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● WAKE ENABLED</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
-            <td><button type="button" class="btn-secondary" onclick="copyCommand('Start-ScheduledTask -TaskName \\'TRM-Notebooklm-Chat-Archive\\' -TaskPath \\'\\\\TRM\\\\'')">Run Task</button></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'TRM-Notebooklm-Chat-Archive' -TaskPath '\TRM\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
         </tbody>
       </table>
@@ -2506,7 +2506,7 @@ flowchart TD
       <div class="section-label">Watchdogs &amp; Daemons</div>
       <div class="panel-header">
         <div class="panel-title">Background Network Ports &amp; Daemons</div>
-        <button type="button" class="panel-action" onclick="copyCommand('Get-NetTCPConnection -LocalPort 8080,8787,8000')">Inspect Ports →</button>
+        <button type="button" class="panel-action" data-copy-command="Get-NetTCPConnection -LocalPort 8080,8787,8000" onclick="copyCommand(this.dataset.copyCommand)">Inspect Ports →</button>
       </div>
       <table class="table-clean">
         <tbody>
@@ -2550,7 +2550,7 @@ flowchart TD
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
           <button type="button" class="panel-action" onclick="fetchCostRoutingMetrics(true)">Refresh Gateway ↺</button>
-          <button type="button" class="panel-action" onclick="copyCommand('mcp call torquequery route_model_request')">Copy MCP Tool 📋</button>
+          <button type="button" class="panel-action" data-copy-command="code 'C:\dev\CIC-GOVERNANCE\WRAPPERS\torquequery_routing_runtime.py'" onclick="copyCommand(this.dataset.copyCommand)">Copy Routing Source 📋</button>
         </div>
       </div>
 
@@ -2715,11 +2715,11 @@ flowchart TD
       <div class="section-label">Quick Actions</div>
       <div class="panel-title" style="margin-bottom: 1rem;">Headroom CLI &amp; Agent Launchers</div>
       <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-        <button type="button" class="panel-action" onclick="copyCommand('headroom doctor')">headroom doctor 📋</button>
-        <button type="button" class="panel-action" onclick="copyCommand('headroom perf')">headroom perf 📋</button>
-        <button type="button" class="panel-action" onclick="copyCommand('headroom wrap claude')">headroom wrap claude 📋</button>
-        <button type="button" class="panel-action" onclick="copyCommand('headroom wrap codex')">headroom wrap codex 📋</button>
-        <button type="button" class="panel-action" onclick="copyCommand('headroom mcp status')">headroom mcp status 📋</button>
+        <button type="button" class="panel-action" data-copy-command="headroom doctor" onclick="copyCommand(this.dataset.copyCommand)">headroom doctor 📋</button>
+        <button type="button" class="panel-action" data-copy-command="headroom perf" onclick="copyCommand(this.dataset.copyCommand)">headroom perf 📋</button>
+        <button type="button" class="panel-action" data-copy-command="headroom wrap claude" onclick="copyCommand(this.dataset.copyCommand)">headroom wrap claude 📋</button>
+        <button type="button" class="panel-action" data-copy-command="headroom wrap codex" onclick="copyCommand(this.dataset.copyCommand)">headroom wrap codex 📋</button>
+        <button type="button" class="panel-action" data-copy-command="headroom mcp status" onclick="copyCommand(this.dataset.copyCommand)">headroom mcp status 📋</button>
       </div>
     </div>
   </section>
@@ -2738,8 +2738,8 @@ flowchart TD
           <span class="tag date" id="graftCommitBadge">65c2966 Adapted</span>
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="panel-action" onclick="copyCommand('node C:\\dev\\benchmarks\\viking-benchmark.mjs')">Run VFS Benchmark 📋</button>
-          <button type="button" class="panel-action" onclick="copyCommand('graft ask')">graft ask 📋</button>
+          <button type="button" class="panel-action" data-copy-command="node C:\dev\benchmarks\viking-benchmark.mjs" onclick="copyCommand(this.dataset.copyCommand)">Run VFS Benchmark 📋</button>
+          <button type="button" class="panel-action" data-copy-command="graft --help" onclick="copyCommand(this.dataset.copyCommand)">graft --help 📋</button>
         </div>
       </div>
 
@@ -2863,17 +2863,17 @@ flowchart TD
     <div class="grid-metrics">
       <div>
         <div class="stat-block">
-          <div class="stat-number" id="skTotalCount">43</div>
+          <div class="stat-number" id="skTotalCount">0</div>
           <div class="stat-label">Total Skills</div>
         </div>
         <div class="stat-sub">Manifest v1.0.0</div>
       </div>
       <div>
         <div class="stat-block">
-          <div class="stat-number" id="skActiveCount" style="color: #5a9e6f;">43</div>
-          <div class="stat-label">Active Skills</div>
+          <div class="stat-number" id="skActiveCount" style="color: #5a9e6f;">0</div>
+          <div class="stat-label">Standalone CLIs</div>
         </div>
-        <div class="stat-sub">100% Operational</div>
+        <div class="stat-sub">Installed entrypoints</div>
       </div>
       <div>
         <div class="stat-block">
@@ -2884,10 +2884,10 @@ flowchart TD
       </div>
       <div>
         <div class="stat-block">
-          <div class="stat-number" id="skHealthScore" style="color: #5eead4;">100%</div>
-          <div class="stat-label">Manifest Conformance</div>
+          <div class="stat-number" id="skHealthScore" style="color: #5eead4;">0</div>
+          <div class="stat-label">Instructions Only</div>
         </div>
-        <div class="stat-sub">Zero Schema Violations</div>
+        <div class="stat-sub">Inputs or runtime required</div>
       </div>
     </div>
 
@@ -3104,8 +3104,8 @@ flowchart TD
   window.executeAction = executeAction;
 
   function copyCommand(cmd) {
-    const payload = cmd;
-    navigator.clipboard.writeText(payload)
+    const payload = String(cmd || '').trim();
+    return Promise.resolve().then(() => navigator.clipboard.writeText(payload))
       .then(() => showToast('Copied: ' + payload))
       .catch(() => showToast('Could not copy'));
   }
@@ -3201,6 +3201,10 @@ flowchart TD
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function skillId(skill) {
+    return String((skill && (skill.id || skill.name)) || '').trim();
   }
 
   async function loadDailyStatus() {
@@ -3833,21 +3837,6 @@ flowchart TD
   let skillSearchTerm = '';
   let currentExecutionFilter = 'all';
 
-  const DEFAULT_SKILLS = [
-    { name: 'analyze-token-burn', category: 'observability', runtime: 'node', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'src/index.ts', desc: 'Project month-end token costs and identify high-spend adapters', health: 'good' },
-    { name: 'ashfall', category: 'automation', runtime: 'node', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'src/index.ts', desc: 'Deterministic session-termination and context-handoff engine for Cast Iron systems', health: 'good' },
-    { name: 'kb-sync-nightly', category: 'governance', runtime: 'bash', version: '1.0.2', owner: 'soren', status: 'active', entrypoint: 'scripts/run.sh', desc: 'Knowledge base sync with integrated cross-reference layer between docs and wiki', health: 'good' },
-    { name: 'cic-ingest-world', category: 'ingestion', runtime: 'python', version: '1.2.0', owner: 'soren', status: 'active', entrypoint: 'main.py', desc: 'Multi-modal harvesting and ingestion pipeline for external research and data', health: 'good' },
-    { name: 'cic-orchestrate-flow', category: 'workflow', runtime: 'node', version: '2.0.0', owner: 'soren', status: 'active', entrypoint: 'src/flow.ts', desc: 'DAG orchestrator for multi-agent workflows and pipeline dispatch', health: 'good' },
-    { name: 'run-adapter-diagnostic', category: 'diagnostics', runtime: 'node', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'src/index.ts', desc: 'Runs diagnostic probes across MCP adapters, verifying connectivity and latency', health: 'good' },
-    { name: 'permission-governor', category: 'governance', runtime: 'node', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'src/index.ts', desc: 'Validates file access permissions and tool execution policies against governance rules', health: 'good' },
-    { name: 'reconcile-vector-store', category: 'intelligence', runtime: 'node', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'src/index.ts', desc: 'Audits and synchronizes local sqlite/vector indices with upstream document graphs', health: 'good' },
-    { name: 'tinyfish-search', category: 'search', runtime: 'python', version: '1.1.0', owner: 'soren', status: 'active', entrypoint: 'search.py', desc: 'Fast local code and document search engine with fuzzy symbol indexing', health: 'good' },
-    { name: 'writing-heuristics', category: 'documentation', runtime: 'markdown', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'SKILL.md', desc: 'Enforces deterministic style and writing heuristics across all project specs', health: 'good' },
-    { name: 'workspace-storage-cleaner', category: 'automation', runtime: 'node', version: '1.0.1', owner: 'soren', status: 'active', entrypoint: 'src/clean.ts', desc: 'Purges stale test artifacts, logs, and temporary sandbox directories', health: 'good' },
-    { name: 'sigil-grok-bridge', category: 'communication', runtime: 'node', version: '1.0.0', owner: 'soren', status: 'active', entrypoint: 'src/bridge.ts', desc: 'Keyless Model Context Protocol bridge for cross-agent task dispatch over Sigil', health: 'good' }
-  ];
-
   const SAMPLE_EXECUTION_RUNS = [
     { timestamp: '2026-09-12 17:40:12', tool: 'kb-sync-nightly', duration: '142 ms', status: 'success', version: '1.0.2', info: 'Sync completed: 0 stale docs' },
     { timestamp: '2026-09-12 17:35:04', tool: 'headroom-proxy', duration: '18 ms', status: 'success', version: '2.1.0', info: 'Prompt compression: 69.6% cache hit' },
@@ -3859,19 +3848,19 @@ flowchart TD
 
   async function loadSkillsInventory() {
     try {
-      const res = await fetch('../../manifest.json', { cache: 'no-store' });
+      const res = await fetch('/api/toolforge/skills', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data.skills && Array.isArray(data.skills)) {
           allSkills = data.skills;
         } else {
-          allSkills = DEFAULT_SKILLS;
+          allSkills = [];
         }
       } else {
-        allSkills = DEFAULT_SKILLS;
+        allSkills = [];
       }
     } catch {
-      allSkills = DEFAULT_SKILLS;
+      allSkills = [];
     }
     renderCategoryPills();
     renderSkillsGrid();
@@ -3922,11 +3911,13 @@ flowchart TD
 
     const activeEl = document.getElementById('skActiveCount');
     const totalEl = document.getElementById('skTotalCount');
-    if (activeEl) activeEl.textContent = allSkills.filter(s => s.status === 'active' || !s.status).length;
+    if (activeEl) activeEl.textContent = allSkills.filter(s => s.runnable).length;
     if (totalEl) totalEl.textContent = allSkills.length;
+    document.getElementById('skHealthScore').textContent = allSkills.filter(s => !s.runnable).length;
+    document.getElementById('skCategoriesCount').textContent = new Set(allSkills.map(s => s.category || 'general')).size;
 
     if (filtered.length === 0) {
-      container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--ash);">No skills found matching "${skillSearchTerm}"</div>`;
+      container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--ash);">${allSkills.length ? 'No matching skills' : 'Skill inventory unavailable'}</div>`;
       return;
     }
 
@@ -3937,6 +3928,8 @@ flowchart TD
       const version = s.version || '1.0.0';
       const owner = s.owner || 'soren';
       const entrypoint = s.entrypoint || 'src/index.ts';
+      const id = skillId(s);
+      const command = s.command || '';
 
       return `
         <div class="item-card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 2px solid var(--ember);">
@@ -3952,10 +3945,10 @@ flowchart TD
               <div style="display: flex; justify-content: space-between;"><span style="color: var(--ash); font-family: var(--font-ui); text-transform: uppercase;">Owner / Ver</span><span style="color: var(--bone); font-family: var(--font-ui);">${owner} · v${version}</span></div>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span class="status-badge live" style="font-size: 0.55rem; padding: 0.2rem 0.6rem;">● OPERATIONAL</span>
+              <span class="status-badge ${s.runnable ? 'live' : 'soon'}" title="${escapeHtml(s.reason || '')}" style="font-size: 0.55rem; padding: 0.2rem 0.6rem;">${escapeHtml((s.availability || 'unavailable').toUpperCase())}</span>
               <div style="display: flex; gap: 4px; align-items: center;">
-                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.65rem;" onclick="executeAction('run-skill', '${escapeHtml(s.name)}', this)">Run Skill ▶</button>
-                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.45rem; font-size: 0.65rem;" title="Copy CLI Command" onclick="copyCommand('pwsh -File C:\\dev\\toolforge.ps1 run ${escapeHtml(s.name)}')">📋</button>
+                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.65rem;" ${s.runnable ? '' : 'disabled'} title="${escapeHtml(s.reason || 'Run skill CLI')}" data-target="${escapeHtml(id)}" onclick="executeAction('run-skill', this.dataset.target, this)">Run Skill ▶</button>
+                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.45rem; font-size: 0.65rem;" ${command ? '' : 'disabled'} title="${s.runnable ? 'Copy CLI Command' : 'Copy Instructions Command'}" data-copy-command="${escapeHtml(command)}" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
               </div>
             </div>
           </div>
@@ -3994,6 +3987,11 @@ flowchart TD
   function handleHashRoute() {
     const hash = window.location.hash.replace('#', '');
     if (!hash) return;
+    if (hash.startsWith('category-')) {
+      switchTab('tab-skills');
+      setSkillCategory(hash.slice('category-'.length));
+      return;
+    }
     const tabMap = {
       'daily': 'tab-daily',
       'mcp': 'tab-mcp',
@@ -4026,7 +4024,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/notebook_ingester_report.json',
       cliCmd: "Start-ScheduledTask -TaskName 'Notebook-Ingester' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:notebook:ingest'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:notebook:ingest"
     },
     {
       id: 'kb-sentinel',
@@ -4038,7 +4036,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/kb_sentinel_report.json',
       cliCmd: "Start-ScheduledTask -TaskName 'KB-Sentinel' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:kb:sentinel'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:kb:sentinel"
     },
     {
       id: 'trm-bot',
@@ -4050,7 +4048,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/trm_bot_report.json',
       cliCmd: "Start-ScheduledTask -TaskName 'TRM-Bot' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:trm:triage'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:trm:triage"
     },
     {
       id: 'watchlist-miner',
@@ -4062,7 +4060,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/watchlist_miner_report.json',
       cliCmd: "Start-ScheduledTask -TaskName 'Watchlist-Miner' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:watchlist:mine'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:watchlist:mine"
     },
     {
       id: 'daemon-healer',
@@ -4074,7 +4072,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/daemon_health.json',
       cliCmd: "Start-ScheduledTask -TaskName 'Daemon-Healer' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:daemon:heal'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:daemon:heal"
     },
     {
       id: 'ironledger-sentinel',
@@ -4086,7 +4084,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/ironledger_health.json',
       cliCmd: "Start-ScheduledTask -TaskName 'IronLedger-Sentinel' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:ironledger:sentinel'
+      npmCmd: "npm --prefix 'C:\\dev' run bot:ironledger:sentinel"
     },
     {
       id: 'ci-watchdog',
@@ -4098,7 +4096,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/ci_alerts.json',
       cliCmd: "Start-ScheduledTask -TaskName 'CI-Watchdog' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:ci:watchdog'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:ci:watchdog"
     },
     {
       id: 'ironbots-reporter',
@@ -4110,7 +4108,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/ironbots_daily_report.json',
       cliCmd: "Start-ScheduledTask -TaskName 'Ironbots-Reporter' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:reporter'
+      npmCmd: "npm --prefix 'C:\\dev\\icf' run bot:report"
     },
     {
       id: 'storage-pruner',
@@ -4122,7 +4120,7 @@ flowchart TD
       logonType: 'soren (S4U) · Highest',
       artifact: '_status-feed/storage_pruner_status.json',
       cliCmd: "Start-ScheduledTask -TaskName 'Storage-Pruner' -TaskPath '\\Ironbots\\'",
-      npmCmd: 'npm run bot:storage:prune'
+      npmCmd: "node 'C:\\dev\\scripts\\storage-pruner.mjs'"
     },
     {
       id: 'trm-drive-sync',
@@ -4536,7 +4534,7 @@ flowchart TD
               <td>
                 <div style="display:flex; gap:4px; align-items:center;">
                   <button type="button" class="btn-secondary" style="padding:0.3rem 0.55rem; font-size:0.65rem;" onclick="executeAction('run-task', '${escapeHtml(def.name)}', this)">Run Task ▶</button>
-                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy Task Command" onclick="copyCommand('${escapeHtml(def.cliCmd)}')">📋</button>
+                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy Task Command" data-copy-command="${escapeHtml(def.cliCmd)}" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
                 </div>
               </td>
             </tr>
@@ -4587,7 +4585,7 @@ flowchart TD
               <td>
                 <div style="display:flex; gap:4px; align-items:center;">
                   <button type="button" class="btn-secondary" style="padding:0.3rem 0.55rem; font-size:0.65rem;" onclick="executeAction('run-bot', '${escapeHtml(def.id)}', this)">Run Bot ▶</button>
-                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy NPM Command" onclick="copyCommand('${escapeHtml(def.npmCmd)}')">📋</button>
+                  <button type="button" class="btn-secondary" style="padding:0.3rem 0.45rem; font-size:0.65rem;" title="Copy NPM Command" data-copy-command="${escapeHtml(def.npmCmd)}" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
                 </div>
               </td>
             </tr>

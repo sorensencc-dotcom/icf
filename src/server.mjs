@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { readToolforgeInventory } from './toolforge-inventory.mjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,7 @@ import { validateWeeklyRetroReport } from '../reporting/src/weekly-retro-contrac
 import { weekRange, SUPPORTED_TREND_WINDOWS } from '../reporting/src/trend-summary.mjs';
 import { createMobileSnapshotService } from './mobile-snapshot.mjs';
 import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
+import { skillId } from './toolforge-skill-command.mjs';
 
 let prCache = { timestamp: 0, prs: [] };
 const PR_CACHE_TTL_MS = 60_000;
@@ -47,6 +49,8 @@ export const HOST = process.env.ICF_HOST || '0.0.0.0';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
 export const REPORTING_HISTORY_SOURCE_SYSTEM = 'icf';
 export const REPORTING_HISTORY_SOURCE_ID = 'weekly-retro';
+export const TOOLFORGE_ROOT = resolve(ROOT, '..');
+export const TOOLFORGE_MANIFEST = resolve(TOOLFORGE_ROOT, 'manifest.json');
 
 const TELEMETRY_DIR = resolve(ROOT, '../modules/telemetry');
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -60,6 +64,26 @@ export function isLoopback(address) {
 
 function importTelemetry(file) {
   return import(`file://${resolve(TELEMETRY_DIR, file).replace(/\\/g, '/')}`);
+}
+
+export function findToolforgeSkill(target, manifestPath = TOOLFORGE_MANIFEST) {
+  const value = String(target || '').trim();
+  if (!value) return null;
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    return (manifest.skills || []).find(skill => skillId(skill) === value || skill.name === value) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function buildToolforgeSkillRunner(target, manifestPath = TOOLFORGE_MANIFEST, toolforgeRoot = TOOLFORGE_ROOT) {
+  try {
+    const skill = readToolforgeInventory(manifestPath, toolforgeRoot).skills.find(skill => skill.id === target || skill.name === target);
+    return skill?.runnable ? skill.runner : null;
+  } catch {
+    return null;
+  }
 }
 
 function formatLocalDay(date) {
@@ -228,6 +252,20 @@ export function createGatewayServer(options = {}) {
     const reqUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
     const pathname = reqUrl.pathname;
 
+    if (pathname === '/api/toolforge/skills') {
+      res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store');
+      try {
+        const inventory = readToolforgeInventory(options.toolforgeManifestPath || TOOLFORGE_MANIFEST, options.toolforgeRoot || TOOLFORGE_ROOT);
+        res.writeHead(200);
+        res.end(JSON.stringify(inventory));
+      } catch {
+        res.writeHead(503);
+        res.end(JSON.stringify({ skills: [], error: 'Toolforge inventory unavailable' }));
+      }
+      return;
+    }
+
     // Real-Time SSE Event Stream endpoint
     if (pathname === '/api/events' || pathname === '/api/stream' || pathname === '/api/reporting/stream') {
       res.writeHead(200, {
@@ -326,8 +364,7 @@ export function createGatewayServer(options = {}) {
           return ['powershell.exe', ['-NoProfile', '-Command', `Start-ScheduledTask -TaskName '${taskName}'`]];
         },
         'run-skill': (skillName) => {
-          if (!/^[a-zA-Z0-9_-]+$/.test(skillName)) return null;
-          return ['pwsh.exe', ['-NoProfile', '-File', resolve(ROOT, '../toolforge.ps1'), 'run', skillName]];
+          return buildToolforgeSkillRunner(skillName);
         },
         'validate-wiki': () => ['node', [resolve(ROOT, '../modules/wiki/validate-staging-docs.mjs')]],
         'autoheal-wiki': (subtype) => {
