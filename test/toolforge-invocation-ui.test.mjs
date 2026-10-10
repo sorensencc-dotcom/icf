@@ -52,11 +52,151 @@ function harness(copyCommand, clipboard) {
   const change = async (name, value) => { field(name).value = value; await field(name).parent.parent.fire('input'); };
   return { doc, inventory, root, mounted, nodes, tag, button, field, status, change, results, context };
 }
-const completed = (skillId, outcome = 'pass', result = { message: '<script>data</script>' }) => ({
+const nativeResult = (skillId, outcome = 'pass') => {
+  if (skillId === 'roadmap-validator') return outcome === 'pass' ? {
+    status: 'success', message: 'Valid', data: { isValid: true, findings: [], syncMarkersPresent: true, contentLength: 10, validated: '2026-10-10T00:00:00Z' }
+  } : { status: 'error', message: 'Missing markers', code: 'MISSING_MARKERS' };
+  if (skillId === 'retro-schema-validator') return {
+    status: 'success', verdict: outcome === 'pass' ? 'GREEN' : 'YELLOW', filesValidated: 1,
+    violations: outcome === 'pass' ? [] : [{ file: 'C:\\work\\a.json', field: 'status', level: 'warning', message: 'Warning' }], timestamp: '2026-10-10T00:00:00Z'
+  };
+  return { agentName: 'agent', driftDetected: outcome === 'findings', missingFields: outcome === 'findings' ? ['missing'] : [], extraFields: [], recommendations: ['<script>data</script>'] };
+};
+const completed = (skillId, outcome = 'pass', result = nativeResult(skillId, outcome)) => ({
   contractVersion: 1, skillId, state: 'completed', outcome, result, error: null, durationMs: 1
 });
 const response = envelope => ({ ok: envelope.state === 'completed', json: async () => envelope });
 const tick = () => new Promise(resolve => setImmediate(resolve));
+async function configurePilot(h, skillId) {
+  h.mounted.open(skillId);
+  if (skillId === 'agent-drift-detector') await h.change('agentName', 'agent');
+  else if (skillId === 'roadmap-validator') await h.change('roadmapPath', 'C:\\work\\a.md');
+  else {
+    const input = h.nodes().find(node => node.tagName === 'INPUT');
+    input.value = 'C:\\work\\a.json'; await input.parent.parent.parent.fire('input');
+  }
+}
+
+test('malformed completed native results never certify success or unlock copy', async t => {
+  let envelope;
+  const copies = [];
+  const h = harness(async value => { copies.push(value); return true; });
+  t.mock.method(globalThis, 'fetch', async () => response(envelope));
+  for (const skillId of h.inventory.slice(0, 3).map(skill => skill.id)) {
+    await configurePilot(h, skillId);
+    const valid = nativeResult(skillId);
+    const missing = { ...valid }; delete missing[Object.keys(valid)[0]];
+    const absent = completed(skillId); delete absent.result;
+    for (const invalid of [null, [], 42, 'text', {}, missing, { ...valid, unexpected: true }].map(result => completed(skillId, 'pass', result)).concat(absent)) {
+      envelope = invalid;
+      await h.tag('form').fire('submit');
+      assert.match(h.status(), /^Failed:/, skillId);
+      assert.equal(h.button('Copy Command').disabled, true, skillId);
+      assert.equal(h.tag('pre').textContent, '');
+      await h.button('Copy Command').fire('click');
+    }
+  }
+  assert.equal(copies.length, 0); assert.equal(h.results.length, 0);
+  h.mounted.dispose();
+});
+
+test('native shape and outcome inconsistencies fail closed for every pilot', async t => {
+  let envelope;
+  const h = harness();
+  t.mock.method(globalThis, 'fetch', async () => response(envelope));
+  const roadmap = nativeResult('roadmap-validator');
+  const retro = nativeResult('retro-schema-validator');
+  const agent = nativeResult('agent-drift-detector');
+  const malformed = {
+    'roadmap-validator': [
+      { status: 'success', message: 'No data' }, { status: 'error', message: 'No code' },
+      { status: 'error', message: 'Runtime', code: 'SKILL_ERROR' },
+      { ...roadmap, message: 1 }, { ...roadmap, code: null }, { ...roadmap, data: null },
+      { ...roadmap, data: { ...roadmap.data, isValid: false } },
+      { ...roadmap, data: { ...roadmap.data, contentLength: -1 } },
+      { ...roadmap, data: { ...roadmap.data, validated: 'invalid' } },
+      { ...roadmap, data: { ...roadmap.data, findings: [{ level: 'info', code: 'INFO', message: 'Data', line: 0 }] } }
+    ],
+    'agent-drift-detector': [
+      { ...agent, agentName: ' ' }, { ...agent, driftDetected: 'false' },
+      { ...agent, missingFields: [1] }, { ...agent, extraFields: null }, { ...agent, recommendations: 'text' },
+      { ...agent, missingFields: ['missing'] }
+    ],
+    'retro-schema-validator': [
+      { ...retro, filesValidated: 0 }, { ...retro, filesValidated: 33 }, { ...retro, filesValidated: 1.5 },
+      { ...retro, timestamp: 'invalid' }, { ...retro, status: 'error' }, { ...retro, verdict: 'YELLOW' },
+      { ...retro, violations: [{ file: 'a', field: 'b', level: 'info', message: 'c' }] },
+      { ...retro, violations: [{ file: 1, field: 'b', level: 'warning', message: 'c' }] }
+    ]
+  };
+  for (const [skillId, results] of Object.entries(malformed)) {
+    await configurePilot(h, skillId);
+    for (const result of results) {
+      envelope = completed(skillId, 'pass', result); await h.tag('form').fire('submit');
+      assert.match(h.status(), /^Failed:/); assert.equal(h.button('Copy Command').disabled, true);
+    }
+    for (const outcome of ['pass', 'findings']) {
+      envelope = completed(skillId, outcome, nativeResult(skillId, outcome === 'pass' ? 'findings' : 'pass'));
+      await h.tag('form').fire('submit');
+      assert.match(h.status(), /^Failed:/); assert.equal(h.button('Copy Command').disabled, true);
+    }
+  }
+  assert.equal(h.results.length, 0); h.mounted.dispose();
+});
+
+test('valid native pass/findings remain accepted, including optional Roadmap data', async t => {
+  let envelope;
+  const h = harness();
+  t.mock.method(globalThis, 'fetch', async () => response(envelope));
+  for (const skillId of h.inventory.slice(0, 3).map(skill => skill.id)) {
+    await configurePilot(h, skillId);
+    for (const outcome of ['pass', 'findings']) {
+      envelope = completed(skillId, outcome); await h.tag('form').fire('submit');
+      assert.equal(h.status(), `Completed / ${outcome === 'pass' ? 'Pass' : 'Findings'}`);
+      assert.equal(h.button('Copy Command').disabled, false);
+      assert.equal(h.tag('pre').textContent, JSON.stringify(envelope.result, null, 2));
+    }
+  }
+  await configurePilot(h, 'roadmap-validator');
+  for (const [result, outcome] of [
+    [{ ...nativeResult('roadmap-validator'), data: { ...nativeResult('roadmap-validator').data, findings: [{ level: 'warning', code: 'WARN', message: 'Warning', line: 1 }] } }, 'findings'],
+    [{ status: 'error', message: 'Invalid', data: { ...nativeResult('roadmap-validator').data, isValid: false, findings: [{ level: 'error', code: 'ERROR', message: 'Error' }] } }, 'findings']
+  ]) {
+    envelope = completed('roadmap-validator', outcome, result); await h.tag('form').fire('submit');
+    assert.equal(h.button('Copy Command').disabled, false);
+  }
+  await configurePilot(h, 'retro-schema-validator');
+  envelope = completed('retro-schema-validator', 'findings', { ...nativeResult('retro-schema-validator', 'findings'), status: 'error', verdict: 'RED', violations: [{ file: 'a', field: 'b', level: 'error', message: 'c' }] });
+  await h.tag('form').fire('submit'); assert.equal(h.button('Copy Command').disabled, false);
+  h.mounted.dispose();
+});
+
+test('strict envelope fields reject absent/invalid duration and extra fields', async t => {
+  let envelope;
+  const h = harness();
+  t.mock.method(globalThis, 'fetch', async () => response(envelope));
+  await configurePilot(h, 'agent-drift-detector');
+  const absent = completed('agent-drift-detector'); delete absent.durationMs;
+  for (const invalid of [absent, ...[-1, null, '1'].map(durationMs => ({ ...completed('agent-drift-detector'), durationMs })), { ...completed('agent-drift-detector'), extra: true }]) {
+    envelope = invalid; await h.tag('form').fire('submit');
+    assert.match(h.status(), /^Failed:/); assert.equal(h.button('Copy Command').disabled, true);
+  }
+  h.mounted.dispose();
+});
+
+test('Retro revalidation clears aria-invalid on every dynamic path row', async () => {
+  const h = harness(); await configurePilot(h, 'retro-schema-validator');
+  await h.button('Add file').fire('click');
+  const rows = h.nodes().filter(node => node.tagName === 'INPUT');
+  rows[0].value = 'relative.json'; rows[1].value = 'C:\\work\\b.json';
+  await rows[0].parent.parent.parent.fire('input');
+  assert.equal(rows[0].attributes['aria-invalid'], 'true');
+  rows[1].setAttribute('aria-invalid', 'true');
+  rows[0].value = 'C:\\work\\a.json'; await rows[0].parent.parent.parent.fire('input');
+  assert.equal(h.button('Run').disabled, false);
+  for (const row of rows) assert.equal(row.attributes['aria-invalid'], undefined);
+  h.mounted.dispose();
+});
 
 test('dialog forms preserve defaults, validate JSON, bound explicit ordered list, and restore focus', async () => {
   const h = harness();

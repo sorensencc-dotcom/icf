@@ -43,6 +43,49 @@ const fields = {
   'retro-schema-validator': ['filePaths']
 };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const strings = value => Array.isArray(value) && value.every(item => typeof item === 'string');
+const integer = value => Number.isSafeInteger(value) && value >= 0;
+const timestamp = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
+const keys = (value, required, optional = []) => object(value) && required.every(key => Object.hasOwn(value, key)) &&
+  Object.keys(value).every(key => required.includes(key) || optional.includes(key));
+
+// Match managed native-result contracts and classification, not handler algorithms.
+function resultOutcome(skillId, result) {
+  if (!object(result)) return null;
+  if (skillId === 'agent-drift-detector') {
+    if (!keys(result, ['agentName', 'driftDetected', 'missingFields', 'extraFields', 'recommendations']) ||
+        typeof result.agentName !== 'string' || !result.agentName.trim() || typeof result.driftDetected !== 'boolean' ||
+        !strings(result.missingFields) || !strings(result.extraFields) || !strings(result.recommendations) ||
+        result.driftDetected !== Boolean(result.missingFields.length || result.extraFields.length)) return null;
+    return result.driftDetected ? 'findings' : 'pass';
+  }
+  if (skillId === 'retro-schema-validator') {
+    if (!keys(result, ['status', 'verdict', 'filesValidated', 'violations', 'timestamp']) ||
+        !integer(result.filesValidated) || result.filesValidated < 1 || result.filesValidated > 32 ||
+        !timestamp(result.timestamp) || !Array.isArray(result.violations)) return null;
+    for (const violation of result.violations) {
+      if (!keys(violation, ['file', 'field', 'level', 'message']) || !['error', 'warning'].includes(violation.level) ||
+          ![violation.file, violation.field, violation.message].every(value => typeof value === 'string')) return null;
+    }
+    const verdict = result.violations.some(violation => violation.level === 'error') ? 'RED' : result.violations.length ? 'YELLOW' : 'GREEN';
+    if (result.verdict !== verdict || result.status !== (verdict === 'RED' ? 'error' : 'success')) return null;
+    return verdict === 'GREEN' ? 'pass' : 'findings';
+  }
+  if (!keys(result, ['status', 'message'], ['code', 'data']) || !['success', 'error'].includes(result.status) ||
+      typeof result.message !== 'string' || (Object.hasOwn(result, 'code') && typeof result.code !== 'string') || result.code === 'SKILL_ERROR') return null;
+  if (!Object.hasOwn(result, 'data')) return result.status === 'error' && result.code ? 'findings' : null;
+  const data = result.data;
+  if (!keys(data, ['isValid', 'findings', 'syncMarkersPresent', 'contentLength', 'validated']) ||
+      typeof data.isValid !== 'boolean' || typeof data.syncMarkersPresent !== 'boolean' || !integer(data.contentLength) ||
+      !timestamp(data.validated) || !Array.isArray(data.findings)) return null;
+  for (const finding of data.findings) {
+    if (!keys(finding, ['level', 'code', 'message'], ['line']) || !['error', 'warning', 'info'].includes(finding.level) ||
+        typeof finding.code !== 'string' || typeof finding.message !== 'string' ||
+        (Object.hasOwn(finding, 'line') && (!integer(finding.line) || finding.line < 1))) return null;
+  }
+  if (data.isValid === data.findings.some(finding => finding.level === 'error') || result.status !== (data.isValid ? 'success' : 'error')) return null;
+  return result.status === 'error' || data.findings.some(finding => finding.level !== 'info') ? 'findings' : 'pass';
+}
 function invalid(field, message) { throw Object.assign(new Error(`${field}: ${message}`), { field }); }
 function pathInput(value, field, extension) {
   if (typeof value !== 'string' || !value.trim()) invalid(field, 'Enter an absolute file path.');
@@ -187,7 +230,7 @@ export function mountToolforgeInvocation({ inventory, rootElement, copyCommand, 
   }
   function validate(report = false) {
     let valid = false;
-    for (const node of Object.values(inputs)) node.removeAttribute('aria-invalid');
+    for (const node of [...Object.values(inputs), ...pathRows.map(row => row.input)]) node.removeAttribute('aria-invalid');
     try { readInput(); valid = true; }
     catch (error) {
       if (report) {
@@ -253,15 +296,20 @@ export function mountToolforgeInvocation({ inventory, rootElement, copyCommand, 
       });
       const envelope = await response.json();
       if (current !== token || !dialog.open) return;
+      if (!keys(envelope, ['contractVersion', 'skillId', 'state', 'outcome', 'result', 'error', 'durationMs']) ||
+          !Number.isFinite(envelope.durationMs) || envelope.durationMs < 0) throw new Error('Invalid invocation response.');
       const states = ['completed', 'rejected', 'unavailable', 'failed', 'timed_out', 'cancelled'];
       const preparseStatus = { FORBIDDEN: 403, METHOD_NOT_ALLOWED: 405, UNSUPPORTED_CONTENT_TYPE: 400, PAYLOAD_TOO_LARGE: 413, INVALID_JSON: 400, INVALID_INPUT: 400, INVALID_TARGET: 400, WORKER_FAILED: 500 };
-      const failure = envelope.outcome === null && envelope.result === null && object(envelope.error) && typeof envelope.error.code === 'string' && typeof envelope.error.message === 'string';
+      const failure = envelope.outcome === null && envelope.result === null && keys(envelope.error, ['code', 'message'], ['fieldErrors']) &&
+        typeof envelope.error.code === 'string' && typeof envelope.error.message === 'string' &&
+        (!Object.hasOwn(envelope.error, 'fieldErrors') || (object(envelope.error.fieldErrors) && Object.values(envelope.error.fieldErrors).every(value => typeof value === 'string')));
       const preparse = envelope.skillId === null && failure && !response.ok &&
         response.status === preparseStatus[envelope.error.code] &&
         envelope.state === (envelope.error.code === 'WORKER_FAILED' ? 'failed' : 'rejected');
       if (envelope.contractVersion !== 1 || (envelope.skillId !== selected.id && !preparse) || !states.includes(envelope.state) ||
           (envelope.state !== 'completed' && !failure)) throw new Error('Invalid invocation response.');
-      const completed = response.ok && envelope.state === 'completed' && ['pass', 'findings'].includes(envelope.outcome) && envelope.error === null;
+      const completed = response.ok && envelope.state === 'completed' && ['pass', 'findings'].includes(envelope.outcome) &&
+        envelope.error === null && resultOutcome(selected.id, envelope.result) === envelope.outcome;
       if (envelope.state === 'completed' && !completed) throw new Error('Invalid completion response.');
       const names = { completed: `Completed / ${envelope.outcome === 'pass' ? 'Pass' : 'Findings'}`, rejected: 'Rejected', unavailable: 'Unavailable', failed: 'Failed', timed_out: 'Timed Out', cancelled: 'Cancelled' };
       status.textContent = names[envelope.state];
