@@ -72,8 +72,8 @@ export function readToolforgeInventory(manifestPath, root, inputInvocations = {}
 
 export const TOOLFORGE_PILOTS = Object.freeze(['roadmap-validator', 'agent-drift-detector', 'retro-schema-validator']);
 const REVIEWED_PATH = 'skills/toolforge-cli/src/invocation-reviewed.json';
-// Review anchor from Toolforge 903c4436; never learn trusted hashes from installed code.
-const REVIEWED_SHA256 = 'e93d685b466750a29471df2991491dc841585987d819cc92b3a292c8be83eb51';
+// Reviewed spawn-boundary annotation update, 2026-10-10; never learn trusted hashes from installed code.
+const REVIEWED_SHA256 = '5a0873f6cf6b8f157490318ab9873810dcba09f2be267ad964372d3140ad639a';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
 function verifyManagedBootstrap(context) {
