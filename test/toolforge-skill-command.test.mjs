@@ -4,12 +4,111 @@ import { readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 import {
   skillCommandText,
   skillEntrypointPath,
   skillRunner
 } from '../src/toolforge-skill-command.mjs';
 import { buildToolforgeSkillRunner, findToolforgeSkill } from '../src/server.mjs';
+
+test('browser pure formatter exactly matches managed formatter for every pilot', async () => {
+  const { formatInvocationCommand } = await import('../dashboard/toolforge-invocation.mjs');
+  const managed = await import('file:///C:/dev/dev-sandbox/toolforge-read-only-pilot/skills/toolforge-cli/src/invoke-skill.mjs');
+  const context = { nodeExecutable: "C:\\Node's\\node.exe", scriptPath: 'C:\\forge\\invoke-skill.mjs', workspaceRoots: ['C:\\work', "C:\\other's"] };
+  const inputs = {
+    'roadmap-validator': { roadmapPath: "C:\\work\\road's.md", strict: false, verbose: true },
+    'agent-drift-detector': { agentName: 'agent \u00e9', expectedSchema: { "a'$`<html>": '"\\' }, actualSchema: {} },
+    'retro-schema-validator': { filePaths: ['C:\\work\\b.json', 'C:\\work\\a.json'] }
+  };
+  for (const [id, input] of Object.entries(inputs)) {
+    assert.equal(formatInvocationCommand(id, input, context), managed.formatInvocationCommand(id, input, context));
+  }
+});
+
+test('copied browser command executes managed CLI with UTF-8 data and restores encoding', async () => {
+  const { formatInvocationCommand } = await import('../dashboard/toolforge-invocation.mjs');
+  const context = {
+    nodeExecutable: process.execPath,
+    scriptPath: 'C:/dev/dev-sandbox/toolforge-read-only-pilot/skills/toolforge-cli/src/invoke-skill.mjs',
+    workspaceRoots: ['C:/dev/dev-sandbox/icf-read-only-pilot']
+  };
+  const agentName = ' agent \u00e9 \' "$ ` <html> ';
+  for (const [input, expectedState, expectedOutcome, exitCode] of [
+    [{ agentName, expectedSchema: { '\u00e9\'`$<html>': null }, actualSchema: { '\u00e9\'`$<html>': 'value' } }, 'completed', 'pass', 0],
+    [{ agentName, expectedSchema: { missing: null }, actualSchema: {} }, 'completed', 'findings', 1],
+    [{ agentName, expectedSchema: [], actualSchema: {} }, 'rejected', null, 2]
+  ]) {
+    const command = formatInvocationCommand('agent-drift-detector', input, context);
+    const script = `$initialEncoding = [System.Text.UnicodeEncoding]::new($false,$true)\n$OutputEncoding = $initialEncoding\n${command}\n@{ restored = [object]::ReferenceEquals($initialEncoding,$OutputEncoding); exitCode = $LASTEXITCODE } | ConvertTo-Json -Compress`;
+    const run = spawnSync('pwsh', ['-NoProfile', '-Command', script], { encoding: 'utf8', timeout: 15000 });
+    assert.equal(run.error, undefined);
+    assert.equal(run.status, 0, run.stderr);
+    const [envelope, check] = run.stdout.trim().split(/\r?\n/).map(line => JSON.parse(line));
+    assert.equal(envelope.state, expectedState);
+    assert.equal(envelope.outcome, expectedOutcome);
+    if (expectedState === 'completed') assert.equal(envelope.result.agentName, agentName.trim());
+    assert.deepEqual(check, { restored: true, exitCode });
+  }
+});
+
+test('both legacy clipboard adapters return explicit success or failure while retaining toasts', async () => {
+  for (const file of ['index.html', 'preview-enhanced.html']) {
+    const html = await readFile(new URL(`../dashboard/${file}`, import.meta.url), 'utf8');
+    const source = html.match(/function copyCommand\(cmd\) \{[\s\S]*?\n  \}/)[0];
+    for (const [navigator, expected] of [[{ clipboard: { writeText: async () => {} } }, true], [{}, false], [{ clipboard: { writeText: async () => { throw new Error('denied'); } } }, false]]) {
+      const messages = [];
+      const actual = await vm.runInNewContext(`${source}; copyCommand('test')`, { navigator, showToast: message => messages.push(message) });
+      assert.equal(actual, expected);
+      assert.deepEqual(messages, [expected ? 'Copied: test' : 'Could not copy']);
+    }
+  }
+});
+
+test('Wikilink and Standup copy handle success, missing, synchronous, and rejected clipboard APIs', async () => {
+  for (const file of ['index.html', 'preview-enhanced.html']) {
+    const html = await readFile(new URL(`../dashboard/${file}`, import.meta.url), 'utf8');
+    for (const family of ['copyWikilink', 'copyStandup']) {
+      const source = html.match(new RegExp(`function ${family}\\([^)]*\\) \\{[\\s\\S]*?\\n  \\}`))[0];
+      for (const [navigator, expected] of [
+        [{ clipboard: { writeText: async () => {} } }, true],
+        [{}, false],
+        [{ clipboard: { writeText() { throw new Error('denied'); } } }, false],
+        [{ clipboard: { writeText: async () => { throw new Error('denied'); } } }, false]
+      ]) {
+        const messages = [];
+        const result = await vm.runInNewContext(`${source}; ${family}('[[topics/test]]')`, { navigator, reportStandupText: 'Standup text', showToast: message => messages.push(message) });
+        assert.equal(result, expected, `${file} ${family}`);
+        assert.deepEqual(messages, [expected ? family === 'copyWikilink' ? 'Copied wikilink: [[topics/test]]' : 'Standup copied' : 'Could not copy']);
+      }
+      if (family === 'copyStandup') {
+        const messages = [];
+        const result = vm.runInNewContext(`${source}; copyStandup()`, { navigator: {}, reportStandupText: '', showToast: message => messages.push(message) });
+        assert.equal(result, undefined);
+        assert.deepEqual(messages, ['No standup for this day']);
+      }
+    }
+    assert.ok(html.includes('data-copy-wikilink="${escapeHtml(`[[topics/${t.name}]]`)}"'));
+    assert.ok(html.includes('onclick="copyWikilink(this.dataset.copyWikilink)"'));
+    assert.ok(!html.includes("onclick=\"copyWikilink('[[topics/${t.name}]]')\""));
+  }
+});
+
+test('dashboard scripts parse and dynamic Wikilinks keep hostile topic text as data', async () => {
+  for (const file of ['index.html', 'preview-enhanced.html']) {
+    const html = await readFile(new URL(`../dashboard/${file}`, import.meta.url), 'utf8');
+    for (const [, attributes, source] of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
+      if (!attributes.includes('type="module"')) assert.doesNotThrow(() => new vm.Script(source), file);
+    }
+    const helper = html.match(/function escapeHtml\(str\) \{[\s\S]*?\n  \}/)[0];
+    const renderer = html.match(/topicsContainer\.innerHTML = trm\.topics\.map\(t => `[\s\S]*?`\)\.join\(''\);/)[0];
+    const topicsContainer = {};
+    vm.runInNewContext(`${helper}; ${renderer}`, { topicsContainer, trm: { topics: [{ name: '\'"<script>$`&', modified: '" onclick="bad' }] } });
+    assert.ok(topicsContainer.innerHTML.includes('data-copy-wikilink="[[topics/\'&quot;&lt;script&gt;$`&amp;]]"'));
+    assert.ok(!topicsContainer.innerHTML.includes('<script>'));
+    assert.ok(!topicsContainer.innerHTML.includes('title="Modified: " onclick="bad'));
+  }
+});
 
 test('skill command text covers Toolforge runtime families', () => {
   const root = 'C:\\dev';

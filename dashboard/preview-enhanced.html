@@ -491,6 +491,7 @@
 
     /* Toast */
     .toast {
+      pointer-events: none;
       position: fixed;
       right: 1.25rem;
       bottom: 1.25rem;
@@ -2884,14 +2885,14 @@ flowchart TD
     const command = String(cmd || '').trim();
     const payload = command;
     return Promise.resolve().then(() => navigator.clipboard.writeText(payload))
-      .then(() => showToast('Copied: ' + payload))
-      .catch(() => showToast('Could not copy'));
+      .then(() => { showToast('Copied: ' + payload); return true; })
+      .catch(() => { showToast('Could not copy'); return false; });
   }
 
   function copyWikilink(link) {
-    navigator.clipboard.writeText(link)
-      .then(() => showToast('Copied wikilink: ' + link))
-      .catch(() => showToast('Could not copy'));
+    return Promise.resolve().then(() => navigator.clipboard.writeText(link))
+      .then(() => { showToast('Copied wikilink: ' + link); return true; })
+      .catch(() => { showToast('Could not copy'); return false; });
   }
 
   function switchTab(tabId) {
@@ -3156,7 +3157,7 @@ flowchart TD
     const topicsContainer = document.getElementById('trmTopicsContainer');
     if (topicsContainer && trm.topics) {
       topicsContainer.innerHTML = trm.topics.map(t => `
-        <span class="tag-pill" style="cursor: pointer;" title="Modified: ${t.modified || 'Unknown'}" onclick="copyWikilink('[[topics/${t.name}]]')">[[topics/${t.name}]]</span>
+        <button type="button" class="tag-pill" style="cursor: pointer;" title="Modified: ${escapeHtml(t.modified || 'Unknown')}" data-copy-wikilink="${escapeHtml(`[[topics/${t.name}]]`)}" onclick="copyWikilink(this.dataset.copyWikilink)">[[topics/${escapeHtml(t.name)}]]</button>
       `).join('');
     }
 
@@ -3503,6 +3504,7 @@ flowchart TD
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span class="status-badge ${s.runnable ? 'live' : 'soon'}" title="${escapeHtml(s.reason || '')}" style="font-size: 0.55rem; padding: 0.2rem 0.6rem;">${escapeHtml((s.availability || 'unavailable').toUpperCase())}</span>
+              ${s.inputInvocation?.available ? `<button type="button" class="btn-secondary" data-toolforge-configure="${escapeHtml(id)}">Configure</button>` : ''}
               <button type="button" class="btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.65rem;" ${command ? '' : 'disabled'} title="${s.runnable ? 'Copy CLI Command' : 'Copy Instructions Command'}" data-target="${escapeHtml(id)}" data-copy-command="${escapeHtml(command)}" onclick="copyCommand(this.dataset.copyCommand)">Copy ${s.runnable ? 'CLI' : 'Instructions'}</button>
             </div>
           </div>
@@ -3888,9 +3890,9 @@ flowchart TD
 
   function copyStandup() {
     if (!reportStandupText) { showToast('No standup for this day'); return; }
-    navigator.clipboard.writeText(reportStandupText)
-      .then(() => showToast('Standup copied'))
-      .catch(() => showToast('Could not copy'));
+    return Promise.resolve().then(() => navigator.clipboard.writeText(reportStandupText))
+      .then(() => { showToast('Standup copied'); return true; })
+      .catch(() => { showToast('Could not copy'); return false; });
   }
 
   async function loadReportWeek() {
@@ -4377,5 +4379,13 @@ flowchart TD
   setInterval(loadStorageAnalytics, 30000);
 </script>
 
+<script type="module">
+  import { mountToolforgeInvocation } from '/dashboard/toolforge-invocation.mjs';
+  const invocation = mountToolforgeInvocation({ inventory: () => allSkills, rootElement: document.body, copyCommand });
+  document.getElementById('skillsGridContainer').addEventListener('click', event => {
+    const trigger = event.target.closest('[data-toolforge-configure]');
+    if (trigger) invocation.open(trigger.dataset.toolforgeConfigure, trigger);
+  });
+</script>
 </body>
 </html>
