@@ -4,6 +4,8 @@ import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import { inspectToolforgeSkill, readToolforgeInventory } from '../src/toolforge-inventory.mjs';
 import { buildToolforgeSkillRunner, createGatewayServer } from '../src/server.mjs';
 
@@ -19,6 +21,48 @@ async function fixture(t) {
   await writeFile(manifest, JSON.stringify({ skills: [skill] }));
   return { root, dir, skill, manifest };
 }
+
+test('legacy run-skill dispatch uses the same configured owner and manifest as inventory', async t => {
+  const f = await fixture(t);
+  const selectedManifest = join(f.root, 'selected-manifest.json');
+  await writeFile(selectedManifest, JSON.stringify({ skills: [f.skill] }));
+  await writeFile(f.manifest, JSON.stringify({ skills: [] }));
+  const calls = [];
+  const spawn = t.mock.method(childProcess, 'spawn', (...args) => {
+    calls.push(args);
+    return { pid: 12345, unref() {} };
+  });
+  syncBuiltinESMExports();
+  t.after(() => { spawn.mock.restore(); syncBuiltinESMExports(); });
+  for (const manifestPath of [selectedManifest, undefined]) {
+    if (!manifestPath) await writeFile(f.manifest, JSON.stringify({ skills: [f.skill] }));
+    const server = createGatewayServer({ toolforgeRoot: f.root, toolforgeManifestPath: manifestPath,
+      historyAdapter: {}, disableWatcher: true });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const url = `http://127.0.0.1:${server.address().port}`;
+      const inventory = await (await fetch(`${url}/api/toolforge/skills`)).json();
+      assert.equal(inventory.skills[0].runnable, true);
+      for (const target of [f.skill.id, f.skill.name]) {
+        const response = await fetch(`${url}/api/actions/run`, { method: 'POST',
+          body: JSON.stringify({ action: 'run-skill', target }) });
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), { ok: true, action: 'run-skill', target, pid: 12345, status: 'DISPATCHED' });
+        assert.deepEqual(calls.at(-1), ['node', [join(f.dir, 'src/index.mjs')],
+          { cwd: f.root, detached: true, stdio: 'ignore' }]);
+      }
+      const callCount = calls.length;
+      for (const content of ['{broken', JSON.stringify({ skills: [] })]) {
+        await writeFile(manifestPath || f.manifest, content);
+        const response = await fetch(`${url}/api/actions/run`, { method: 'POST',
+          body: JSON.stringify({ action: 'run-skill', target: f.skill.id }) });
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { ok: false, error: 'Invalid action or target: run-skill/demo' });
+        assert.equal(calls.length, callCount);
+      }
+    } finally { await new Promise(resolve => server.close(resolve)); }
+  }
+});
 
 test('checked inventory and dispatcher agree; real CLI runner executes fixture', async t => {
   const f = await fixture(t);

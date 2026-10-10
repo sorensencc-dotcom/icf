@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, mkdtemp } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import vm from 'node:vm';
@@ -8,9 +8,74 @@ import { spawnSync } from 'node:child_process';
 import {
   skillCommandText,
   skillEntrypointPath,
-  skillRunner
+  skillRunner,
+  quotePowerShell
 } from '../src/toolforge-skill-command.mjs';
 import { buildToolforgeSkillRunner, findToolforgeSkill } from '../src/server.mjs';
+
+test('four wiki clipboard families carry quoted owner cwd on both surfaces', async t => {
+  const root = await mkdtemp(join(tmpdir(), "icf-wiki owner's-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const unrelated = join(root, 'unrelated shell');
+  const owner = join(root, 'wiki owner');
+  await mkdir(unrelated);
+  await mkdir(owner);
+  const commands = [
+    "node 'modules/wiki/validate-staging-docs.mjs' '--json=./.validation-report.json' '.'",
+    "node 'modules/wiki/autoheal-sweeper.mjs' '--fix' '--allow-dirty' '--target-dir' 'wiki'",
+    "node 'scripts/fix-wiki-frontmatter.mjs' 'wiki' '--allow-dirty'",
+    "node 'modules/wiki/validate-staging-docs.mjs' '--fix' '--json=./.validation-report.json' 'wiki'"
+  ];
+  for (const file of ['index.html', 'preview-enhanced.html']) {
+    const html = await readFile(new URL(`../dashboard/${file}`, import.meta.url), 'utf8');
+    const source = html.match(/function copyCommand\(cmd\) \{[\s\S]*?\n  \}/)[0];
+    const payloads = [...html.matchAll(/data-copy-command="([^"]*)"/g)].map(([, text]) => text.replace(/&amp;/g, '&'));
+    for (const command of commands) {
+      const expected = `& { Push-Location -LiteralPath 'C:\\dev\\kb-sync' -ErrorAction Stop; try { ${command} } finally { Pop-Location } }`;
+      assert.ok(payloads.includes(expected), `${file}: ${command}`);
+      const clipboard = [];
+      assert.equal(await vm.runInNewContext(`${source}; copyCommand(payload)`, {
+        payload: expected, navigator: { clipboard: { writeText: async value => clipboard.push(value) } }, showToast() {},
+        location: { pathname: 'C:/unrelated directory' }
+      }), true);
+      assert.deepEqual(clipboard, [expected]);
+      // Replace only owner location and intercept node; never execute a wiki script.
+      const copied = clipboard[0].replace(quotePowerShell('C:\\dev\\kb-sync'), quotePowerShell(owner));
+      const missing = copied.replace(quotePowerShell(owner), quotePowerShell(join(root, 'missing owner')));
+      const script = `
+        $observed = [System.Collections.Generic.List[object]]::new()
+        function node { $observed.Add(@{ cwd = (Get-Location).Path; argv = @($args) }); if ($failNode) { throw 'synthetic failure' } }
+        ${copied}
+        $afterSuccess = (Get-Location).Path
+        $failNode = $true
+        try { ${copied} } catch {}
+        $afterFailure = (Get-Location).Path
+        try { ${missing} } catch {}
+        @{ calls = @($observed.ToArray()); afterSuccess = $afterSuccess; afterFailure = $afterFailure; afterMissing = (Get-Location).Path } | ConvertTo-Json -Depth 5 -Compress
+      `;
+      const run = spawnSync('pwsh', ['-NoProfile', '-Command', script], { cwd: unrelated, encoding: 'utf8', timeout: 15000 });
+      assert.equal(run.error, undefined);
+      assert.equal(run.status, 0, run.stderr);
+      const result = JSON.parse(run.stdout.trim());
+      assert.equal(result.calls.length, 2, 'missing owner must not invoke node');
+      for (const call of result.calls) {
+        assert.equal(call.cwd, owner);
+        assert.deepEqual(call.argv, [...command.matchAll(/'([^']*)'/g)].map(([, value]) => value));
+      }
+      for (const key of ['afterSuccess', 'afterFailure', 'afterMissing']) assert.equal(result[key], unrelated);
+    }
+  }
+});
+
+test('inventory labels describe non-CLI capabilities without a stale registration count', async () => {
+  for (const file of ['index.html', 'preview-enhanced.html']) {
+    const html = await readFile(new URL(`../dashboard/${file}`, import.meta.url), 'utf8');
+    assert.ok(html.includes('<div class="stat-label">Non-CLI Skills</div>'), file);
+    assert.ok(!html.includes('Instructions Only'), file);
+    assert.ok(!html.includes('43 Registered'), file);
+    if (file === 'preview-enhanced.html') assert.ok(html.includes('id="tabSkillsBadge">Inventory</span>'));
+  }
+});
 
 test('browser pure formatter exactly matches managed formatter for every pilot', async () => {
   const { formatInvocationCommand } = await import('../dashboard/toolforge-invocation.mjs');

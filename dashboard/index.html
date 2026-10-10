@@ -1118,6 +1118,7 @@
     <div style="display: flex; gap: 0.8rem; justify-content: center; margin: 1.5rem 0 0.75rem; flex-wrap: wrap;">
       <button type="button" class="btn-secondary" onclick="loadValidationReport()">Reload report JSON</button>
       <button type="button" class="btn-secondary" onclick="executeAction('validate-wiki', 'all', this)">Re-run validator ▶</button>
+      <button type="button" class="btn-secondary" title="Copy validator command" aria-label="Copy validator command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/validate-staging-docs.mjs' '--json=./.validation-report.json' '.' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
       <button type="button" class="btn-secondary" onclick="exportReportJson()">Export Report JSON</button>
       <button type="button" class="btn-secondary" onclick="clearCache()" style="border-color: rgba(196,80,26,0.55);">Clear Cache</button>
     </div>
@@ -1139,6 +1140,7 @@
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Forward-looking double-bracket links pointing to conceptual topics and entities not yet created on disk. This represents active knowledge graph growth in the Karpathy LLM-wiki workflow.</div>
         <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'stubs', this)">Scaffold Concept Stubs ▶</button>
+        <button type="button" class="btn-secondary" title="Copy scaffold command" aria-label="Copy scaffold command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/autoheal-sweeper.mjs' '--fix' '--allow-dirty' '--target-dir' 'wiki' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
       </div>
 
       <div class="breakdown-card" style="border-left: 4px solid var(--brass);">
@@ -1148,6 +1150,7 @@
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Missing top-level # Title headings, heading level jumps (e.g. H1 to H3), or missing frontmatter properties that affect automated indexers and AST parsing.</div>
         <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'frontmatter', this)">Standardize Headers ▶</button>
+        <button type="button" class="btn-secondary" title="Copy header command" aria-label="Copy header command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'scripts/fix-wiki-frontmatter.mjs' 'wiki' '--allow-dirty' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
       </div>
 
       <div class="breakdown-card" style="border-left: 4px solid var(--ash);">
@@ -1157,6 +1160,7 @@
         </div>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--ash);">Consecutive blank lines and trailing whitespace at the ends of lines. Completely safe to auto-format without semantic risk.</div>
         <button type="button" class="btn-secondary" onclick="executeAction('autoheal-wiki', 'hygiene', this)">Run Auto-Fixer ▶</button>
+        <button type="button" class="btn-secondary" title="Copy auto-fixer command" aria-label="Copy auto-fixer command" data-copy-command="&amp; { Push-Location -LiteralPath 'C:\dev\kb-sync' -ErrorAction Stop; try { node 'modules/wiki/validate-staging-docs.mjs' '--fix' '--json=./.validation-report.json' 'wiki' } finally { Pop-Location } }" onclick="copyCommand(this.dataset.copyCommand)">📋</button>
       </div>
     </div>
 
@@ -2886,7 +2890,7 @@ flowchart TD
       <div>
         <div class="stat-block">
           <div class="stat-number" id="skHealthScore" style="color: #5eead4;">0</div>
-          <div class="stat-label">Instructions Only</div>
+          <div class="stat-label">Non-CLI Skills</div>
         </div>
         <div class="stat-sub">Inputs or runtime required</div>
       </div>

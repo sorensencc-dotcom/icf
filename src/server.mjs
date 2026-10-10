@@ -454,7 +454,7 @@ export function createGatewayServer(options = {}) {
           return ['powershell.exe', ['-NoProfile', '-Command', `Start-ScheduledTask -TaskName '${taskName}'`]];
         },
         'run-skill': (skillName) => {
-          return buildToolforgeSkillRunner(skillName);
+          return buildToolforgeSkillRunner(skillName, toolforgeManifestPath, toolforgeRoot);
         },
         'validate-wiki': () => ['node', [resolve(ROOT, '../modules/wiki/validate-staging-docs.mjs')]],
         'autoheal-wiki': (subtype) => {
@@ -490,7 +490,7 @@ export function createGatewayServer(options = {}) {
       const [cmd, cmdArgs] = runner;
       try {
         const proc = spawn(cmd, cmdArgs, {
-          cwd: resolve(ROOT, '..'),
+          cwd: action === 'run-skill' ? toolforgeRoot : resolve(ROOT, '..'),
           detached: true,
           stdio: 'ignore'
         });
