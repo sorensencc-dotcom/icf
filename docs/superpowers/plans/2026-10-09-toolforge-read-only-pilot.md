@@ -4,7 +4,7 @@
 
 **Goal:** Execute three read-only skills with explicit inputs, honest results, and equivalent clipboard commands on both ICF dashboards.
 
-**Architecture:** Toolforge owns reviewed contracts, native-handler adapters, a bounded Node worker, and JSON-stdin CLI. ICF consumes this API through a separate route and optional inventory capability; legacy dispatch stays unchanged. Enable descriptors only after real-worker acceptance passes.
+**Architecture:** Toolforge owns reviewed contracts, native-handler adapters, a bounded Node worker, and JSON-stdin CLI. ICF consumes this API through a separate route and optional inventory capability; legacy responses stay unchanged. Final approved owner/cwd correction is recorded below. Enable descriptors only after real-worker acceptance passes.
 
 **Tech Stack:** Windows, Node 24, native TypeScript stripping, standard Node APIs, node:test, PowerShell 7, existing HTML/CSS/JavaScript, BrowserOS Neo. No new dependencies.
 
@@ -185,3 +185,7 @@ Approved ruling supersedes legacy-unchanged boundary only for configured-owner d
 QA URL: http://127.0.0.1:8082/modules/wiki/dashboard.html#category-governance. Configured workspace roots cover synthetic chat fixtures only. Pilot runtime remains in isolated worktrees; canonical 8080 not restarted; unrelated dirty work preserved. No push, merge, remote CI, or production activation.
 
 Delivery evidence: chat outputs/toolforge-pilot-qa.md; task/final review artifacts retained. Preview desktop screenshot predates final label-only correction; mobile screenshot reflects final dialog behavior. Product acceptance is based on final live checks, not old labels.
+
+## Remote Delivery Authorization - 2026-10-10
+
+Human requested push/PR and current local/remote docs after acceptance. Earlier no-push statements describe pre-authorization history, not current prohibition. No merge or production activation authorized. Scoped PR bases: ICF fix/dashboard-docs-button-8001; Toolforge parkd821-20260908. Repository [acceptance evidence](../acceptance/2026-10-10-toolforge-read-only-pilot.md) records findings, checks, and limits; operator contract remains in Toolforge skills/toolforge-cli/docs/USAGE.md.

@@ -178,3 +178,11 @@ Implement in verified isolated checkouts preserving current scoped command-audit
 Enable only tested descriptors. Rollback removes inputInvocation capability and restores instructions behavior. Do not restart unknown existing server owners; use separate loopback port and report stale live backends explicitly.
 
 This is a written-spec review artifact, not an implementation plan or execution approval. After user approves this written spec, invoke writing-plans to produce a concrete plan. User then reviews plan and selects execution method before implementation, per explicitly invoked brainstorming workflow.
+
+## Implementation and Delivery Status - 2026-10-10
+
+Human-approved plan executed for all three fixed pilots. Native contracts, bounded workers, JSON CLI, HTTP route, shared forms, and clipboard parity passed acceptance. See [completed plan](../plans/2026-10-09-toolforge-read-only-pilot.md) and [acceptance evidence](../acceptance/2026-10-10-toolforge-read-only-pilot.md).
+
+Approved implementation ruling narrows legacy-unchanged scope: configured Toolforge owner now controls run-skill script/cwd; four wiki command families restore caller location under kb-sync owner, with matching main copy-only controls. Legacy response shapes and other action families remain unchanged. Clipboard error/focus/label fixes do not expand runtime capabilities.
+
+Human explicitly authorized push and PR creation on 2026-10-10. This authorizes remote branch/document delivery only, not merge, production activation, or canonical server restart. ICF PR targets existing fix/dashboard-docs-button-8001 baseline; matching Toolforge PR targets parkd821-20260908 to exclude unrelated history.
