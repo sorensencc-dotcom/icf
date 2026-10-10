@@ -88,3 +88,34 @@ test('inventory HTTP endpoint exposes canonical checked inventory and fails expl
   assert.equal(res.status, 503);
   assert.deepEqual(await res.json(), { skills: [], error: 'Toolforge inventory unavailable' });
 });
+
+test('only three pilots receive unavailable capability without changing standalone command', async t => {
+  const f = await fixture(t);
+  const pilots = ['roadmap-validator', 'agent-drift-detector', 'retro-schema-validator'];
+  for (const id of pilots) {
+    const dir = join(f.root, 'skills', id);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'SKILL.md'), '# Pilot instructions');
+  }
+  await writeFile(f.manifest, JSON.stringify({ skills: [f.skill, ...pilots.map(id => ({ id }))] }));
+  const standalone = readToolforgeInventory(f.manifest, f.root);
+  const server = createGatewayServer({ toolforgeRoot: f.root, historyAdapter: {},
+    toolforgeWorkspaceRoots: [f.root], toolforgeNodeExecutable: process.execPath });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/toolforge/skills`);
+  assert.equal(res.status, 200, 'configured root supplies its own manifest');
+  const inventory = await res.json();
+  for (let i = 0; i < inventory.skills.length; i++) {
+    const { inputInvocation, ...legacy } = inventory.skills[i];
+    assert.deepEqual(legacy, standalone.skills[i]);
+    if (!pilots.includes(legacy.id)) { assert.equal(inputInvocation, undefined); continue; }
+    assert.equal(inputInvocation.contractVersion, 1);
+    assert.deepEqual(inputInvocation.fields, []);
+    assert.equal(inputInvocation.available, false);
+    assert.equal(inputInvocation.reason, 'RUNTIME_UNAVAILABLE');
+    assert.deepEqual(inputInvocation.commandContext, { nodeExecutable: process.execPath,
+      scriptPath: join(f.root, 'skills/toolforge-cli/src/invoke-skill.mjs'), workspaceRoots: [f.root] });
+    assert.ok(legacy.command.startsWith('code '));
+  }
+});

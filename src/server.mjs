@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readToolforgeInventory } from './toolforge-inventory.mjs';
+import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -162,7 +162,39 @@ const MIME_TYPES = {
   '.md': 'text/markdown; charset=UTF-8'
 };
 
+function readToolforgeBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let bytes = 0;
+    const cleanup = () => {
+      req.removeListener('data', data);
+      req.removeListener('end', end);
+      req.removeListener('error', error);
+      req.removeListener('aborted', aborted);
+    };
+    const fail = code => { cleanup(); reject(Object.assign(new Error('body'), { code })); };
+    const data = chunk => {
+      bytes += chunk.length;
+      if (bytes > 65536) { fail('PAYLOAD_TOO_LARGE'); req.resume(); return; }
+      chunks.push(chunk);
+    };
+    const end = () => { cleanup(); resolve(Buffer.concat(chunks)); };
+    const error = () => fail('HTTP_STREAM_FAILED');
+    const aborted = () => fail('CANCELLED');
+    req.on('data', data);
+    req.on('end', end);
+    req.on('error', error);
+    req.on('aborted', aborted);
+  });
+}
+
 export function createGatewayServer(options = {}) {
+  const toolforgeRoot = resolve(options.toolforgeRoot || TOOLFORGE_ROOT);
+  const toolforgeManifestPath = options.toolforgeManifestPath || join(toolforgeRoot, 'manifest.json');
+  const toolforgeInvocation = createToolforgeInvocationConsumer({ toolforgeRoot, manifestPath: toolforgeManifestPath,
+    nodeExecutable: options.toolforgeNodeExecutable ?? process.execPath,
+    workspaceRoots: options.toolforgeWorkspaceRoots ?? [ROOT] }, options.toolforgeInvocationTestApi);
+  const toolforgeDashboardOrigin = options.toolforgeDashboardOrigin ?? `http://127.0.0.1:${PORT}`;
   const reportingHistory = options.historyAdapter
     ? { store: options.snapshotStore || null, historyAdapter: options.historyAdapter }
     : createReportingHistory(options);
@@ -249,14 +281,65 @@ export function createGatewayServer(options = {}) {
       return;
     }
 
-    const reqUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+    const reqUrl = new URL(req.url, req.url?.startsWith('/api/toolforge/invoke') ? 'http://127.0.0.1' : `http://${req.headers.host || '127.0.0.1'}`);
     const pathname = reqUrl.pathname;
+
+    if (pathname === '/api/toolforge/invoke') {
+      const controller = new AbortController();
+      const disconnected = () => { if (!res.writableEnded) controller.abort(); };
+      const incomplete = () => { if (!req.complete) controller.abort(); };
+      res.on('close', disconnected);
+      req.on('close', incomplete);
+      const send = value => {
+        if (res.destroyed || controller.signal.aborted) return;
+        const code = value.error?.code;
+        const status = value.state === 'completed' ? 200 : code === 'FORBIDDEN' ? 403 : code === 'METHOD_NOT_ALLOWED' ? 405 :
+          code === 'PAYLOAD_TOO_LARGE' ? 413 : code === 'BUSY' ? 429 : value.state === 'unavailable' ? 503 :
+          value.state === 'timed_out' ? 504 : value.state === 'rejected' ? 400 : 500;
+        res.writeHead(status, { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store',
+          ...(status === 405 ? { Allow: 'POST' } : {}) });
+        res.end(JSON.stringify(value));
+      };
+      try {
+        if (!isLoopback(req.socket.remoteAddress) || req.headers.origin !== toolforgeDashboardOrigin) {
+          send(toolforgeHttpFailure(null, 'FORBIDDEN')); return;
+        }
+        if (req.method !== 'POST') { send(toolforgeHttpFailure(null, 'METHOD_NOT_ALLOWED')); return; }
+        if (!/^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(req.headers['content-type'] || '') ||
+            (req.headers['content-encoding'] && req.headers['content-encoding'] !== 'identity')) {
+          send(toolforgeHttpFailure(null, 'UNSUPPORTED_CONTENT_TYPE')); return;
+        }
+        let body;
+        try { body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readToolforgeBody(req))); }
+        catch (cause) {
+          send(toolforgeHttpFailure(null, cause.code === 'PAYLOAD_TOO_LARGE' ? cause.code : cause.code === 'HTTP_STREAM_FAILED' ? 'WORKER_FAILED' : 'INVALID_JSON', cause.code === 'HTTP_STREAM_FAILED' ? 'failed' : 'rejected'));
+          return;
+        }
+        if (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length !== 2 ||
+            !Object.hasOwn(body, 'skillId') || !Object.hasOwn(body, 'input')) {
+          send(toolforgeHttpFailure(null, 'INVALID_INPUT')); return;
+        }
+        if (!TOOLFORGE_PILOTS.includes(body.skillId)) { send(toolforgeHttpFailure(null, 'INVALID_TARGET')); return; }
+        if (!body.input || typeof body.input !== 'object' || Array.isArray(body.input)) {
+          send(toolforgeHttpFailure(body.skillId, 'INVALID_INPUT')); return;
+        }
+        send(await toolforgeInvocation.invokeSkill(body.skillId, body.input, { signal: controller.signal }));
+      } catch {
+        send(toolforgeHttpFailure(null, 'WORKER_FAILED', 'failed'));
+      } finally {
+        res.removeListener('close', disconnected);
+        req.removeListener('close', incomplete);
+        req.resume();
+      }
+      return;
+    }
 
     if (pathname === '/api/toolforge/skills') {
       res.setHeader('Content-Type', 'application/json; charset=UTF-8');
       res.setHeader('Cache-Control', 'no-store');
       try {
-        const inventory = readToolforgeInventory(options.toolforgeManifestPath || TOOLFORGE_MANIFEST, options.toolforgeRoot || TOOLFORGE_ROOT);
+        const metadata = Object.fromEntries(await Promise.all(TOOLFORGE_PILOTS.map(async id => [id, await toolforgeInvocation.inspectInvocation(id)])));
+        const inventory = readToolforgeInventory(toolforgeManifestPath, toolforgeRoot, metadata);
         res.writeHead(200);
         res.end(JSON.stringify(inventory));
       } catch {
@@ -866,6 +949,7 @@ export function createGatewayServer(options = {}) {
   });
 
   server.on('close', () => {
+    void toolforgeInvocation.dispose().catch(() => {});
     clearInterval(heartbeatInterval);
     if (feedWatcher) {
       try { feedWatcher.close(); } catch {}
