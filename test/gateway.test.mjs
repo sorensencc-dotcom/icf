@@ -300,6 +300,22 @@ test('Action execution routes dispatch valid tasks and reject invalid inputs', a
     assert.equal(validData.ok, true);
     assert.equal(validData.status, 'DISPATCHED');
     assert.ok(typeof validData.pid === 'number');
+
+    // 5. Reject payload too large (>64KB)
+    const largeRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'validate-wiki', target: 'x'.repeat(70000) })
+    });
+    assert.equal(largeRes.status, 413);
+
+    // 6. Reject invalid JSON
+    const malformedRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{ malformed json'
+    });
+    assert.equal(malformedRes.status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
