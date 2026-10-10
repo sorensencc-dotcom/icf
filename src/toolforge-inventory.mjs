@@ -12,6 +12,7 @@ function contained(root, path) {
 export function inspectToolforgeSkill(skill, root) {
   const id = skillId(skill);
   const result = { ...skill, id, runnable: false, command: '', availability: 'unavailable' };
+  delete result.inputInvocation;
   if (!/^[a-z0-9_][a-z0-9_-]*$/i.test(id)) return { ...result, reason: 'Invalid skill identifier' };
   const directory = resolve(root, 'skills', id);
   if (!existsSync(directory) || !contained(realpathSync(resolve(root, 'skills')), realpathSync(directory))) {
@@ -65,7 +66,7 @@ export function readToolforgeInventory(manifestPath, root, inputInvocations = {}
   if (!Array.isArray(manifest.skills)) throw new TypeError('Invalid Toolforge skills manifest');
   return { ...manifest, skills: manifest.skills.map(skill => {
     const checked = inspectToolforgeSkill(skill, root);
-    return Object.hasOwn(inputInvocations, checked.id) ? { ...checked, inputInvocation: inputInvocations[checked.id] } : checked;
+    return TOOLFORGE_PILOTS.includes(checked.id) && Object.hasOwn(inputInvocations, checked.id) ? { ...checked, inputInvocation: inputInvocations[checked.id] } : checked;
   }) };
 }
 

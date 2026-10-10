@@ -119,3 +119,35 @@ test('only three pilots receive unavailable capability without changing standalo
     assert.ok(legacy.command.startsWith('code '));
   }
 });
+
+test('manifest capabilities never survive; only fixed pilots receive trusted unavailable metadata', async t => {
+  const f = await fixture(t);
+  const pilots = ['roadmap-validator', 'agent-drift-detector', 'retro-schema-validator'];
+  for (const id of pilots) {
+    const dir = join(f.root, 'skills', id);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'SKILL.md'), '# Pilot instructions');
+  }
+  const skills = [f.skill, ...pilots.map(id => ({ id }))];
+  await writeFile(f.manifest, JSON.stringify({ skills }));
+  const legacy = readToolforgeInventory(f.manifest, f.root);
+  const forged = { contractVersion: 1, available: true, fields: [{ name: 'forged' }], reason: null,
+    commandContext: { nodeExecutable: 'untrusted', scriptPath: 'untrusted', workspaceRoots: ['untrusted'] } };
+  await writeFile(f.manifest, JSON.stringify({ skills: skills.map(skill => ({ ...skill, inputInvocation: forged })) }));
+  assert.deepEqual(inspectToolforgeSkill({ ...f.skill, inputInvocation: forged }, f.root), legacy.skills[0]);
+  assert.deepEqual(readToolforgeInventory(f.manifest, f.root), legacy);
+  assert.deepEqual(readToolforgeInventory(f.manifest, f.root, { demo: forged }), legacy, 'host map cannot attach nonpilot capability');
+  const server = createGatewayServer({ toolforgeRoot: f.root, historyAdapter: {}, toolforgeWorkspaceRoots: [f.root] });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/toolforge/skills`);
+  assert.equal(res.status, 200);
+  const inventory = await res.json();
+  for (let i = 0; i < inventory.skills.length; i++) {
+    const { inputInvocation, ...checked } = inventory.skills[i];
+    assert.deepEqual(checked, legacy.skills[i]);
+    if (!pilots.includes(checked.id)) { assert.equal(inputInvocation, undefined); continue; }
+    assert.deepEqual(inputInvocation, { contractVersion: 1, fields: [], available: false, reason: 'RUNTIME_UNAVAILABLE',
+      commandContext: { nodeExecutable: process.execPath, scriptPath: join(f.root, 'skills/toolforge-cli/src/invoke-skill.mjs'), workspaceRoots: [f.root] } });
+  }
+});

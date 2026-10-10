@@ -100,6 +100,32 @@ test('route rejects method/origin/content type before JSON and preserves legacy 
   assert.deepEqual(legacy.body, { ok: false, error: 'Invalid JSON' });
 });
 
+test('pilot traversal queries keep null-field JSON envelope; legacy traversal remains plain text', async t => {
+  let invocations = 0;
+  const { port } = await gateway(t, { toolforgeInvocationTestApi: { createInvocationRunner: () => ({
+    invokeSkill: async () => { invocations++; throw new Error('must not execute'); },
+    dispose: async () => {},
+  }) } });
+  const expected = { contractVersion: 1, skillId: null, state: 'rejected', outcome: null, result: null,
+    error: { code: 'FORBIDDEN', message: 'Forbidden: loopback and configured Origin required' }, durationMs: 0 };
+  for (const query of ['unused=%2e%2e', 'unused=%2E%2E', 'unused=/..']) {
+    for (const [body, headers] of [[JSON.stringify(payload), {}], ['{broken', {}], ['{broken', { Origin: 'http://evil.test' }]]) {
+      const res = await request(port, body, { path: `/api/toolforge/invoke?${query}`, headers });
+      assert.equal(res.status, 403);
+      assert.match(res.headers['content-type'], /^application\/json/);
+      envelope(res.body, { preparse: true });
+      assert.deepEqual(res.body, expected);
+    }
+    for (const path of ['/api/actions/run', '/dashboard']) {
+      const res = await fetch(`http://127.0.0.1:${port}${path}?${query}`, { method: 'POST', body: '{broken' });
+      assert.equal(res.status, 403);
+      assert.equal(res.headers.get('content-type'), 'text/plain');
+      assert.equal(await res.text(), '403 Forbidden: Invalid file path');
+    }
+  }
+  assert.equal(invocations, 0);
+});
+
 test('strict envelopes reject target/input/extra request config', async t => {
   const { port } = await gateway(t);
   for (const value of [null, [], {}, { ...payload, workspaceRoots: [toolforgeRoot] }, { ...payload, input: null }, { ...payload, input: [] }, { ...payload, skillId: 'unknown' }, { ...payload, skillId: 1 }, { skillId: payload.skillId }]) {

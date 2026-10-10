@@ -274,14 +274,21 @@ export function createGatewayServer(options = {}) {
   if (heartbeatInterval.unref) heartbeatInterval.unref();
 
   const server = createServer(async (req, res) => {
+    let pilotRequest = false;
+    try { pilotRequest = new URL(req.url, 'http://127.0.0.1').pathname === '/api/toolforge/invoke'; } catch {}
     // Check raw requested URL for directory traversal patterns
     if (req.url && (req.url.includes('/..') || req.url.includes('\\..') || req.url.includes('%2e%2e') || req.url.includes('%2E%2E'))) {
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
-      res.end('403 Forbidden: Invalid file path');
+      if (pilotRequest) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(toolforgeHttpFailure(null, 'FORBIDDEN')));
+      } else {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('403 Forbidden: Invalid file path');
+      }
       return;
     }
 
-    const reqUrl = new URL(req.url, req.url?.startsWith('/api/toolforge/invoke') ? 'http://127.0.0.1' : `http://${req.headers.host || '127.0.0.1'}`);
+    const reqUrl = new URL(req.url, pilotRequest ? 'http://127.0.0.1' : `http://${req.headers.host || '127.0.0.1'}`);
     const pathname = reqUrl.pathname;
 
     if (pathname === '/api/toolforge/invoke') {
