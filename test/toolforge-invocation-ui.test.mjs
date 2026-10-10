@@ -170,11 +170,14 @@ test('valid native pass/findings remain accepted, including optional Roadmap dat
   }
   await configurePilot(h, 'roadmap-validator');
   for (const [result, outcome] of [
+    [{ status: 'error', code: 'VALIDATION_FAILED', message: 'Roadmap validation failed (strict mode): 1 issues found' }, 'findings'],
     [{ ...nativeResult('roadmap-validator'), data: { ...nativeResult('roadmap-validator').data, findings: [{ level: 'warning', code: 'WARN', message: 'Warning', line: 1 }] } }, 'findings'],
     [{ status: 'error', message: 'Invalid', data: { ...nativeResult('roadmap-validator').data, isValid: false, findings: [{ level: 'error', code: 'ERROR', message: 'Error' }] } }, 'findings']
   ]) {
     envelope = completed('roadmap-validator', outcome, result); await h.tag('form').fire('submit');
+    assert.equal(h.status(), 'Completed / Findings');
     assert.equal(h.button('Copy Command').disabled, false);
+    assert.equal(h.tag('pre').textContent, JSON.stringify(result, null, 2));
   }
   await configurePilot(h, 'retro-schema-validator');
   envelope = completed('retro-schema-validator', 'findings', { ...nativeResult('retro-schema-validator', 'findings'), status: 'error', verdict: 'RED', violations: [{ file: 'a', field: 'b', level: 'error', message: 'c' }] });
