@@ -3,7 +3,7 @@ import { readToolforgeInventory } from './toolforge-inventory.mjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync, spawn } from 'node:child_process';
+import { execSync, execFileSync, spawn } from 'node:child_process';
 import os from 'node:os';
 import zlib from 'node:zlib';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
@@ -847,15 +847,34 @@ export function createGatewayServer(options = {}) {
           const repo = body.repo || 'sorensencc-dotcom/toolforge';
           const title = body.title || `[TRM-Triage] ${body.cardId}`;
           const bodyText = body.body || `Promoted from action card ${body.cardId}`;
-          const labels = (body.labels || ['enhancement']).join(',');
+          const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
           
           let issueUrl = null;
-          try {
-            const ghCmd = `gh issue create --repo ${repo} --title "${title.replace(/"/g, '\\"')}" --body "${bodyText.replace(/"/g, '\\"')}" --label "${labels}"`;
-            const out = execSync(ghCmd, { encoding: 'utf8', timeout: 10000 });
-            issueUrl = out.trim().split(/\r?\n/).pop();
-          } catch {
-            issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+          // First attempt: with requested labels
+          if (labelList.length > 0) {
+            try {
+              const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
+              for (const lbl of labelList) {
+                args.push('--label', lbl);
+              }
+              const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+              issueUrl = out.trim().split(/\r?\n/).pop();
+            } catch (err) {
+              // If failed (e.g. label does not exist on target repo), retry without labels
+              console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
+            }
+          }
+
+          // Second attempt: without labels if first attempt failed or had no labels
+          if (!issueUrl) {
+            try {
+              const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
+              const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+              issueUrl = out.trim().split(/\r?\n/).pop();
+            } catch (err) {
+              console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
+              issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+            }
           }
 
           const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');

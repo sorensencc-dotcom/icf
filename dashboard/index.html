@@ -5091,6 +5091,24 @@ flowchart TD
     }
   }
 
+  const BACKLOG_DOMAIN_TO_REPO = {
+    'toolforge': 'sorensencc-dotcom/toolforge',
+    'sigil': 'sorensencc-dotcom/sigil',
+    'rewrite-mcp': 'sorensencc-dotcom/rewrite-mcp',
+    'rewrite-docs': 'sorensencc-dotcom/rewrite-docs',
+    'cic-kb': 'sorensencc-dotcom/toolforge',
+    'kb-sync': 'sorensencc-dotcom/toolforge',
+    'cic': 'sorensencc-dotcom/toolforge',
+    'cross-fleet': 'sorensencc-dotcom/toolforge',
+    'strategic-intelligence': 'sorensencc-dotcom/toolforge'
+  };
+
+  function resolveRepoForCard(card) {
+    if (card.repo && card.repo !== 'IronLedger') return card.repo;
+    const domainKey = (card.domain || card.target || '').toLowerCase().trim();
+    return BACKLOG_DOMAIN_TO_REPO[domainKey] || 'sorensencc-dotcom/toolforge';
+  }
+
   function openPromoteModal(cardId) {
     const card = cachedTrmBacklogCards.find(c => c.id === cardId);
     if (!card) return;
@@ -5104,10 +5122,10 @@ flowchart TD
 
     if (cardIdInput) cardIdInput.value = card.id;
     if (titleInput) titleInput.value = card.intent || card.title || `feat(${card.target || 'core'}): ${card.id}`;
-    if (repoInput) repoInput.value = card.repo || 'IronLedger';
-    if (labelsInput) labelsInput.value = (card.tags && card.tags.length) ? card.tags.join(', ') : 'backlog, mobile-ingress';
+    if (repoInput) repoInput.value = resolveRepoForCard(card);
+    if (labelsInput) labelsInput.value = (card.tags && card.tags.length) ? card.tags.join(', ') : 'enhancement';
     if (bodyInput) {
-      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n`;
+      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || card.domain || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n`;
     }
 
     if (modal) modal.style.display = 'flex';
@@ -5133,11 +5151,15 @@ flowchart TD
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardId, title, repo, body, labels })
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.status === 'SUCCESS') {
         closePromoteModal();
+        if (typeof showToast === 'function') {
+          showToast(`Issue created: ${data.issue_url || 'Success'}`);
+        }
         loadTrmBacklog();
       } else {
-        alert('Promotion request failed');
+        alert(`Promotion request failed: ${data.error || 'Unknown error'}`);
       }
     } catch (e) {
       console.error('Promotion error', e);
