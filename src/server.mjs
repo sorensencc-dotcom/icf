@@ -968,6 +968,8 @@ export function createGatewayServer(options = {}) {
       candidatePaths.push(normalize(resolve(ROOT, 'wiki', stripped)));
       candidatePaths.push(normalize(resolve(ROOT, '..', 'wiki', stripped)));
       candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync-wiki', stripped)));
     }
 
     for (const targetPath of candidatePaths) {
