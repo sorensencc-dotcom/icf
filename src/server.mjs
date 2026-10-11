@@ -39,6 +39,27 @@ export function getPullRequests() {
   }
 }
 
+export function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 1024 * 1024) {
+        req.destroy();
+        reject(new Error('Payload too large'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 process.stdout?.on?.('error', () => {});
 process.stderr?.on?.('error', () => {});
@@ -647,7 +668,8 @@ export function createGatewayServer(options = {}) {
         try {
           const outboxDirs = [
             resolve(ROOT, '../trm-drive/inbox/outbox'),
-            resolve(ROOT, '../.trm/inbox/outbox')
+            resolve(ROOT, '../.trm/inbox/outbox'),
+            'G:/My Drive/TRM-Research/mobile-outbox'
           ];
           const rawReceipts = [];
           for (const dir of outboxDirs) {
@@ -745,6 +767,124 @@ export function createGatewayServer(options = {}) {
           const prs = getPullRequests();
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', count: prs.length, prs }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          const cards = [];
+          if (existsSync(ledgerPath)) {
+            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            for (const l of lines) {
+              try {
+                cards.push(JSON.parse(l));
+              } catch {}
+            }
+          }
+          cards.reverse();
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/triage-card') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          let updatedCard = null;
+          if (existsSync(ledgerPath)) {
+            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const updatedLines = [];
+            for (const l of lines) {
+              try {
+                const item = JSON.parse(l);
+                if (item.id === body.cardId) {
+                  if (body.priority) item.priority = body.priority;
+                  if (body.status) item.status = body.status;
+                  updatedCard = item;
+                }
+                updatedLines.push(JSON.stringify(item));
+              } catch {
+                updatedLines.push(l);
+              }
+            }
+            writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            try {
+              const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
+              refreshLedgerMarkdown();
+            } catch {}
+          }
+          if (!updatedCard) {
+            updatedCard = { id: body.cardId, priority: body.priority, status: body.status };
+          }
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', card: updatedCard }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/promote') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const repo = body.repo || 'sorensencc-dotcom/toolforge';
+          const title = body.title || `[TRM-Triage] ${body.cardId}`;
+          const bodyText = body.body || `Promoted from action card ${body.cardId}`;
+          const labels = (body.labels || ['enhancement']).join(',');
+          
+          let issueUrl = null;
+          try {
+            const ghCmd = `gh issue create --repo ${repo} --title "${title.replace(/"/g, '\\"')}" --body "${bodyText.replace(/"/g, '\\"')}" --label "${labels}"`;
+            const out = execSync(ghCmd, { encoding: 'utf8', timeout: 10000 });
+            issueUrl = out.trim().split(/\r?\n/).pop();
+          } catch {
+            issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+          }
+
+          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          let updatedCard = null;
+          if (existsSync(ledgerPath)) {
+            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const updatedLines = [];
+            for (const l of lines) {
+              try {
+                const item = JSON.parse(l);
+                if (item.id === body.cardId) {
+                  item.issue_url = issueUrl;
+                  item.status = 'IN_PROGRESS';
+                  updatedCard = item;
+                }
+                updatedLines.push(JSON.stringify(item));
+              } catch {
+                updatedLines.push(l);
+              }
+            }
+            writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            try {
+              const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
+              refreshLedgerMarkdown();
+            } catch {}
+          }
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', issue_url: issueUrl, card: updatedCard }));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
