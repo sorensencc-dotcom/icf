@@ -779,15 +779,107 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
-          const cards = [];
+          const pendingDir = resolve(ROOT, '../.harness/tasks/pending');
+          const archiveDir = resolve(ROOT, '../.harness/tasks/archive');
+          const outboxDir = resolve(ROOT, '../trm-drive/inbox/outbox');
+          const completedOutboxDir = resolve(ROOT, '../trm-drive/inbox/completed/outbox');
+
+          // Collect latest receipt metadata for live card reconciliation
+          const receipts = new Map();
+          for (const dir of [completedOutboxDir, outboxDir]) {
+            if (existsSync(dir)) {
+              for (const f of readdirSync(dir)) {
+                if (f.endsWith('.json')) {
+                  try {
+                    const data = JSON.parse(readFileSync(resolve(dir, f), 'utf8'));
+                    const id = data.action_id || data.id;
+                    if (id && !receipts.has(id)) receipts.set(id, data);
+                  } catch {}
+                }
+              }
+            }
+          }
+
+          const cardsMap = new Map();
+
+          // 1. Ingest historical and active items from ledger.jsonl
           if (existsSync(ledgerPath)) {
             const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
             for (const l of lines) {
               try {
-                cards.push(JSON.parse(l));
+                const item = JSON.parse(l);
+                if (item.id) cardsMap.set(item.id, item);
               } catch {}
             }
           }
+
+          // 2. Discover live cards from .harness/tasks/pending and archive
+          for (const [dir, defaultStatus] of [[pendingDir, 'STAGED'], [archiveDir, 'ARCHIVED']]) {
+            if (existsSync(dir)) {
+              for (const f of readdirSync(dir)) {
+                try {
+                  const fullPath = resolve(dir, f);
+                  const content = readFileSync(fullPath, 'utf8');
+                  let data = {};
+                  try { data = JSON.parse(content); } catch {}
+                  const id = data.id || f.replace(/\.(md|gdoc|json)$/, '');
+                  const rcpt = receipts.get(id);
+
+                  if (!cardsMap.has(id)) {
+                    cardsMap.set(id, {
+                      id,
+                      target: data.target || data.domain || rcpt?.target_notebook || 'toolforge',
+                      intent: data.intent || data.title || rcpt?.intent || id,
+                      summary: data.summary || rcpt?.summary || data.intent || '',
+                      status: rcpt?.status || data.status || defaultStatus,
+                      priority: data.priority || 'P2',
+                      issue_url: rcpt?.issue_url || data.issue_url || null,
+                      research_ref: rcpt?.research_ref || data.research_ref || null
+                    });
+                  } else {
+                    const existing = cardsMap.get(id);
+                    if (rcpt?.status && existing.status !== 'COMPLETED' && existing.status !== 'DONE') {
+                      existing.status = rcpt.status;
+                    }
+                    if (rcpt?.issue_url && !existing.issue_url) {
+                      existing.issue_url = rcpt.issue_url;
+                    }
+                  }
+                } catch {}
+              }
+            }
+          }
+
+          const cards = Array.from(cardsMap.values());
+          const prs = getPullRequests();
+          for (const card of cards) {
+            if (!card.pr_url) {
+              const matchedPr = prs.find(p => {
+                if (card.issue_url) {
+                  const issueNum = card.issue_url.split('/').pop();
+                  if (issueNum && (p.title.includes(`#${issueNum}`) || p.title.toLowerCase().includes(`closes #${issueNum}`) || p.title.toLowerCase().includes(`fixes #${issueNum}`))) {
+                    return true;
+                  }
+                }
+                if (card.id) {
+                  const slug = card.id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
+                  if (slug.length > 5 && p.title.toLowerCase().includes(slug)) return true;
+                }
+                if (card.intent) {
+                  const intentSlug = card.intent.replace(/_/g, ' ').toLowerCase();
+                  if (intentSlug.length > 5 && p.title.toLowerCase().includes(intentSlug)) return true;
+                }
+                return false;
+              });
+              if (matchedPr) {
+                card.pr_url = matchedPr.url;
+                card.pr_number = matchedPr.number;
+                card.pr_title = matchedPr.title;
+                card.pr_state = matchedPr.state;
+              }
+            }
+          }
+
           cards.reverse();
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
@@ -849,31 +941,37 @@ export function createGatewayServer(options = {}) {
           const bodyText = body.body || `Promoted from action card ${body.cardId}`;
           const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
           
+          const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.TAP);
           let issueUrl = null;
-          // First attempt: with requested labels
-          if (labelList.length > 0) {
-            try {
-              const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
-              for (const lbl of labelList) {
-                args.push('--label', lbl);
-              }
-              const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
-              issueUrl = out.trim().split(/\r?\n/).pop();
-            } catch (err) {
-              // If failed (e.g. label does not exist on target repo), retry without labels
-              console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
-            }
-          }
 
-          // Second attempt: without labels if first attempt failed or had no labels
-          if (!issueUrl) {
-            try {
-              const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
-              const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
-              issueUrl = out.trim().split(/\r?\n/).pop();
-            } catch (err) {
-              console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
-              issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+          if (isDryRun) {
+            issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+          } else {
+            // First attempt: with requested labels
+            if (labelList.length > 0) {
+              try {
+                const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
+                for (const lbl of labelList) {
+                  args.push('--label', lbl);
+                }
+                const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                issueUrl = out.trim().split(/\r?\n/).pop();
+              } catch (err) {
+                // If failed (e.g. label does not exist on target repo), retry without labels
+                console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
+              }
+            }
+
+            // Second attempt: without labels if first attempt failed or had no labels
+            if (!issueUrl) {
+              try {
+                const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
+                const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                issueUrl = out.trim().split(/\r?\n/).pop();
+              } catch (err) {
+                console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
+                issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+              }
             }
           }
 
@@ -900,6 +998,10 @@ export function createGatewayServer(options = {}) {
               const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
               refreshLedgerMarkdown();
             } catch {}
+          }
+
+          if (!updatedCard) {
+            updatedCard = { id: body.cardId, status: 'IN_PROGRESS', issue_url: issueUrl };
           }
 
           res.writeHead(200);

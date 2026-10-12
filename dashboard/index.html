@@ -514,7 +514,7 @@
       text-transform: uppercase;
       transition: all 0.2s;
     }
-    .btn-secondary:hover {
+    .btn-secondary:hover, .btn-secondary.active {
       background: var(--accent-terracotta);
       color: #ffffff;
       border-color: var(--accent-terracotta);
@@ -1432,25 +1432,41 @@
     </div>
 
     <!-- Active & Triaged Research Gaps Panel -->
-    <div class="panel">
+    <div class="panel" id="trmActiveGapsPanel">
       <div class="section-label">Active Research Gaps Matrix</div>
-      <div class="panel-header">
-        <div class="panel-title">Open, Triaged, and Corroborated Gaps</div>
-        <button type="button" class="panel-action" onclick="copyCommand('npm run test:trm:triage')">Run Gap Triage →</button>
+      <div class="panel-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <div class="panel-title">Open, Triaged, and Corroborated Gaps</div>
+          <div style="font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem;" id="trmGapsCountSummary">
+            Showing all gaps
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="trmGapsSearchInput" placeholder="Filter target or excerpt..." 
+                 oninput="filterTrmGaps(currentTrmGapsFilter)" 
+                 style="font-family: var(--font-ui); background: var(--bg-canvas); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 5px 10px; font-size: 0.75rem; border-radius: 2px; width: 190px;">
+          <button type="button" class="btn-secondary active" id="btnGapFilterAll" onclick="filterTrmGaps('ALL')">All (<span id="trmGapCountAll">0</span>)</button>
+          <button type="button" class="btn-secondary" id="btnGapFilterOpen" onclick="filterTrmGaps('OPEN')">⚠️ Open (<span id="trmGapCountOpen">0</span>)</button>
+          <button type="button" class="btn-secondary" id="btnGapFilterTriaged" onclick="filterTrmGaps('TRIAGED')">🔬 Triaged (<span id="trmGapCountTriaged">0</span>)</button>
+          <button type="button" class="btn-secondary" id="btnGapFilterResolved" onclick="filterTrmGaps('RESOLVED')">✅ Resolved (<span id="trmGapCountResolved">0</span>)</button>
+          <button type="button" class="panel-action" onclick="copyCommand('npm run test:trm:triage')">Run Gap Triage →</button>
+        </div>
       </div>
-      <table class="table-clean">
-        <thead>
-          <tr>
-            <th style="width: 110px;">Status</th>
-            <th style="width: 280px;">Target Inquiry</th>
-            <th>Description / Historical Excerpt</th>
-            <th style="width: 140px;">RFC Resolution</th>
-          </tr>
-        </thead>
-        <tbody id="trmGapsTableBody">
-          <!-- Populated dynamically via daily_status.json -->
-        </tbody>
-      </table>
+      <div style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 3px; margin-top: 8px;">
+        <table class="table-clean" style="margin-top: 0;">
+          <thead style="position: sticky; top: 0; background: var(--bg-surface); z-index: 2;">
+            <tr>
+              <th style="width: 110px; background: var(--bg-surface);">Status</th>
+              <th style="width: 280px; background: var(--bg-surface);">Target Inquiry</th>
+              <th style="background: var(--bg-surface);">Description / Historical Excerpt</th>
+              <th style="width: 140px; background: var(--bg-surface);">RFC Resolution</th>
+            </tr>
+          </thead>
+          <tbody id="trmGapsTableBody">
+            <!-- Populated dynamically via daily_status.json -->
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Action Cards Backlog & Triage Panel -->
@@ -3267,6 +3283,8 @@ flowchart TD
   let currentPipelineData = null;
   let currentTrmHistoryDates = [];
   let selectedTrmNotebookId = '0caf6707-f8f2-4d2a-acd2-020acead55ba';
+  let currentTrmGapsFilter = 'ALL';
+  let cachedAllTrmGaps = [];
 
   function escapeHtml(str) {
     if (!str) return '';
@@ -3412,37 +3430,9 @@ flowchart TD
       }
     }
 
-    // 4. Render Active Gaps Table
-    const gapsBody = document.getElementById('trmGapsTableBody');
-    if (gapsBody) {
-      const allGaps = [...(trm.active_gaps || []), ...(trm.resolved_gaps || [])];
-      if (allGaps.length === 0) {
-        gapsBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: var(--ash);">No research gaps logged in current registry.</td></tr>`;
-      } else {
-        gapsBody.innerHTML = allGaps.map(g => {
-          let badge = `<span class="status-badge soon" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(196,80,26,0.15); color: var(--ember); border-color: rgba(196,80,26,0.3);">● OPEN</span>`;
-          if (g.resolved || g.status === 'RESOLVED') {
-            badge = `<span class="status-badge live" style="font-size:0.65rem; padding:0.2rem 0.5rem;">● RESOLVED</span>`;
-          } else if (g.triaged || g.status === 'TRIAGED') {
-            badge = `<span class="status-badge progress" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(122,159,191,0.15); color: #7a9fbf; border-color: rgba(122,159,191,0.3);">● TRIAGED</span>`;
-          }
-
-          const rfcHref = g.rfc_link ? (g.rfc_link.startsWith('/') ? g.rfc_link : '/' + g.rfc_link) : null;
-          const rfcCell = rfcHref ? 
-            `<a href="${rfcHref}" target="_blank" class="tag date" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.25rem;">RFC ↗</a>` : 
-            `<span style="color:var(--ash); font-size:0.75rem;">—</span>`;
-
-          return `
-            <tr>
-              <td>${badge}</td>
-              <td><code style="font-family: var(--font-ui); color: var(--bone); font-weight: 700;">${escapeHtml(g.target)}</code></td>
-              <td><div style="font-size: 0.8rem; color: var(--ash); line-height: 1.4;">${escapeHtml(g.excerpt)}</div></td>
-              <td>${rfcCell}</td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
+    // 4. Cache & Render Active Gaps Table
+    cachedAllTrmGaps = [...(trm.active_gaps || []), ...(trm.resolved_gaps || [])];
+    renderTrmGapsTable();
 
     // 5. Render Notebook Registry Table
     const regBody = document.getElementById('trmRegistryTableBody');
@@ -3479,6 +3469,99 @@ flowchart TD
     // 7. Update Notebook Synthesis View
     updateTrmNotebookView(selectedTrmNotebookId);
   }
+
+  function filterTrmGaps(filter) {
+    currentTrmGapsFilter = filter;
+    
+    const filterBtns = {
+      'ALL': document.getElementById('btnGapFilterAll'),
+      'OPEN': document.getElementById('btnGapFilterOpen'),
+      'TRIAGED': document.getElementById('btnGapFilterTriaged'),
+      'RESOLVED': document.getElementById('btnGapFilterResolved')
+    };
+    Object.entries(filterBtns).forEach(([k, btn]) => {
+      if (btn) {
+        if (k === filter) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+
+    renderTrmGapsTable();
+  }
+  window.filterTrmGaps = filterTrmGaps;
+
+  function renderTrmGapsTable() {
+    const gapsBody = document.getElementById('trmGapsTableBody');
+    if (!gapsBody) return;
+
+    const searchInput = document.getElementById('trmGapsSearchInput');
+    const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    const openCount = cachedAllTrmGaps.filter(g => !g.resolved && g.status !== 'RESOLVED' && !g.triaged && g.status !== 'TRIAGED').length;
+    const triagedCount = cachedAllTrmGaps.filter(g => !g.resolved && g.status !== 'RESOLVED' && (g.triaged || g.status === 'TRIAGED')).length;
+    const resolvedCount = cachedAllTrmGaps.filter(g => g.resolved || g.status === 'RESOLVED').length;
+
+    const countAllEl = document.getElementById('trmGapCountAll');
+    const countOpenEl = document.getElementById('trmGapCountOpen');
+    const countTriagedEl = document.getElementById('trmGapCountTriaged');
+    const countResolvedEl = document.getElementById('trmGapCountResolved');
+    if (countAllEl) countAllEl.textContent = String(cachedAllTrmGaps.length);
+    if (countOpenEl) countOpenEl.textContent = String(openCount);
+    if (countTriagedEl) countTriagedEl.textContent = String(triagedCount);
+    if (countResolvedEl) countResolvedEl.textContent = String(resolvedCount);
+
+    let filtered = cachedAllTrmGaps;
+    if (currentTrmGapsFilter === 'OPEN') {
+      filtered = filtered.filter(g => !g.resolved && g.status !== 'RESOLVED' && !g.triaged && g.status !== 'TRIAGED');
+    } else if (currentTrmGapsFilter === 'TRIAGED') {
+      filtered = filtered.filter(g => !g.resolved && g.status !== 'RESOLVED' && (g.triaged || g.status === 'TRIAGED'));
+    } else if (currentTrmGapsFilter === 'RESOLVED') {
+      filtered = filtered.filter(g => g.resolved || g.status === 'RESOLVED');
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(g => {
+        const targetMatch = (g.target || '').toLowerCase().includes(searchQuery);
+        const excerptMatch = (g.excerpt || '').toLowerCase().includes(searchQuery);
+        return targetMatch || excerptMatch;
+      });
+    }
+
+    const summaryEl = document.getElementById('trmGapsCountSummary');
+    if (summaryEl) {
+      const filterLabel = currentTrmGapsFilter === 'ALL' ? 'all' : currentTrmGapsFilter.toLowerCase();
+      summaryEl.textContent = `Showing ${filtered.length} of ${cachedAllTrmGaps.length} gaps (${filterLabel}${searchQuery ? `, matching "${searchQuery}"` : ''})`;
+    }
+
+    if (filtered.length === 0) {
+      gapsBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: var(--fg-muted); font-style: italic;">No research gaps match the current filter.</td></tr>`;
+      return;
+    }
+
+    gapsBody.innerHTML = filtered.map(g => {
+      let badge = `<span class="status-badge soon" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(196,80,26,0.15); color: var(--ember); border-color: rgba(196,80,26,0.3);">● OPEN</span>`;
+      if (g.resolved || g.status === 'RESOLVED') {
+        badge = `<span class="status-badge live" style="font-size:0.65rem; padding:0.2rem 0.5rem;">● RESOLVED</span>`;
+      } else if (g.triaged || g.status === 'TRIAGED') {
+        badge = `<span class="status-badge progress" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(122,159,191,0.15); color: #7a9fbf; border-color: rgba(122,159,191,0.3);">● TRIAGED</span>`;
+      }
+
+      const rfcHref = g.rfc_link ? (g.rfc_link.startsWith('/') ? g.rfc_link : '/' + g.rfc_link) : null;
+      const rfcCell = rfcHref ? 
+        `<a href="${rfcHref}" target="_blank" class="tag date" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.25rem;">RFC ↗</a>` : 
+        `<span style="color:var(--ash); font-size:0.75rem;">—</span>`;
+
+      return `
+        <tr>
+          <td>${badge}</td>
+          <td><code style="font-family: var(--font-ui); color: var(--bone); font-weight: 700;">${escapeHtml(g.target)}</code></td>
+          <td><div style="font-size: 0.8rem; color: var(--ash); line-height: 1.4;">${escapeHtml(g.excerpt)}</div></td>
+          <td>${rfcCell}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+  window.renderTrmGapsTable = renderTrmGapsTable;
 
   function updateTrmNotebookView(notebookId) {
     if (!notebookId) return;
@@ -4987,9 +5070,9 @@ flowchart TD
 
       // Update Tab 01 quick stats
       const total = cachedTrmBacklogCards.length;
-      const staged = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING').length;
+      const staged = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE' || c.status === 'STAGED_FOR_RESEARCH').length;
       const inProgress = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS').length;
-      const deferred = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED').length;
+      const deferred = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI').length;
 
       if (quickTotal) quickTotal.textContent = String(total);
       if (quickStaged) quickStaged.textContent = String(staged);
@@ -5014,13 +5097,13 @@ flowchart TD
 
     let filtered = cachedTrmBacklogCards;
     if (currentTrmBacklogFilter === 'STAGED') {
-      filtered = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING');
+      filtered = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE');
     } else if (currentTrmBacklogFilter === 'RESEARCH') {
-      filtered = cachedTrmBacklogCards.filter(c => c.target === 'RESEARCH' || c.status === 'RESEARCH');
+      filtered = cachedTrmBacklogCards.filter(c => c.target === 'RESEARCH' || c.status === 'RESEARCH' || c.status === 'STAGED_FOR_RESEARCH');
     } else if (currentTrmBacklogFilter === 'IN_PROGRESS') {
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS');
     } else if (currentTrmBacklogFilter === 'DEFERRED') {
-      filtered = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED');
+      filtered = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI');
     }
 
     if (filtered.length === 0) {
@@ -5029,6 +5112,12 @@ flowchart TD
     }
 
     tableBody.innerHTML = filtered.map(card => {
+      const isStaged = card.status === 'STAGED' || card.status === 'PENDING' || card.status === 'STAGED_FOR_TRIAGE';
+      const isResearch = card.status === 'RESEARCH' || card.status === 'STAGED_FOR_RESEARCH';
+      const isInProgress = card.status === 'IN_PROGRESS';
+      const isDeferred = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI';
+      const isDone = card.status === 'DONE' || card.status === 'COMPLETED';
+
       return `
         <tr>
           <td>
@@ -5045,14 +5134,20 @@ flowchart TD
           <td>
             <div style="font-weight:600; color:var(--fg-primary);">${escapeHtml(card.intent || card.title || 'Untitled Card')}</div>
             <div style="font-size:0.75rem; color:var(--fg-muted); margin-top:0.2rem;">${escapeHtml(card.raw_preview || card.summary || '')}</div>
-            ${card.tags && card.tags.length ? `<div style="display:flex; gap:0.3rem; margin-top:0.3rem;">${card.tags.map(t => `<span class="tag date" style="font-size:0.65rem;">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center; margin-top:0.35rem;">
+              ${card.issue_url ? `<a href="${escapeHtml(card.issue_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(196,80,26,0.15); color:var(--accent-terracotta); padding:0.12rem 0.4rem; border:1px solid rgba(196,80,26,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">Issue #${escapeHtml(card.issue_url.split('/').pop())} ↗</a>` : ''}
+              ${card.pr_url ? `<a href="${escapeHtml(card.pr_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.12rem 0.4rem; border:1px solid rgba(90,158,111,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">PR #${escapeHtml(String(card.pr_number || card.pr_url.split('/').pop()))} (${escapeHtml(card.pr_state || 'MERGED')}) ↗</a>` : ''}
+              ${card.research_ref ? `<a href="${escapeHtml(card.research_ref)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; background:rgba(184,146,42,0.15); color:var(--fg-muted); padding:0.12rem 0.4rem; border:1px solid rgba(184,146,42,0.3); font-size:0.68rem; font-family:monospace; text-decoration:none; border-radius:2px;">RFC Note ↗</a>` : ''}
+              ${card.tags && card.tags.length ? card.tags.map(t => `<span class="tag date" style="font-size:0.65rem;">#${escapeHtml(t)}</span>`).join('') : ''}
+            </div>
           </td>
           <td>
             <select class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.35rem;" onchange="updateCardStatus('${escapeHtml(card.id)}', this.value)">
-              <option value="STAGED" ${card.status === 'STAGED' || card.status === 'PENDING' ? 'selected' : ''}>⏳ Staged</option>
-              <option value="IN_PROGRESS" ${card.status === 'IN_PROGRESS' ? 'selected' : ''}>🛠️ In Progress</option>
-              <option value="DEFERRED" ${card.status === 'DEFERRED' ? 'selected' : ''}>🚫 Deferred</option>
-              <option value="DONE" ${card.status === 'DONE' || card.status === 'COMPLETED' ? 'selected' : ''}>✅ Done</option>
+              <option value="STAGED" ${isStaged ? 'selected' : ''}>⏳ Staged</option>
+              <option value="RESEARCH" ${isResearch ? 'selected' : ''}>🔬 Research</option>
+              <option value="IN_PROGRESS" ${isInProgress ? 'selected' : ''}>🛠️ In Progress</option>
+              <option value="DEFERRED" ${isDeferred ? 'selected' : ''}>🚫 Deferred</option>
+              <option value="DONE" ${isDone ? 'selected' : ''}>✅ Done</option>
             </select>
           </td>
           <td>
@@ -5125,7 +5220,7 @@ flowchart TD
     if (repoInput) repoInput.value = resolveRepoForCard(card);
     if (labelsInput) labelsInput.value = (card.tags && card.tags.length) ? card.tags.join(', ') : 'enhancement';
     if (bodyInput) {
-      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || card.domain || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n`;
+      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || card.domain || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### PR & Issue Traceability\n- When opening a Pull Request for this issue, include \`Closes #<issue_number>\` in the PR description.\n- Use conventional commit title: \`feat(${card.target || 'core'}): ${card.intent || card.id} (closes #<issue_number>)\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n`;
     }
 
     if (modal) modal.style.display = 'flex';

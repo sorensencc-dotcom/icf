@@ -62,7 +62,8 @@ test('ICF Gateway - POST /api/reporting/trm-backlog/promote attaches issue URL a
         repo: 'sorensencc-dotcom/toolforge',
         title: '[TRM-Triage] [P1] [EVALUATE] Evaluate Gemini Workspace Connectors',
         body: 'Automated test issue body',
-        labels: ['enhancement', 'evaluation']
+        labels: ['enhancement', 'evaluation'],
+        dryRun: true
       })
     });
     assert.equal(res.status, 200);
