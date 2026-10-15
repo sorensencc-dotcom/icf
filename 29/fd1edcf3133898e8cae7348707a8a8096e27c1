@@ -1,0 +1,23 @@
+dashboard/index.html
+  s_a8c54205434b64::t_1faff61a47f66b 5207-5224,5248
+src/server.mjs
+  s_a8c54205434b64::t_80472b9fa6636c 837-842,846-849
+test/promote-card-detail-sections.test.mjs
+  s_a8c54205434b64::t_fb0de616af21fd 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "29fd1edcf3133898e8cae7348707a8a8096e27c1",
+  "prompts": {},
+  "sessions": {
+    "s_a8c54205434b64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2a36691-8258-4ddb-9f0d-48310f3f8876",
+        "model": "unknown"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
