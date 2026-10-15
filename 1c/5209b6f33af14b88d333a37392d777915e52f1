@@ -1,0 +1,28 @@
+dashboard/index.html
+  s_a8c54205434b64::t_86d9d55e9b196c 5207-5213
+  s_a8c54205434b64::t_463c6854b9a94d 5155
+  s_a8c54205434b64::t_050826c1050cea 5230
+src/server.mjs
+  s_a8c54205434b64::t_5977313cac3e27 943-944,947-951,954-975
+  s_a8c54205434b64::t_3c72baa5368888 945-946
+  s_a8c54205434b64::t_df9b620b56058e 952-953
+  s_a8c54205434b64::t_89c5a05c4dd3f1 1010
+test/trm-backlog-api.test.mjs
+  s_a8c54205434b64::t_fc1641f49b2ddc 4-6,53-61,64-70,72-82,88-89,92-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1c5209b6f33af14b88d333a37392d777915e52f1",
+  "prompts": {},
+  "sessions": {
+    "s_a8c54205434b64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2a36691-8258-4ddb-9f0d-48310f3f8876",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
