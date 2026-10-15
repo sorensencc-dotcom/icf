@@ -3,7 +3,7 @@ import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PI
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync, spawn } from 'node:child_process';
+import { execSync, execFileSync, spawn } from 'node:child_process';
 import os from 'node:os';
 import zlib from 'node:zlib';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
@@ -37,6 +37,27 @@ export function getPullRequests() {
   } catch {
     return prCache.prs || [];
   }
+}
+
+export function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 1024 * 1024) {
+        req.destroy();
+        reject(new Error('Payload too large'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
@@ -494,6 +515,10 @@ export function createGatewayServer(options = {}) {
           detached: true,
           stdio: 'ignore'
         });
+        proc.on('error', (procErr) => {
+          console.error(`[ICF-ACTION-ENGINE] Async execution error for ${action}/${target}:`, procErr.message);
+          broadcastSseEvent('action_error', { action, target, error: procErr.message, timestamp: new Date().toISOString() });
+        });
         proc.unref();
 
         broadcastSseEvent('action_dispatched', { action, target, pid: proc.pid, timestamp: new Date().toISOString() });
@@ -733,7 +758,8 @@ export function createGatewayServer(options = {}) {
         try {
           const outboxDirs = [
             resolve(ROOT, '../trm-drive/inbox/outbox'),
-            resolve(ROOT, '../.trm/inbox/outbox')
+            resolve(ROOT, '../.trm/inbox/outbox'),
+            'G:/My Drive/TRM-Research/mobile-outbox'
           ];
           const rawReceipts = [];
           for (const dir of outboxDirs) {
@@ -838,6 +864,286 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
+      if (pathname === '/api/reporting/trm-backlog') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          const pendingDir = resolve(ROOT, '../.harness/tasks/pending');
+          const archiveDir = resolve(ROOT, '../.harness/tasks/archive');
+          const outboxDir = resolve(ROOT, '../trm-drive/inbox/outbox');
+          const completedOutboxDir = resolve(ROOT, '../trm-drive/inbox/completed/outbox');
+
+          // Collect latest receipt metadata for live card reconciliation
+          const receipts = new Map();
+          for (const dir of [completedOutboxDir, outboxDir]) {
+            if (existsSync(dir)) {
+              for (const f of readdirSync(dir)) {
+                if (f.endsWith('.json')) {
+                  try {
+                    const data = JSON.parse(readFileSync(resolve(dir, f), 'utf8'));
+                    const id = data.action_id || data.id;
+                    if (id && !receipts.has(id)) receipts.set(id, data);
+                  } catch {}
+                }
+              }
+            }
+          }
+
+          const cardsMap = new Map();
+
+          // 1. Ingest historical and active items from ledger.jsonl
+          if (existsSync(ledgerPath)) {
+            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            for (const l of lines) {
+              try {
+                const item = JSON.parse(l);
+                if (item.id) cardsMap.set(item.id, item);
+              } catch {}
+            }
+          }
+
+          // 2. Discover live cards from .harness/tasks/pending and archive
+          for (const [dir, defaultStatus] of [[pendingDir, 'STAGED'], [archiveDir, 'ARCHIVED']]) {
+            if (existsSync(dir)) {
+              for (const f of readdirSync(dir)) {
+                try {
+                  const fullPath = resolve(dir, f);
+                  const content = readFileSync(fullPath, 'utf8');
+                  let data = {};
+                  try { data = JSON.parse(content); } catch {}
+                  const id = data.id || f.replace(/\.(md|gdoc|json)$/, '');
+                  const rcpt = receipts.get(id);
+
+                  if (!cardsMap.has(id)) {
+                    cardsMap.set(id, {
+                      id,
+                      target: data.target || data.domain || rcpt?.target_notebook || 'toolforge',
+                      intent: data.intent || data.title || rcpt?.intent || id,
+                      summary: data.summary || rcpt?.summary || data.intent || '',
+                      status: rcpt?.status || data.status || defaultStatus,
+                      priority: data.priority || 'P2',
+                      issue_url: rcpt?.issue_url || data.issue_url || null,
+                      research_ref: rcpt?.research_ref || data.research_ref || null,
+                      action_type: data.action_type,
+                      category: data.category,
+                      context: data.context,
+                      execution_plan: data.execution_plan,
+                      deliverables: data.deliverables
+                    });
+                  } else {
+                    const existing = cardsMap.get(id);
+                    // Ledger rows are flat; fill in the structured card sections from the archived card.
+                    for (const key of ['context', 'execution_plan', 'deliverables']) {
+                      if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
+                    }
+                    if (rcpt?.status && existing.status !== 'COMPLETED' && existing.status !== 'DONE') {
+                      existing.status = rcpt.status;
+                    }
+                    if (rcpt?.issue_url && !existing.issue_url) {
+                      existing.issue_url = rcpt.issue_url;
+                    }
+                  }
+                } catch {}
+              }
+            }
+          }
+
+          const cards = Array.from(cardsMap.values());
+          const prs = getPullRequests();
+          for (const card of cards) {
+            if (!card.pr_url) {
+              const matchedPr = prs.find(p => {
+                if (card.issue_url) {
+                  const issueNum = card.issue_url.split('/').pop();
+                  if (issueNum && (p.title.includes(`#${issueNum}`) || p.title.toLowerCase().includes(`closes #${issueNum}`) || p.title.toLowerCase().includes(`fixes #${issueNum}`))) {
+                    return true;
+                  }
+                }
+                if (card.id) {
+                  const slug = card.id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
+                  if (slug.length > 5 && p.title.toLowerCase().includes(slug)) return true;
+                }
+                if (card.intent) {
+                  const intentSlug = card.intent.replace(/_/g, ' ').toLowerCase();
+                  if (intentSlug.length > 5 && p.title.toLowerCase().includes(intentSlug)) return true;
+                }
+                return false;
+              });
+              if (matchedPr) {
+                card.pr_url = matchedPr.url;
+                card.pr_number = matchedPr.number;
+                card.pr_title = matchedPr.title;
+                card.pr_state = matchedPr.state;
+              }
+            }
+          }
+
+          cards.reverse();
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/triage-card') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          let updatedCard = null;
+          if (existsSync(ledgerPath)) {
+            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const updatedLines = [];
+            for (const l of lines) {
+              try {
+                const item = JSON.parse(l);
+                if (item.id === body.cardId) {
+                  if (body.priority) item.priority = body.priority;
+                  if (body.status) item.status = body.status;
+                  updatedCard = item;
+                }
+                updatedLines.push(JSON.stringify(item));
+              } catch {
+                updatedLines.push(l);
+              }
+            }
+            writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            try {
+              const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
+              refreshLedgerMarkdown();
+            } catch {}
+          }
+          if (!updatedCard) {
+            updatedCard = { id: body.cardId, priority: body.priority, status: body.status };
+          }
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', card: updatedCard }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/promote') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const repo = body.repo || 'sorensencc-dotcom/toolforge';
+          const title = body.title || `[TRM-Triage] ${body.cardId}`;
+          const bodyText = body.body || `Promoted from action card ${body.cardId}`;
+          const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
+
+          // Re-promotion lock: refuse completed or already-promoted cards, and reconcile rows whose receipt says completed.
+          const promoteInboxDir = process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(ROOT, '../trm-drive/inbox');
+          const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
+          const lockRow = existsSync(lockLedgerPath)
+            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === body.cardId)
+            : null;
+          if (lockRow) {
+            const receiptName = `receipt-${lockRow.id}-completed.json`;
+            const hasReceipt = ['completed/outbox', 'outbox']
+              .some(d => existsSync(resolve(promoteInboxDir, d, receiptName)));
+            const rowCompleted = lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at);
+            let reason = null;
+            if (rowCompleted) reason = 'card already completed';
+            else if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
+            else if (hasReceipt) reason = 'completion receipt exists';
+            if (reason) {
+              if (hasReceipt && lockRow.status !== 'COMPLETED') {
+                const reconciled = readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => {
+                  try {
+                    const item = JSON.parse(l);
+                    if (item.id === lockRow.id) item.status = 'COMPLETED';
+                    return JSON.stringify(item);
+                  } catch { return l; }
+                });
+                writeFileSync(lockLedgerPath, reconciled.join('\n') + '\n', 'utf8');
+              }
+              res.writeHead(409);
+              res.end(JSON.stringify({ status: 'CONFLICT', error: `Promote refused: ${reason}`, card_id: lockRow.id }));
+              return;
+            }
+          }
+
+          const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.TAP);
+          let issueUrl = null;
+
+          if (isDryRun) {
+            issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+          } else {
+            // First attempt: with requested labels
+            if (labelList.length > 0) {
+              try {
+                const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
+                for (const lbl of labelList) {
+                  args.push('--label', lbl);
+                }
+                const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                issueUrl = out.trim().split(/\r?\n/).pop();
+              } catch (err) {
+                // If failed (e.g. label does not exist on target repo), retry without labels
+                console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
+              }
+            }
+
+            // Second attempt: without labels if first attempt failed or had no labels
+            if (!issueUrl) {
+              try {
+                const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
+                const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                issueUrl = out.trim().split(/\r?\n/).pop();
+              } catch (err) {
+                console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
+                issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+              }
+            }
+          }
+
+          const ledgerPath = lockLedgerPath;
+          let updatedCard = null;
+          if (existsSync(ledgerPath)) {
+            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const updatedLines = [];
+            for (const l of lines) {
+              try {
+                const item = JSON.parse(l);
+                if (item.id === body.cardId) {
+                  item.issue_url = issueUrl;
+                  item.status = 'IN_PROGRESS';
+                  updatedCard = item;
+                }
+                updatedLines.push(JSON.stringify(item));
+              } catch {
+                updatedLines.push(l);
+              }
+            }
+            writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            try {
+              const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
+              refreshLedgerMarkdown();
+            } catch {}
+          }
+
+          if (!updatedCard) {
+            updatedCard = { id: body.cardId, status: 'IN_PROGRESS', issue_url: issueUrl };
+          }
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', issue_url: issueUrl, card: updatedCard }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
       if (pathname === '/api/reporting/weekly-retro') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         try {
@@ -914,6 +1220,8 @@ export function createGatewayServer(options = {}) {
       candidatePaths.push(normalize(resolve(ROOT, 'wiki', stripped)));
       candidatePaths.push(normalize(resolve(ROOT, '..', 'wiki', stripped)));
       candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync-wiki', stripped)));
     }
 
     for (const targetPath of candidatePaths) {

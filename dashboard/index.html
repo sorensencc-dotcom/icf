@@ -514,7 +514,7 @@
       text-transform: uppercase;
       transition: all 0.2s;
     }
-    .btn-secondary:hover {
+    .btn-secondary:hover, .btn-secondary.active {
       background: var(--accent-terracotta);
       color: #ffffff;
       border-color: var(--accent-terracotta);
@@ -1039,6 +1039,45 @@
         </table>
       </div>
     </div>
+
+    <!-- TRM ACTION BACKLOG QUICK STATUS -->
+    <div class="panel" style="border-top: 3px solid var(--accent-terracotta); margin-top: 1.5rem; margin-bottom: 1.5rem;">
+      <div class="section-label">Mobile Ingress &amp; Action Triage Quick Status</div>
+      <div class="panel-header">
+        <div>
+          <div class="panel-title" style="display: flex; align-items: center; gap: 0.6rem;">
+            <span>Action Card Backlog</span>
+            <span class="badge-pill sage" id="trmBacklogQuickBadge">● LOADING</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem;">
+            Pending mobile cards, triage queue, and 1-click issue promotion surface.
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <a href="#trm-ops" class="btn-secondary" style="font-size: 0.72rem; text-decoration: none;" onclick="switchTab('tab-trm')">View Full Backlog &amp; Triage →</a>
+          <button type="button" class="panel-action" onclick="loadTrmBacklog()">Refresh ⟳</button>
+        </div>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+        <div style="background: var(--bg-surface); padding: 0.75rem; border: 1px solid var(--border-subtle);">
+          <div style="font-size: 0.7rem; color: var(--fg-muted); text-transform: uppercase;">Total Active Cards</div>
+          <div id="trmQuickTotalCount" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-sage); font-family: monospace;">--</div>
+        </div>
+        <div style="background: var(--bg-surface); padding: 0.75rem; border: 1px solid var(--border-subtle);">
+          <div style="font-size: 0.7rem; color: var(--fg-muted); text-transform: uppercase;">Needs Triage (Staged)</div>
+          <div id="trmQuickStagedCount" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-terracotta); font-family: monospace;">--</div>
+        </div>
+        <div style="background: var(--bg-surface); padding: 0.75rem; border: 1px solid var(--border-subtle);">
+          <div style="font-size: 0.7rem; color: var(--fg-muted); text-transform: uppercase;">In Progress</div>
+          <div id="trmQuickInProgressCount" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-brass); font-family: monospace;">--</div>
+        </div>
+        <div style="background: var(--bg-surface); padding: 0.75rem; border: 1px solid var(--border-subtle);">
+          <div style="font-size: 0.7rem; color: var(--fg-muted); text-transform: uppercase;">Deferred (YAGNI)</div>
+          <div id="trmQuickDeferredCount" style="font-size: 1.25rem; font-weight: 700; color: var(--fg-muted); font-family: monospace;">--</div>
+        </div>
+      </div>
+    </div>
   </section>
 
 <!-- ================================================================= -->
@@ -1398,23 +1437,74 @@
     </div>
 
     <!-- Active & Triaged Research Gaps Panel -->
-    <div class="panel">
+    <div class="panel" id="trmActiveGapsPanel">
       <div class="section-label">Active Research Gaps Matrix</div>
-      <div class="panel-header">
-        <div class="panel-title">Open, Triaged, and Corroborated Gaps</div>
-        <button type="button" class="panel-action" data-copy-command="node 'C:\dev\scripts\trm-bot-runner.mjs'" onclick="copyCommand(this.dataset.copyCommand)">Run Gap Triage →</button>
+      <div class="panel-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <div class="panel-title">Open, Triaged, and Corroborated Gaps</div>
+          <div style="font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem;" id="trmGapsCountSummary">
+            Showing all gaps
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="trmGapsSearchInput" placeholder="Filter target or excerpt..." 
+                 oninput="filterTrmGaps(currentTrmGapsFilter)" 
+                 style="font-family: var(--font-ui); background: var(--bg-canvas); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 5px 10px; font-size: 0.75rem; border-radius: 2px; width: 190px;">
+          <button type="button" class="btn-secondary active" id="btnGapFilterAll" onclick="filterTrmGaps('ALL')">All (<span id="trmGapCountAll">0</span>)</button>
+          <button type="button" class="btn-secondary" id="btnGapFilterOpen" onclick="filterTrmGaps('OPEN')">⚠️ Open (<span id="trmGapCountOpen">0</span>)</button>
+          <button type="button" class="btn-secondary" id="btnGapFilterTriaged" onclick="filterTrmGaps('TRIAGED')">🔬 Triaged (<span id="trmGapCountTriaged">0</span>)</button>
+          <button type="button" class="btn-secondary" id="btnGapFilterResolved" onclick="filterTrmGaps('RESOLVED')">✅ Resolved (<span id="trmGapCountResolved">0</span>)</button>
+          <button type="button" class="panel-action" data-copy-command="node 'C:\dev\scripts\trm-bot-runner.mjs'" onclick="copyCommand(this.dataset.copyCommand)">Run Gap Triage →</button>
+        </div>
+      </div>
+      <div style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 3px; margin-top: 8px;">
+        <table class="table-clean" style="margin-top: 0;">
+          <thead style="position: sticky; top: 0; background: var(--bg-surface); z-index: 2;">
+            <tr>
+              <th style="width: 110px; background: var(--bg-surface);">Status</th>
+              <th style="width: 280px; background: var(--bg-surface);">Target Inquiry</th>
+              <th style="background: var(--bg-surface);">Description / Historical Excerpt</th>
+              <th style="width: 140px; background: var(--bg-surface);">RFC Resolution</th>
+            </tr>
+          </thead>
+          <tbody id="trmGapsTableBody">
+            <!-- Populated dynamically via daily_status.json -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Action Cards Backlog & Triage Panel -->
+    <div class="panel" id="trmActionBacklogPanel">
+      <div class="section-label">Mobile Ingress &amp; Action Item Lifecycle</div>
+      <div class="panel-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <div class="panel-title">TRM Action Backlog &amp; Lifecycle Triage</div>
+          <div style="font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem;">
+            Autonomous Ollama intent triage with 1-click promotion to GitHub Issues and lifecycle tracking.
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('ALL')">All</button>
+          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('STAGED')">⏳ Needs Triage</button>
+          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('RESEARCH')">🔬 Research</button>
+          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('IN_PROGRESS')">🛠️ In Progress</button>
+          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('DEFERRED')">🚫 Deferred (YAGNI)</button>
+          <button type="button" class="panel-action" onclick="loadTrmBacklog()">Refresh Backlog →</button>
+        </div>
       </div>
       <table class="table-clean">
         <thead>
           <tr>
-            <th style="width: 110px;">Status</th>
-            <th style="width: 280px;">Target Inquiry</th>
-            <th>Description / Historical Excerpt</th>
-            <th style="width: 140px;">RFC Resolution</th>
+            <th style="width: 90px;">Priority</th>
+            <th style="width: 220px;">Card ID &amp; Target</th>
+            <th>Intent / Summary</th>
+            <th style="width: 140px;">Status</th>
+            <th style="width: 180px;">Actions</th>
           </tr>
         </thead>
-        <tbody id="trmGapsTableBody">
-          <!-- Populated dynamically via daily_status.json -->
+        <tbody id="trmBacklogTableBody">
+          <!-- Populated dynamically via /api/reporting/trm-backlog -->
         </tbody>
       </table>
     </div>
@@ -1465,7 +1555,7 @@
 
       <!-- Standalone SVG Diagram in Cathryn Lavery Standard Warm/Forge Palette -->
       <div style="overflow-x: auto; padding: 1rem 0; text-align: center;">
-                <svg viewBox="0 0 1200 680" width="100%" height="auto" style="max-width: 1200px; font-family: 'Barlow Condensed', sans-serif; background: #f2ece2; border: 2px solid #2c2420; border-radius: 4px; box-shadow: 0 8px 24px rgba(44,36,32,0.12);" xmlns="http://www.w3.org/2000/svg">
+                <svg viewBox="0 0 1200 680" width="100%" height="680" style="max-width: 1200px; height: auto; font-family: 'Barlow Condensed', sans-serif; background: #f2ece2; border: 2px solid #2c2420; border-radius: 4px; box-shadow: 0 8px 24px rgba(44,36,32,0.12);" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="cardGradWarm" x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
@@ -1489,7 +1579,7 @@
           <!-- STAGE 1: INGESTION -->
           <g transform="translate(40, 80)">
             <rect x="0" y="0" width="200" height="230" rx="4" fill="#ffffff" stroke="#c4501a" stroke-width="1.5"/>
-            <rect x="0" y="0" width="200" height="34" fill="#c4501a" rx="4 4 0 0"/>
+            <rect x="0" y="0" width="200" height="34" fill="#c4501a" rx="4"/>
             <text x="100" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">01. MULTIMODAL INGEST</text>
             <text x="15" y="60" font-size="13" font-weight="700" fill="#2c2420">Primary Sources</text>
             <text x="15" y="78" font-size="11" fill="#5c5349">• PDFs, Transcripts, Audios</text>
@@ -1508,7 +1598,7 @@
           <!-- STAGE 2: DEEP QUESTION MINING -->
           <g transform="translate(280, 80)">
             <rect x="0" y="0" width="210" height="230" rx="4" fill="#ffffff" stroke="#b8922a" stroke-width="1.5"/>
-            <rect x="0" y="0" width="210" height="34" fill="#b8922a" rx="4 4 0 0"/>
+            <rect x="0" y="0" width="210" height="34" fill="#b8922a" rx="4"/>
             <text x="105" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">02. QUESTION MINING</text>
             <text x="15" y="58" font-size="12" font-weight="700" fill="#2c2420">4 Canonical Query Vectors</text>
             <text x="15" y="76" font-size="11" fill="#2c2420">1. Unresolved Contradictions</text>
@@ -1528,7 +1618,7 @@
           <!-- STAGE 3: TRIAGE & COGNITIVE CACHE -->
           <g transform="translate(530, 80)">
             <rect x="0" y="0" width="210" height="230" rx="4" fill="#ffffff" stroke="#2c2420" stroke-width="1.5"/>
-            <rect x="0" y="0" width="210" height="34" fill="#2c2420" rx="4 4 0 0"/>
+            <rect x="0" y="0" width="210" height="34" fill="#2c2420" rx="4"/>
             <text x="105" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">03. COGNITIVE TRIAGE</text>
             <text x="15" y="58" font-size="12" font-weight="700" fill="#2c2420">Gaps Matrix Registry</text>
             <text x="15" y="76" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">trm-research-gaps.md</text>
@@ -1548,7 +1638,7 @@
           <!-- STAGE 4: VAULT FACT EXTRACTION & CORROBORATION -->
           <g transform="translate(780, 80)">
             <rect x="0" y="0" width="200" height="230" rx="4" fill="#ffffff" stroke="#b8922a" stroke-width="1.5"/>
-            <rect x="0" y="0" width="200" height="34" fill="#b8922a" rx="4 4 0 0"/>
+            <rect x="0" y="0" width="200" height="34" fill="#b8922a" rx="4"/>
             <text x="100" y="22" font-size="13" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#ffffff">04. CORROBORATION</text>
             <text x="15" y="58" font-size="12" font-weight="700" fill="#2c2420">Topic Fact Vault</text>
             <text x="15" y="76" font-family="'Geist Mono', monospace" font-size="11" fill="#b8922a">trm-vault/topics/*</text>
@@ -1567,7 +1657,7 @@
           <!-- STAGE 5: IRON COMMAND FORGE TELEMETRY -->
           <g transform="translate(1020, 80)">
             <rect x="0" y="0" width="140" height="230" rx="4" fill="#ffffff" stroke="#c4501a" stroke-width="2"/>
-            <rect x="0" y="0" width="140" height="34" fill="#c4501a" rx="4 4 0 0"/>
+            <rect x="0" y="0" width="140" height="34" fill="#c4501a" rx="4"/>
             <text x="70" y="22" font-size="12" font-weight="700" letter-spacing="1" text-anchor="middle" fill="#ffffff">05. COMMAND FORGE</text>
             <text x="12" y="60" font-size="11" font-weight="700" fill="#2c2420">Daily Telemetry</text>
             <text x="12" y="78" font-family="'Geist Mono', monospace" font-size="9" fill="#c4501a">daily_status.json</text>
@@ -1588,7 +1678,7 @@
           <!-- BOTTOM CALLOUT BOX -->
           <g transform="translate(40, 390)">
             <rect x="0" y="0" width="1120" height="260" rx="4" fill="#ffffff" stroke="#2c2420" stroke-width="1.5"/>
-            <rect x="0" y="0" width="1120" height="34" fill="#2c2420" rx="4 4 0 0"/>
+            <rect x="0" y="0" width="1120" height="34" fill="#2c2420" rx="4"/>
             <text x="20" y="22" font-family="'Playfair Display', Georgia, serif" font-size="14" font-weight="700" fill="#f2ece2">GRANULAR SYNTHESIS &amp; RECONCILIATION CONTRACT</text>
             <g transform="translate(30, 50)">
               <text x="0" y="20" font-size="13" font-weight="700" fill="#c4501a">1. Item-Level SHA-256 Hashing</text>
@@ -1865,7 +1955,7 @@ flowchart TD
       </div>
 
       <div style="overflow-x: auto; padding: 1rem 0; text-align: center;">
-        <svg viewBox="0 0 1060 620" width="100%" height="auto" style="max-width: 1060px; font-family: 'Barlow Condensed', sans-serif; background: #f2ece2; border: 2px solid #2c2420; border-radius: 4px; box-shadow: 0 8px 24px rgba(44,36,32,0.12);" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 1060 620" width="100%" height="620" style="max-width: 1060px; height: auto; font-family: 'Barlow Condensed', sans-serif; background: #f2ece2; border: 2px solid #2c2420; border-radius: 4px; box-shadow: 0 8px 24px rgba(44,36,32,0.12);" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <marker id="arrow-bot" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#c4501a" />
@@ -3198,6 +3288,8 @@ flowchart TD
   let currentPipelineData = null;
   let currentTrmHistoryDates = [];
   let selectedTrmNotebookId = '0caf6707-f8f2-4d2a-acd2-020acead55ba';
+  let currentTrmGapsFilter = 'ALL';
+  let cachedAllTrmGaps = [];
 
   function escapeHtml(str) {
     if (!str) return '';
@@ -3347,37 +3439,9 @@ flowchart TD
       }
     }
 
-    // 4. Render Active Gaps Table
-    const gapsBody = document.getElementById('trmGapsTableBody');
-    if (gapsBody) {
-      const allGaps = [...(trm.active_gaps || []), ...(trm.resolved_gaps || [])];
-      if (allGaps.length === 0) {
-        gapsBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: var(--ash);">No research gaps logged in current registry.</td></tr>`;
-      } else {
-        gapsBody.innerHTML = allGaps.map(g => {
-          let badge = `<span class="status-badge soon" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(196,80,26,0.15); color: var(--ember); border-color: rgba(196,80,26,0.3);">● OPEN</span>`;
-          if (g.resolved || g.status === 'RESOLVED') {
-            badge = `<span class="status-badge live" style="font-size:0.65rem; padding:0.2rem 0.5rem;">● RESOLVED</span>`;
-          } else if (g.triaged || g.status === 'TRIAGED') {
-            badge = `<span class="status-badge progress" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(122,159,191,0.15); color: #7a9fbf; border-color: rgba(122,159,191,0.3);">● TRIAGED</span>`;
-          }
-
-          const rfcHref = g.rfc_link ? (g.rfc_link.startsWith('/') ? g.rfc_link : '/' + g.rfc_link) : null;
-          const rfcCell = rfcHref ? 
-            `<a href="${rfcHref}" target="_blank" class="tag date" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.25rem;">RFC ↗</a>` : 
-            `<span style="color:var(--ash); font-size:0.75rem;">—</span>`;
-
-          return `
-            <tr>
-              <td>${badge}</td>
-              <td><code style="font-family: var(--font-ui); color: var(--bone); font-weight: 700;">${escapeHtml(g.target)}</code></td>
-              <td><div style="font-size: 0.8rem; color: var(--ash); line-height: 1.4;">${escapeHtml(g.excerpt)}</div></td>
-              <td>${rfcCell}</td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
+    // 4. Cache & Render Active Gaps Table
+    cachedAllTrmGaps = [...(trm.active_gaps || []), ...(trm.resolved_gaps || [])];
+    renderTrmGapsTable();
 
     // 5. Render Notebook Registry Table
     const regBody = document.getElementById('trmRegistryTableBody');
@@ -3414,6 +3478,99 @@ flowchart TD
     // 7. Update Notebook Synthesis View
     updateTrmNotebookView(selectedTrmNotebookId);
   }
+
+  function filterTrmGaps(filter) {
+    currentTrmGapsFilter = filter;
+    
+    const filterBtns = {
+      'ALL': document.getElementById('btnGapFilterAll'),
+      'OPEN': document.getElementById('btnGapFilterOpen'),
+      'TRIAGED': document.getElementById('btnGapFilterTriaged'),
+      'RESOLVED': document.getElementById('btnGapFilterResolved')
+    };
+    Object.entries(filterBtns).forEach(([k, btn]) => {
+      if (btn) {
+        if (k === filter) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+
+    renderTrmGapsTable();
+  }
+  window.filterTrmGaps = filterTrmGaps;
+
+  function renderTrmGapsTable() {
+    const gapsBody = document.getElementById('trmGapsTableBody');
+    if (!gapsBody) return;
+
+    const searchInput = document.getElementById('trmGapsSearchInput');
+    const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    const openCount = cachedAllTrmGaps.filter(g => !g.resolved && g.status !== 'RESOLVED' && !g.triaged && g.status !== 'TRIAGED').length;
+    const triagedCount = cachedAllTrmGaps.filter(g => !g.resolved && g.status !== 'RESOLVED' && (g.triaged || g.status === 'TRIAGED')).length;
+    const resolvedCount = cachedAllTrmGaps.filter(g => g.resolved || g.status === 'RESOLVED').length;
+
+    const countAllEl = document.getElementById('trmGapCountAll');
+    const countOpenEl = document.getElementById('trmGapCountOpen');
+    const countTriagedEl = document.getElementById('trmGapCountTriaged');
+    const countResolvedEl = document.getElementById('trmGapCountResolved');
+    if (countAllEl) countAllEl.textContent = String(cachedAllTrmGaps.length);
+    if (countOpenEl) countOpenEl.textContent = String(openCount);
+    if (countTriagedEl) countTriagedEl.textContent = String(triagedCount);
+    if (countResolvedEl) countResolvedEl.textContent = String(resolvedCount);
+
+    let filtered = cachedAllTrmGaps;
+    if (currentTrmGapsFilter === 'OPEN') {
+      filtered = filtered.filter(g => !g.resolved && g.status !== 'RESOLVED' && !g.triaged && g.status !== 'TRIAGED');
+    } else if (currentTrmGapsFilter === 'TRIAGED') {
+      filtered = filtered.filter(g => !g.resolved && g.status !== 'RESOLVED' && (g.triaged || g.status === 'TRIAGED'));
+    } else if (currentTrmGapsFilter === 'RESOLVED') {
+      filtered = filtered.filter(g => g.resolved || g.status === 'RESOLVED');
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(g => {
+        const targetMatch = (g.target || '').toLowerCase().includes(searchQuery);
+        const excerptMatch = (g.excerpt || '').toLowerCase().includes(searchQuery);
+        return targetMatch || excerptMatch;
+      });
+    }
+
+    const summaryEl = document.getElementById('trmGapsCountSummary');
+    if (summaryEl) {
+      const filterLabel = currentTrmGapsFilter === 'ALL' ? 'all' : currentTrmGapsFilter.toLowerCase();
+      summaryEl.textContent = `Showing ${filtered.length} of ${cachedAllTrmGaps.length} gaps (${filterLabel}${searchQuery ? `, matching "${searchQuery}"` : ''})`;
+    }
+
+    if (filtered.length === 0) {
+      gapsBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: var(--fg-muted); font-style: italic;">No research gaps match the current filter.</td></tr>`;
+      return;
+    }
+
+    gapsBody.innerHTML = filtered.map(g => {
+      let badge = `<span class="status-badge soon" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(196,80,26,0.15); color: var(--ember); border-color: rgba(196,80,26,0.3);">● OPEN</span>`;
+      if (g.resolved || g.status === 'RESOLVED') {
+        badge = `<span class="status-badge live" style="font-size:0.65rem; padding:0.2rem 0.5rem;">● RESOLVED</span>`;
+      } else if (g.triaged || g.status === 'TRIAGED') {
+        badge = `<span class="status-badge progress" style="font-size:0.65rem; padding:0.2rem 0.5rem; background: rgba(122,159,191,0.15); color: #7a9fbf; border-color: rgba(122,159,191,0.3);">● TRIAGED</span>`;
+      }
+
+      const rfcHref = g.rfc_link ? (g.rfc_link.startsWith('/') ? g.rfc_link : '/' + g.rfc_link) : null;
+      const rfcCell = rfcHref ? 
+        `<a href="${rfcHref}" target="_blank" class="tag date" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.25rem;">RFC ↗</a>` : 
+        `<span style="color:var(--ash); font-size:0.75rem;">—</span>`;
+
+      return `
+        <tr>
+          <td>${badge}</td>
+          <td><code style="font-family: var(--font-ui); color: var(--bone); font-weight: 700;">${escapeHtml(g.target)}</code></td>
+          <td><div style="font-size: 0.8rem; color: var(--ash); line-height: 1.4;">${escapeHtml(g.excerpt)}</div></td>
+          <td>${rfcCell}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+  window.renderTrmGapsTable = renderTrmGapsTable;
 
   function updateTrmNotebookView(notebookId) {
     if (!notebookId) return;
@@ -4897,6 +5054,242 @@ flowchart TD
   })() || 'parchment';
   applyTheme(savedTheme);
 
+  let cachedTrmBacklogCards = [];
+  let currentTrmBacklogFilter = 'ALL';
+
+  async function loadTrmBacklog() {
+    const tableBody = document.getElementById('trmBacklogTableBody');
+    const quickBadge = document.getElementById('trmBacklogQuickBadge');
+    const quickTotal = document.getElementById('trmQuickTotalCount');
+    const quickStaged = document.getElementById('trmQuickStagedCount');
+    const quickProgress = document.getElementById('trmQuickInProgressCount');
+    const quickDeferred = document.getElementById('trmQuickDeferredCount');
+
+    try {
+      const res = await fetch('/api/reporting/trm-backlog', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      cachedTrmBacklogCards = data.cards || [];
+
+      // Update Tab 01 quick stats
+      const total = cachedTrmBacklogCards.length;
+      const staged = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE' || c.status === 'STAGED_FOR_RESEARCH').length;
+      const inProgress = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS').length;
+      const deferred = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI').length;
+
+      if (quickTotal) quickTotal.textContent = String(total);
+      if (quickStaged) quickStaged.textContent = String(staged);
+      if (quickProgress) quickProgress.textContent = String(inProgress);
+      if (quickDeferred) quickDeferred.textContent = String(deferred);
+      if (quickBadge) quickBadge.textContent = staged > 0 ? `● ${staged} NEEDS TRIAGE` : '● ALL TRIAGED';
+
+      renderTrmBacklogTable();
+    } catch (e) {
+      console.error('Failed to load TRM backlog', e);
+    }
+  }
+
+  function filterTrmBacklog(filter) {
+    currentTrmBacklogFilter = filter;
+    renderTrmBacklogTable();
+  }
+
+  function renderTrmBacklogTable() {
+    const tableBody = document.getElementById('trmBacklogTableBody');
+    if (!tableBody) return;
+
+    let filtered = cachedTrmBacklogCards;
+    if (currentTrmBacklogFilter === 'STAGED') {
+      filtered = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE');
+    } else if (currentTrmBacklogFilter === 'RESEARCH') {
+      filtered = cachedTrmBacklogCards.filter(c => c.target === 'RESEARCH' || c.status === 'RESEARCH' || c.status === 'STAGED_FOR_RESEARCH');
+    } else if (currentTrmBacklogFilter === 'IN_PROGRESS') {
+      filtered = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS');
+    } else if (currentTrmBacklogFilter === 'DEFERRED') {
+      filtered = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI');
+    }
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No cards match the active filter.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = filtered.map(card => {
+      const isStaged = card.status === 'STAGED' || card.status === 'PENDING' || card.status === 'STAGED_FOR_TRIAGE';
+      const isResearch = card.status === 'RESEARCH' || card.status === 'STAGED_FOR_RESEARCH';
+      const isInProgress = card.status === 'IN_PROGRESS';
+      const isDeferred = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI';
+      const isDone = card.status === 'DONE' || card.status === 'COMPLETED';
+
+      return `
+        <tr>
+          <td>
+            <select class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.35rem;" onchange="updateCardPriority('${escapeHtml(card.id)}', this.value)">
+              <option value="P1" ${card.priority === 'P1' ? 'selected' : ''}>P1</option>
+              <option value="P2" ${card.priority === 'P2' ? 'selected' : ''}>P2</option>
+              <option value="P3" ${card.priority === 'P3' ? 'selected' : ''}>P3</option>
+            </select>
+          </td>
+          <td>
+            <strong style="color:var(--fg-primary); font-family:monospace; font-size:0.8rem;">${escapeHtml(card.id)}</strong>
+            <br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Target: ${escapeHtml(card.target || 'toolforge')}</span>
+          </td>
+          <td>
+            <div style="font-weight:600; color:var(--fg-primary);">${escapeHtml(card.intent || card.title || 'Untitled Card')}</div>
+            <div style="font-size:0.75rem; color:var(--fg-muted); margin-top:0.2rem;">${escapeHtml(card.raw_preview || card.summary || '')}</div>
+            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center; margin-top:0.35rem;">
+              ${card.issue_url ? `<a href="${escapeHtml(card.issue_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(196,80,26,0.15); color:var(--accent-terracotta); padding:0.12rem 0.4rem; border:1px solid rgba(196,80,26,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">Issue #${escapeHtml(card.issue_url.split('/').pop())} ↗</a>` : ''}
+              ${card.pr_url ? `<a href="${escapeHtml(card.pr_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.12rem 0.4rem; border:1px solid rgba(90,158,111,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">PR #${escapeHtml(String(card.pr_number || card.pr_url.split('/').pop()))} (${escapeHtml(card.pr_state || 'MERGED')}) ↗</a>` : ''}
+              ${card.research_ref ? `<a href="${escapeHtml(card.research_ref)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; background:rgba(184,146,42,0.15); color:var(--fg-muted); padding:0.12rem 0.4rem; border:1px solid rgba(184,146,42,0.3); font-size:0.68rem; font-family:monospace; text-decoration:none; border-radius:2px;">RFC Note ↗</a>` : ''}
+              ${card.tags && card.tags.length ? card.tags.map(t => `<span class="tag date" style="font-size:0.65rem;">#${escapeHtml(t)}</span>`).join('') : ''}
+            </div>
+          </td>
+          <td>
+            <select class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.35rem;" onchange="updateCardStatus('${escapeHtml(card.id)}', this.value)">
+              <option value="STAGED" ${isStaged ? 'selected' : ''}>⏳ Staged</option>
+              <option value="RESEARCH" ${isResearch ? 'selected' : ''}>🔬 Research</option>
+              <option value="IN_PROGRESS" ${isInProgress ? 'selected' : ''}>🛠️ In Progress</option>
+              <option value="DEFERRED" ${isDeferred ? 'selected' : ''}>🚫 Deferred</option>
+              <option value="DONE" ${isDone ? 'selected' : ''}>✅ Done</option>
+            </select>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+              ${(isDone || card.completed_at || card.issue_url) ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">Promote →</button>`}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function updateCardPriority(cardId, priority) {
+    try {
+      const res = await fetch('/api/reporting/trm-backlog/triage-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId, priority })
+      });
+      if (res.ok) loadTrmBacklog();
+    } catch (e) {
+      console.error('Failed to update priority', e);
+    }
+  }
+
+  async function updateCardStatus(cardId, status) {
+    try {
+      const res = await fetch('/api/reporting/trm-backlog/triage-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId, status })
+      });
+      if (res.ok) loadTrmBacklog();
+    } catch (e) {
+      console.error('Failed to update status', e);
+    }
+  }
+
+  const BACKLOG_DOMAIN_TO_REPO = {
+    'toolforge': 'sorensencc-dotcom/toolforge',
+    'sigil': 'sorensencc-dotcom/sigil',
+    'rewrite-mcp': 'sorensencc-dotcom/rewrite-mcp',
+    'rewrite-docs': 'sorensencc-dotcom/rewrite-docs',
+    'cic-kb': 'sorensencc-dotcom/toolforge',
+    'kb-sync': 'sorensencc-dotcom/toolforge',
+    'cic': 'sorensencc-dotcom/toolforge',
+    'cross-fleet': 'sorensencc-dotcom/toolforge',
+    'strategic-intelligence': 'sorensencc-dotcom/toolforge'
+  };
+
+  function resolveRepoForCard(card) {
+    if (card.repo && card.repo !== 'IronLedger') return card.repo;
+    const domainKey = (card.domain || card.target || '').toLowerCase().trim();
+    return BACKLOG_DOMAIN_TO_REPO[domainKey] || 'sorensencc-dotcom/toolforge';
+  }
+
+  function buildCardDetailSections(card) {
+    const fence = '`'.repeat(3);
+    let out = '';
+    if (card.context && Object.keys(card.context).length) {
+      out += '\n### Context\n' + fence + 'json\n' + JSON.stringify(card.context, null, 2) + '\n' + fence + '\n';
+      if (card.context.note && /fetch failed/i.test(card.context.note)) {
+        out += '\n> Warning: the source document body was not fetched, so this card holds only filename-derived metadata. Open the original card before acting.\n';
+      }
+    }
+    if (Array.isArray(card.execution_plan) && card.execution_plan.length) {
+      out += '\n### Execution plan\n' + card.execution_plan.map(st => st.step + '. ' + (st.action || '') + (st.command ? ' - `' + st.command + '`' : '')).join('\n') + '\n';
+    }
+    if (card.deliverables) {
+      out += '\n### Deliverables & acceptance criteria\n' + (typeof card.deliverables === 'string' ? card.deliverables : JSON.stringify(card.deliverables, null, 2)) + '\n';
+    }
+    return out;
+  }
+
+  function commitTypeForCard(card) {
+    const category = String(card.category || '').toUpperCase();
+    if (card.action_type === 'deterministic_fix') return 'fix';
+    if (category === 'RESEARCH' || category === 'EVALUATE') return 'chore';
+    return 'feat';
+  }
+
+  function openPromoteModal(cardId) {
+    const card = cachedTrmBacklogCards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const modal = document.getElementById('promoteModal');
+    const cardIdInput = document.getElementById('promoteCardIdInput');
+    const titleInput = document.getElementById('promoteTitleInput');
+    const repoInput = document.getElementById('promoteRepoInput');
+    const labelsInput = document.getElementById('promoteLabelsInput');
+    const bodyInput = document.getElementById('promoteBodyInput');
+
+    if (cardIdInput) cardIdInput.value = card.id;
+    if (titleInput) titleInput.value = card.intent || card.title || `feat(${card.target || 'core'}): ${card.id}`;
+    if (repoInput) repoInput.value = resolveRepoForCard(card);
+    if (labelsInput) labelsInput.value = (card.tags && card.tags.length) ? card.tags.join(', ') : 'enhancement';
+    if (bodyInput) {
+      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || card.domain || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### PR & Issue Traceability\n- When opening a Pull Request for this issue, include \`Closes #<issue_number>\` in the PR description.\n- Use conventional commit title: \`${commitTypeForCard(card)}(${card.target || 'core'}): ${card.intent || card.id} (closes #<issue_number>)\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n` + buildCardDetailSections(card);
+    }
+
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closePromoteModal() {
+    const modal = document.getElementById('promoteModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function submitPromoteModal() {
+    const cardId = document.getElementById('promoteCardIdInput')?.value;
+    const title = document.getElementById('promoteTitleInput')?.value;
+    const repo = document.getElementById('promoteRepoInput')?.value;
+    const labelsStr = document.getElementById('promoteLabelsInput')?.value || '';
+    const body = document.getElementById('promoteBodyInput')?.value;
+
+    const labels = labelsStr.split(',').map(s => s.trim()).filter(Boolean);
+
+    try {
+      const res = await fetch('/api/reporting/trm-backlog/promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId, title, repo, body, labels })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'SUCCESS') {
+        closePromoteModal();
+        if (typeof showToast === 'function') {
+          showToast(`Issue created: ${data.issue_url || 'Success'}`);
+        }
+        loadTrmBacklog();
+      } else {
+        alert(`Promotion request failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error('Promotion error', e);
+      alert('Promotion request error');
+    }
+  }
+
   renderMcpCards();
   renderDomainsTable();
   loadDailyStatus();
@@ -4910,6 +5303,7 @@ flowchart TD
   loadMobileOutbox();
   loadPullRequests();
   loadStorageAnalytics();
+  loadTrmBacklog();
   handleHashRoute();
   initRealtimeEventStream();
 
@@ -4921,7 +5315,47 @@ flowchart TD
   setInterval(loadMobileOutbox, 15000);
   setInterval(loadPullRequests, 30000);
   setInterval(loadStorageAnalytics, 30000);
+  setInterval(loadTrmBacklog, 30000);
 </script>
+
+<!-- PROMOTE MODAL OVERLAY -->
+<div id="promoteModal" style="display: none; position: fixed; inset: 0; background: rgba(10,8,6,0.85); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: var(--bg-surface); border: 1.5px solid var(--accent-terracotta); max-width: 640px; width: 100%; padding: 1.5rem; box-shadow: var(--card-shadow-hover);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
+      <h3 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 1.2rem; color: var(--fg-primary);">Promote Card to GitHub Issue</h3>
+      <button type="button" class="btn-secondary" onclick="closePromoteModal()" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">✕</button>
+    </div>
+    
+    <input type="hidden" id="promoteCardIdInput" />
+    
+    <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+      <div>
+        <label style="display: block; font-size: 0.75rem; color: var(--fg-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Target Repository</label>
+        <input type="text" id="promoteRepoInput" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 0.4rem; font-family: monospace; font-size: 0.85rem;" />
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 0.75rem; color: var(--fg-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Issue Title</label>
+        <input type="text" id="promoteTitleInput" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 0.4rem; font-size: 0.85rem;" />
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 0.75rem; color: var(--fg-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Labels (comma separated)</label>
+        <input type="text" id="promoteLabelsInput" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 0.4rem; font-family: monospace; font-size: 0.85rem;" />
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 0.75rem; color: var(--fg-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Issue Body (Markdown)</label>
+        <textarea id="promoteBodyInput" rows="7" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 0.4rem; font-family: monospace; font-size: 0.8rem;"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+        <button type="button" class="btn-secondary" onclick="closePromoteModal()">Cancel</button>
+        <button type="button" class="panel-action" onclick="submitPromoteModal()">Create GitHub Issue ↗</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script type="module">
   import { mountToolforgeInvocation } from '/dashboard/toolforge-invocation.mjs';

@@ -30,7 +30,7 @@ test('legacy run-skill dispatch uses the same configured owner and manifest as i
   const calls = [];
   const spawn = t.mock.method(childProcess, 'spawn', (...args) => {
     calls.push(args);
-    return { pid: 12345, unref() {} };
+    return { pid: 12345, on() {}, unref() {} };
   });
   syncBuiltinESMExports();
   t.after(() => { spawn.mock.restore(); syncBuiltinESMExports(); });
