@@ -1,0 +1,23 @@
+test/trm-backlog-api.test.mjs
+  s_a8c54205434b64::t_a9ee4bcac59ced 29,33,39-41,63
+src/server.mjs
+  s_a8c54205434b64::t_a9ee4bcac59ced 68-69,999,1046
+test/helpers/toolforge-root.mjs
+  s_a8c54205434b64::t_75fabfac59a9b2 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "603f42b88b76cd1f35baf3cbe5923e0e40b5878b",
+  "prompts": {},
+  "sessions": {
+    "s_a8c54205434b64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2a36691-8258-4ddb-9f0d-48310f3f8876",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
