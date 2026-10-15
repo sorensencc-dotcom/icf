@@ -940,7 +940,39 @@ export function createGatewayServer(options = {}) {
           const title = body.title || `[TRM-Triage] ${body.cardId}`;
           const bodyText = body.body || `Promoted from action card ${body.cardId}`;
           const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
-          
+
+          // Re-promotion lock: refuse completed or already-promoted cards, and reconcile rows whose receipt says completed.
+          const promoteInboxDir = process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(ROOT, '../trm-drive/inbox');
+          const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
+          const lockRow = existsSync(lockLedgerPath)
+            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === body.cardId)
+            : null;
+          if (lockRow) {
+            const receiptName = `receipt-${lockRow.id}-completed.json`;
+            const hasReceipt = ['completed/outbox', 'outbox']
+              .some(d => existsSync(resolve(promoteInboxDir, d, receiptName)));
+            const rowCompleted = lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at);
+            let reason = null;
+            if (rowCompleted) reason = 'card already completed';
+            else if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
+            else if (hasReceipt) reason = 'completion receipt exists';
+            if (reason) {
+              if (hasReceipt && lockRow.status !== 'COMPLETED') {
+                const reconciled = readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => {
+                  try {
+                    const item = JSON.parse(l);
+                    if (item.id === lockRow.id) item.status = 'COMPLETED';
+                    return JSON.stringify(item);
+                  } catch { return l; }
+                });
+                writeFileSync(lockLedgerPath, reconciled.join('\n') + '\n', 'utf8');
+              }
+              res.writeHead(409);
+              res.end(JSON.stringify({ status: 'CONFLICT', error: `Promote refused: ${reason}`, card_id: lockRow.id }));
+              return;
+            }
+          }
+
           const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.TAP);
           let issueUrl = null;
 
@@ -975,7 +1007,7 @@ export function createGatewayServer(options = {}) {
             }
           }
 
-          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          const ledgerPath = lockLedgerPath;
           let updatedCard = null;
           if (existsSync(ledgerPath)) {
             const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
