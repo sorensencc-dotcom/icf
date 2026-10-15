@@ -1,0 +1,28 @@
+test/toolforge-skill-command.test.mjs
+  s_a8c54205434b64::t_a97dbe8230dc74 89,105-106
+  s_a8c54205434b64::t_0167276610d017 1,6,16-21
+test/toolforge-invocation.test.mjs
+  s_a8c54205434b64::t_1b4b7ae19753fb 1,12,14-16
+test/fixtures/toolforge-pinned/manifest.json
+  s_a8c54205434b64::t_0796252a13abeb 1-1850
+test/fixtures/toolforge-pinned/package.json
+  s_a8c54205434b64::t_ddf98dd9c507f6 1-125
+test/helpers/toolforge-root.mjs
+  s_a8c54205434b64::t_8c623620d49dc4 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9a51bfb11f16d788c58208622cd3d1e8cf93f308",
+  "prompts": {},
+  "sessions": {
+    "s_a8c54205434b64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2a36691-8258-4ddb-9f0d-48310f3f8876",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
