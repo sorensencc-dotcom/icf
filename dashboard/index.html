@@ -5204,6 +5204,24 @@ flowchart TD
     return BACKLOG_DOMAIN_TO_REPO[domainKey] || 'sorensencc-dotcom/toolforge';
   }
 
+  function buildCardDetailSections(card) {
+    const fence = '`'.repeat(3);
+    let out = '';
+    if (card.context && Object.keys(card.context).length) {
+      out += '\n### Context\n' + fence + 'json\n' + JSON.stringify(card.context, null, 2) + '\n' + fence + '\n';
+      if (card.context.note && /fetch failed/i.test(card.context.note)) {
+        out += '\n> Warning: the source document body was not fetched, so this card holds only filename-derived metadata. Open the original card before acting.\n';
+      }
+    }
+    if (Array.isArray(card.execution_plan) && card.execution_plan.length) {
+      out += '\n### Execution plan\n' + card.execution_plan.map(st => st.step + '. ' + (st.action || '') + (st.command ? ' - `' + st.command + '`' : '')).join('\n') + '\n';
+    }
+    if (card.deliverables) {
+      out += '\n### Deliverables & acceptance criteria\n' + (typeof card.deliverables === 'string' ? card.deliverables : JSON.stringify(card.deliverables, null, 2)) + '\n';
+    }
+    return out;
+  }
+
   function commitTypeForCard(card) {
     const category = String(card.category || '').toUpperCase();
     if (card.action_type === 'deterministic_fix') return 'fix';
@@ -5227,7 +5245,7 @@ flowchart TD
     if (repoInput) repoInput.value = resolveRepoForCard(card);
     if (labelsInput) labelsInput.value = (card.tags && card.tags.length) ? card.tags.join(', ') : 'enhancement';
     if (bodyInput) {
-      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || card.domain || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### PR & Issue Traceability\n- When opening a Pull Request for this issue, include \`Closes #<issue_number>\` in the PR description.\n- Use conventional commit title: \`${commitTypeForCard(card)}(${card.target || 'core'}): ${card.intent || card.id} (closes #<issue_number>)\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n`;
+      bodyInput.value = `### Overview\n${card.summary || card.intent || ''}\n\n### Card Context\n- Card ID: \`${card.id}\`\n- Target: \`${card.target || card.domain || 'toolforge'}\`\n- Priority: \`${card.priority || 'P2'}\`\n\n### PR & Issue Traceability\n- When opening a Pull Request for this issue, include \`Closes #<issue_number>\` in the PR description.\n- Use conventional commit title: \`${commitTypeForCard(card)}(${card.target || 'core'}): ${card.intent || card.id} (closes #<issue_number>)\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n` + buildCardDetailSections(card);
     }
 
     if (modal) modal.style.display = 'flex';

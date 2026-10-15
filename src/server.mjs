@@ -834,10 +834,19 @@ export function createGatewayServer(options = {}) {
                       status: rcpt?.status || data.status || defaultStatus,
                       priority: data.priority || 'P2',
                       issue_url: rcpt?.issue_url || data.issue_url || null,
-                      research_ref: rcpt?.research_ref || data.research_ref || null
+                      research_ref: rcpt?.research_ref || data.research_ref || null,
+                      action_type: data.action_type,
+                      category: data.category,
+                      context: data.context,
+                      execution_plan: data.execution_plan,
+                      deliverables: data.deliverables
                     });
                   } else {
                     const existing = cardsMap.get(id);
+                    // Ledger rows are flat; fill in the structured card sections from the archived card.
+                    for (const key of ['context', 'execution_plan', 'deliverables']) {
+                      if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
+                    }
                     if (rcpt?.status && existing.status !== 'COMPLETED' && existing.status !== 'DONE') {
                       existing.status = rcpt.status;
                     }
