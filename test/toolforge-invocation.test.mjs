@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { networkInterfaces, tmpdir } from 'node:os';
@@ -9,8 +9,11 @@ import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { createHash } from 'node:crypto';
 import { createGatewayServer } from '../src/server.mjs';
+import { createToolforgeTestRoot } from './helpers/toolforge-root.mjs';
 
-const toolforgeRoot = resolve(process.env.ICF_TEST_TOOLFORGE_ROOT || '../toolforge-read-only-pilot');
+const toolforgeFixture = await createToolforgeTestRoot();
+const toolforgeRoot = toolforgeFixture.root;
+after(() => toolforgeFixture.cleanup());
 const apiPath = join(toolforgeRoot, 'skills/toolforge-cli/src/invoke-skill.mjs');
 const origin = 'http://127.0.0.1:8123';
 const input = { agentName: 'HTTP sentinel', expectedSchema: {}, actualSchema: {} };
