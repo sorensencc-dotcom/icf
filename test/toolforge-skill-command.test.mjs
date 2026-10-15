@@ -1,8 +1,9 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import {
@@ -12,6 +13,12 @@ import {
   quotePowerShell
 } from '../src/toolforge-skill-command.mjs';
 import { buildToolforgeSkillRunner, findToolforgeSkill } from '../src/server.mjs';
+import { createToolforgeTestRoot } from './helpers/toolforge-root.mjs';
+
+const toolforgeFixture = await createToolforgeTestRoot();
+const { icfRoot } = toolforgeFixture;
+const invokeSkillPath = join(toolforgeFixture.root, 'skills/toolforge-cli/src/invoke-skill.mjs');
+after(() => toolforgeFixture.cleanup());
 
 test('four wiki clipboard families carry quoted owner cwd on both surfaces', async t => {
   const root = await mkdtemp(join(tmpdir(), "icf-wiki owner's-"));
@@ -79,7 +86,7 @@ test('inventory labels describe non-CLI capabilities without a stale registratio
 
 test('browser pure formatter exactly matches managed formatter for every pilot', async () => {
   const { formatInvocationCommand } = await import('../dashboard/toolforge-invocation.mjs');
-  const managed = await import('file:///C:/dev/dev-sandbox/toolforge-read-only-pilot/skills/toolforge-cli/src/invoke-skill.mjs');
+  const managed = await import(pathToFileURL(invokeSkillPath).href);
   const context = { nodeExecutable: "C:\\Node's\\node.exe", scriptPath: 'C:\\forge\\invoke-skill.mjs', workspaceRoots: ['C:\\work', "C:\\other's"] };
   const inputs = {
     'roadmap-validator': { roadmapPath: "C:\\work\\road's.md", strict: false, verbose: true },
@@ -95,8 +102,8 @@ test('copied browser command executes managed CLI with UTF-8 data and restores e
   const { formatInvocationCommand } = await import('../dashboard/toolforge-invocation.mjs');
   const context = {
     nodeExecutable: process.execPath,
-    scriptPath: 'C:/dev/dev-sandbox/toolforge-read-only-pilot/skills/toolforge-cli/src/invoke-skill.mjs',
-    workspaceRoots: ['C:/dev/dev-sandbox/icf-read-only-pilot']
+    scriptPath: invokeSkillPath,
+    workspaceRoots: [icfRoot]
   };
   const agentName = ' agent \u00e9 \' "$ ` <html> ';
   for (const [input, expectedState, expectedOutcome, exitCode] of [

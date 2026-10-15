@@ -65,6 +65,8 @@ process.stdout?.on?.('error', () => {});
 process.stderr?.on?.('error', () => {});
 export const ROOT = resolve(__dirname, '..');
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
+// TRM_INBOX_DIR lets tests mutate a temp ledger instead of the live trm-drive inbox.
+export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(ROOT, '../trm-drive/inbox'));
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
 export const HOST = process.env.ICF_HOST || '0.0.0.0';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
@@ -994,7 +996,7 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
-          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
           let updatedCard = null;
           if (existsSync(ledgerPath)) {
             const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
@@ -1041,7 +1043,7 @@ export function createGatewayServer(options = {}) {
           const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
 
           // Re-promotion lock: refuse completed or already-promoted cards, and reconcile rows whose receipt says completed.
-          const promoteInboxDir = process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(ROOT, '../trm-drive/inbox');
+          const promoteInboxDir = trmInboxDir();
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
           const lockRow = existsSync(lockLedgerPath)
             ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === body.cardId)
