@@ -26,28 +26,19 @@ test('ICF Gateway - GET /api/reporting/trm-backlog returns structured backlog ca
 });
 
 test('ICF Gateway - POST /api/reporting/trm-backlog/triage-card updates card priority and status', async () => {
-  const server = createGatewayServer();
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const port = server.address().port;
-  const baseUrl = `http://127.0.0.1:${port}`;
-
-  try {
+  await withPromoteInbox([{ id: 'card-triage', status: 'COMPLETED', priority: 'P3' }], [], async ({ baseUrl, readRows }) => {
     const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/triage-card`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cardId: 'act-03-evaluate-gemini-workspace-connectors',
-        priority: 'P1',
-        status: 'STAGED_FOR_TRIAGE'
-      })
+      body: JSON.stringify({ cardId: 'card-triage', priority: 'P1', status: 'STAGED_FOR_TRIAGE' })
     });
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
     assert.equal(body.card.priority, 'P1');
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-  }
+    assert.equal(readRows()[0].priority, 'P1');
+    assert.equal(readRows()[0].status, 'STAGED_FOR_TRIAGE');
+  });
 });
 
 async function withPromoteInbox(rows, receiptIds, fn) {
@@ -69,7 +60,7 @@ async function withPromoteInbox(rows, receiptIds, fn) {
   });
   const readRows = () => readFileSync(join(inboxDir, 'ledger.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   try {
-    await fn({ promote, readRows });
+    await fn({ promote, readRows, baseUrl });
   } finally {
     await new Promise((resolve) => server.close(resolve));
     if (previous === undefined) delete process.env.TRM_INBOX_DIR; else process.env.TRM_INBOX_DIR = previous;

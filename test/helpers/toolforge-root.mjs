@@ -20,7 +20,7 @@ export async function createToolforgeTestRoot() {
     await copyFile(join(sourceRoot, cli, 'src', file), join(root, cli, 'src', file));
   }
   // The pin also covers each pilot skill's own files; those come from the real tree and must match.
-  const reviewed = JSON.parse(await readFile(join(root, cli, 'src/invocation-reviewed.json'), 'utf8'));
+  const reviewed = JSON.parse(await readFile(join(sourceRoot, cli, 'src/invocation-reviewed.json'), 'utf8'));
   const skillFiles = Object.values(reviewed.skills).flatMap(skill => skill.files);
   for (const file of skillFiles) {
     await mkdir(dirname(join(root, file)), { recursive: true });
