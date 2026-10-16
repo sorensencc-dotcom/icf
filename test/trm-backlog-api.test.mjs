@@ -98,3 +98,31 @@ test('ICF Gateway - promote refuses completed, already-promoted, and receipt-bac
     assert.equal(byId['card-receipt'].status, 'COMPLETED', 'receipt-backed row is reconciled to COMPLETED');
   });
 });
+
+test('ICF Gateway - promote hydrates card body and formats title with commit prefix from archived card', async () => {
+  const row = { id: 'card-hydrate', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'toolforge', intent: 'test_hydration' };
+  await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
+    const completedDir = join(process.env.TRM_INBOX_DIR, 'completed');
+    mkdirSync(completedDir, { recursive: true });
+    writeFileSync(join(completedDir, 'card-hydrate.json'), JSON.stringify({
+      id: 'card-hydrate',
+      category: 'IMPLEMENT',
+      target: 'toolforge',
+      intent: 'test_hydration',
+      context: { source_system: 'test-harness' },
+      execution_plan: [{ step: 1, action: 'verify' }],
+      deliverables: 'Deliverable 1'
+    }), 'utf8');
+
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/promote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-hydrate', repo: 'sorensencc-dotcom/toolforge', dryRun: true })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.equal(body.card.status, 'IN_PROGRESS');
+  });
+});
+

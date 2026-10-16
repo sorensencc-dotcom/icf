@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, watch } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, execFileSync, spawn } from 'node:child_process';
@@ -209,6 +209,92 @@ function readToolforgeBody(req) {
     req.on('error', error);
     req.on('aborted', aborted);
   });
+}
+
+export function commitTypeForCard(card = {}) {
+  const category = String(card.category || '').toUpperCase();
+  if (card.action_type === 'deterministic_fix') return 'fix';
+  if (category === 'RESEARCH' || category === 'EVALUATE') return 'chore';
+  return 'feat';
+}
+
+export function buildCardDetailSections(card = {}) {
+  const fence = '`'.repeat(3);
+  let out = '';
+  if (card.context && Object.keys(card.context).length) {
+    out += '\n### Context\n' + fence + 'json\n' + JSON.stringify(card.context, null, 2) + '\n' + fence + '\n';
+    if (card.context.note && /fetch failed/i.test(card.context.note)) {
+      out += '\n> Warning: the source document body was not fetched, so this card holds only filename-derived metadata. Open the original card before acting.\n';
+    }
+  }
+  if (Array.isArray(card.execution_plan) && card.execution_plan.length) {
+    out += '\n### Execution plan\n' + card.execution_plan.map(st => (st.step || 1) + '. ' + (st.action || '') + (st.command ? ' - `' + st.command + '`' : '')).join('\n') + '\n';
+  }
+  if (card.deliverables) {
+    out += '\n### Deliverables & acceptance criteria\n' + (typeof card.deliverables === 'string' ? card.deliverables : JSON.stringify(card.deliverables, null, 2)) + '\n';
+  }
+  if (card.direction) {
+    out += '\n### Direction\n' + (typeof card.direction === 'string' ? card.direction : JSON.stringify(card.direction, null, 2)) + '\n';
+  }
+  return out;
+}
+
+export function loadArchivedCard(cardId, lockRow = null, inboxDir = null) {
+  const candidatePaths = [];
+  if (lockRow?.archived_path) candidatePaths.push(lockRow.archived_path);
+
+  const baseInbox = inboxDir || trmInboxDir();
+  const harnessPending = resolve(ROOT, '../.harness/tasks/pending');
+  const harnessArchive = resolve(ROOT, '../.harness/tasks/archive');
+  const inboxCompleted = resolve(baseInbox, 'completed');
+  const gdriveArchive = resolve('G:/My Drive/TRM-Research/04_archive/mobile-inbox');
+
+  candidatePaths.push(
+    resolve(harnessPending, `${cardId}.json`),
+    resolve(harnessArchive, `${cardId}.json`),
+    resolve(harnessPending, `${cardId}.md`),
+    resolve(harnessArchive, `${cardId}.md`),
+    resolve(inboxCompleted, `${cardId}.json`),
+    resolve(inboxCompleted, `${cardId}.md`)
+  );
+
+  for (const dir of [harnessPending, harnessArchive, inboxCompleted, gdriveArchive]) {
+    if (existsSync(dir)) {
+      try {
+        const files = readdirSync(dir);
+        for (const f of files) {
+          if (f.includes(cardId)) {
+            candidatePaths.push(resolve(dir, f));
+          }
+        }
+      } catch {}
+    }
+  }
+
+  for (const p of candidatePaths) {
+    if (p && existsSync(p)) {
+      try {
+        const stat = statSync(p);
+        if (!stat.isFile()) continue;
+        const content = readFileSync(p, 'utf8');
+        if (p.endsWith('.json') || content.trim().startsWith('{')) {
+          return JSON.parse(content);
+        } else if (p.endsWith('.md') || content.includes('---')) {
+          const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+          if (match) {
+            const frontmatter = {};
+            for (const line of match[1].split(/\r?\n/)) {
+              const idx = line.indexOf(':');
+              if (idx > 0) frontmatter[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+            }
+            frontmatter.body = content.slice(match[0].length).trim();
+            return frontmatter;
+          }
+        }
+      } catch {}
+    }
+  }
+  return null;
 }
 
 export function createGatewayServer(options = {}) {
@@ -936,7 +1022,7 @@ export function createGatewayServer(options = {}) {
                   } else {
                     const existing = cardsMap.get(id);
                     // Ledger rows are flat; fill in the structured card sections from the archived card.
-                    for (const key of ['context', 'execution_plan', 'deliverables']) {
+                    for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path']) {
                       if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
                     }
                     if (rcpt?.status && existing.status !== 'COMPLETED' && existing.status !== 'DONE') {
@@ -1037,17 +1123,33 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
+          const cardId = body.cardId;
           const repo = body.repo || 'sorensencc-dotcom/toolforge';
-          const title = body.title || `[TRM-Triage] ${body.cardId}`;
-          const bodyText = body.body || `Promoted from action card ${body.cardId}`;
-          const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
 
           // Re-promotion lock: refuse completed or already-promoted cards, and reconcile rows whose receipt says completed.
           const promoteInboxDir = trmInboxDir();
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
           const lockRow = existsSync(lockLedgerPath)
-            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === body.cardId)
+            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === cardId)
             : null;
+
+          const archivedCard = loadArchivedCard(cardId, lockRow, promoteInboxDir);
+          const cardData = {
+            ...(lockRow || {}),
+            ...(archivedCard || {})
+          };
+
+          const commitType = commitTypeForCard(cardData);
+          const target = cardData.target || cardData.domain || 'core';
+          const intent = cardData.intent || cardData.title || cardId;
+          const title = body.title || `${commitType}(${target}): ${intent}`;
+
+          let bodyText = body.body;
+          if (!bodyText || bodyText === `Promoted from action card ${cardId}`) {
+            bodyText = `### Overview\n${cardData.summary || cardData.intent || ''}\n\n### Card Context\n- Card ID: \`${cardId}\`\n- Target: \`${target}\`\n- Priority: \`${cardData.priority || 'P2'}\`\n\n### PR & Issue Traceability\n- When opening a Pull Request for this issue, include \`Closes #<issue_number>\` in the PR description.\n- Use conventional commit title: \`${commitType}(${target}): ${intent} (closes #<issue_number>)\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n` + buildCardDetailSections(cardData);
+          }
+          const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
+
           if (lockRow) {
             const receiptName = `receipt-${lockRow.id}-completed.json`;
             const hasReceipt = ['completed/outbox', 'outbox']
@@ -1080,31 +1182,37 @@ export function createGatewayServer(options = {}) {
           if (isDryRun) {
             issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
           } else {
-            // First attempt: with requested labels
-            if (labelList.length > 0) {
-              try {
-                const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
-                for (const lbl of labelList) {
-                  args.push('--label', lbl);
+            const tmpFile = resolve(os.tmpdir(), `trm-promote-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
+            writeFileSync(tmpFile, bodyText, 'utf8');
+            try {
+              // First attempt: with requested labels
+              if (labelList.length > 0) {
+                try {
+                  const args = ['issue', 'create', '--repo', repo, '--title', title, '--body-file', tmpFile];
+                  for (const lbl of labelList) {
+                    args.push('--label', lbl);
+                  }
+                  const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                  issueUrl = out.trim().split(/\r?\n/).pop();
+                } catch (err) {
+                  // If failed (e.g. label does not exist on target repo), retry without labels
+                  console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
                 }
-                const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
-                issueUrl = out.trim().split(/\r?\n/).pop();
-              } catch (err) {
-                // If failed (e.g. label does not exist on target repo), retry without labels
-                console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
               }
-            }
 
-            // Second attempt: without labels if first attempt failed or had no labels
-            if (!issueUrl) {
-              try {
-                const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', bodyText];
-                const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
-                issueUrl = out.trim().split(/\r?\n/).pop();
-              } catch (err) {
-                console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
-                issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+              // Second attempt: without labels if first attempt failed or had no labels
+              if (!issueUrl) {
+                try {
+                  const args = ['issue', 'create', '--repo', repo, '--title', title, '--body-file', tmpFile];
+                  const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                  issueUrl = out.trim().split(/\r?\n/).pop();
+                } catch (err) {
+                  console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
+                  issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+                }
               }
+            } finally {
+              try { unlinkSync(tmpFile); } catch {}
             }
           }
 
