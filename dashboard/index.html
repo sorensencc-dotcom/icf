@@ -2252,14 +2252,14 @@ flowchart TD
         </div>
       </div>
 
-      <!-- Nightly Maintenance Banner -->
+      <!-- Operations & Research Decoupled Pipeline Banner -->
       <div style="margin-top: 1.5rem; padding: 1.25rem; background: rgba(34, 27, 23, 0.6); border-left: 4px solid #7a9fbf; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div>
           <div style="font-family: var(--font-ui); font-size: 0.9rem; font-weight: 700; color: #7a9fbf; letter-spacing: 0.1em; text-transform: uppercase;">
-            🌙 Nightly Maintenance Window (08:00 PM – 08:30 PM ET)
+            🌙 Decoupled Operations &amp; Research Maintenance Windows
           </div>
           <div style="font-size: 0.85rem; color: var(--bone); margin-top: 0.25rem;">
-            <code>08:00 PM</code> <strong>KB-Sync-Master-Pipeline</strong> (wiki validation, link integrity, autohealing) ➔ <code>08:00 PM</code> <strong>TRM-Notebooklm-Chat-Archive</strong> (all-notebook chat archival → knowledge.db) ➔ <code>08:30 PM</code> <strong>KB-Sync-TRM-Triage</strong> (gap triage engine, RFC drafting &amp; fact reconciliation).
+            <code>06:45 PM</code> <strong>KB-Sync-Ops</strong> (Clusters C, D, E: Core Dev &amp; Tooling) ➔ <code>07:45 PM</code> <strong>KB-Sync-Ops-Audit</strong> ➔ <code>10:45 PM</code> <strong>KB-Sync-Research</strong> (Clusters A, B: Historical &amp; Deep Research) ➔ <code>06:00 AM</code> <strong>KB-Sync-Catchup</strong> (quarantine/dropped delta pass) ➔ <code>06:45 AM</code> <strong>KB-Sync-Research-Audit</strong>.
           </div>
         </div>
         <span class="tag date" style="background: rgba(90, 158, 111, 0.15); color: var(--sage); border-color: rgba(90, 158, 111, 0.4);">SCHEDULED DAILY</span>
@@ -2278,14 +2278,19 @@ flowchart TD
       </p>
       <pre style="background: var(--iron); padding: 1.25rem; border: 1px solid rgba(154, 144, 136, 0.15); color: var(--bone); font-family: monospace; font-size: 0.8rem; overflow-x: auto;"><code>flowchart TD
   subgraph MorningChain["Daily Morning Pipeline (06:00 AM – 07:00 AM ET)"]
-    M1["06:00 AM: TRM-Notebooklm-Mine\n(Ingests 11 NBs &amp; Mines Gaps)"] -->|"30 min buffer"| M2["06:30 AM: toolforge-trm-sync-treatment\n(Reconciles Vault Facts)"]
+    M0["06:00 AM: KB-Sync-Catchup\n(Delta pass on quarantined NBs)"] -->|"parallel"| M1["06:00 AM: TRM-Notebooklm-Mine\n(Ingests NBs &amp; Mines Gaps)"]
+    M1 -->|"30 min buffer"| M2["06:30 AM: toolforge-trm-sync-treatment\n(Reconciles Vault Facts)"]
     M2 -->|"15 min buffer"| M3["06:45 AM: CIC-Mirror-ClaudeMemory\n(Mirrors Protected Memory)"]
+    M3 -->|"parallel"| M3b["06:45 AM: KB-Sync-Research-Audit\n(Evaluates Research State)"]
     M3 -->|"15 min buffer"| M4["07:00 AM: CIC-Daily-Status\n(Aggregates JSON &amp; Renders ICF Dashboard)"]
   end
 
-  subgraph EveningChain["Nightly Maintenance (08:00 PM – 08:30 PM ET)"]
-    E1["08:00 PM: KB-Sync-Master-Pipeline\n(Wiki Validation &amp; Autoheal)"] -->|"parallel"| E1b["08:00 PM: TRM-Notebooklm-Chat-Archive\n(All-Notebook Chat Archival)"]
-    E1b -->|"30 min buffer"| E2["08:30 PM: KB-Sync-TRM-Triage\n(Gap Triage &amp; RFC Synthesis Pass)"]
+  subgraph EveningChain["Decoupled Operations &amp; Research Schedule (EDT)"]
+    O1["06:45 PM: KB-Sync-Ops\n(Clusters C, D, E: Core Dev &amp; Tooling)"] -->|"60 min buffer"| O2["07:45 PM: KB-Sync-Ops-Audit\n(Evaluates Dev/Ops State)"]
+    O2 -->|"parallel"| E1["08:00 PM: KB-Sync-Master-Pipeline\n(Wiki Validation &amp; Autoheal)"]
+    E1 -->|"parallel"| E1b["08:00 PM: TRM-Notebooklm-Chat-Archive\n(All-Notebook Chat Archival)"]
+    E1b -->|"30 min buffer"| E2["08:30 PM: KB-Sync-TRM-Triage\n(Gap Triage Pass)"]
+    E2 -->|"overnight"| R1["10:45 PM: KB-Sync-Research\n(Clusters A, B: Historical &amp; Heavy OCR)"]
   end</code></pre>
     </div>
 
@@ -2575,6 +2580,24 @@ flowchart TD
             <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'CIC-Daily-Status' -TaskPath '\CIC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
           <tr>
+            <td><strong style="color:var(--white);">KB-Sync-Ops</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
+            <td><span class="tag date">Daily 06:45 PM</span></td>
+            <td>~20–30 mins</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● READY</span></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-Ops' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">KB-Sync-Ops-Audit</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
+            <td><span class="tag date">Daily 07:45 PM</span></td>
+            <td>~2–5 mins</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● READY</span></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-Ops-Audit' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
+          </tr>
+          <tr>
             <td><strong style="color:var(--white);">KB-Sync-Master-Pipeline</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
             <td><span class="tag date">Daily 08:00 PM</span></td>
             <td>~3–8 mins</td>
@@ -2591,6 +2614,33 @@ flowchart TD
             <td><span class="status-badge live" style="font-size:0.6rem;">● WAKE ENABLED</span></td>
             <td><span class="status-badge live" style="font-size:0.6rem;">● SUCCESS (0)</span></td>
             <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'TRM-Notebooklm-Chat-Archive' -TaskPath '\TRM\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">KB-Sync-Research</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
+            <td><span class="tag high">Daily 10:45 PM</span></td>
+            <td>~30–60 mins</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● WAKE ENABLED</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● READY</span></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-Research' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">KB-Sync-Catchup</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
+            <td><span class="tag high">Daily 06:00 AM</span></td>
+            <td>&lt;5 mins</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● WAKE ENABLED</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● READY</span></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-Catchup' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--white);">KB-Sync-Research-Audit</strong><br><span style="font-size:0.75rem; color:var(--ash); font-family:monospace;">\KB-SYNC\</span></td>
+            <td><span class="tag date">Daily 06:45 AM</span></td>
+            <td>~2–5 mins</td>
+            <td><code>soren (S4U)</code> · Highest</td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● CATCHUP ON</span></td>
+            <td><span class="status-badge live" style="font-size:0.6rem;">● READY</span></td>
+            <td><button type="button" class="btn-secondary" data-copy-command="Start-ScheduledTask -TaskName 'KB-Sync-Research-Audit' -TaskPath '\KB-SYNC\'" onclick="copyCommand(this.dataset.copyCommand)">Run Task</button></td>
           </tr>
         </tbody>
       </table>
