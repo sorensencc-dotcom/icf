@@ -5244,7 +5244,10 @@ flowchart TD
     const bodyInput = document.getElementById('promoteBodyInput');
 
     if (cardIdInput) cardIdInput.value = card.id;
-    if (titleInput) titleInput.value = card.intent || card.title || `feat(${card.target || 'core'}): ${card.id}`;
+    const prefix = commitTypeForCard(card);
+    const target = card.target || card.domain || 'core';
+    const intent = card.intent || card.title || card.id;
+    if (titleInput) titleInput.value = `${prefix}(${target}): ${intent}`;
     if (repoInput) repoInput.value = resolveRepoForCard(card);
     if (labelsInput) labelsInput.value = (card.tags && card.tags.length) ? card.tags.join(', ') : 'enhancement';
     if (bodyInput) {
