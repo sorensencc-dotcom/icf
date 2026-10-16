@@ -1379,7 +1379,7 @@
       <!-- 4-Quadrant Deep Synthesis View -->
       <div class="synthesis-grid">
         <div class="synth-card contradictions">
-          <div class="synth-head">⚖️ Unresolved Contradictions Identified</div>
+          <div class="synth-head" id="trmHeadContradictions">⚖️ Unresolved Contradictions Identified</div>
           <div id="trmSynthContradictions">
             <div class="synth-item">
               <div class="synth-item-title">Bennett vs. Sorensen Narrative Conflict</div>
@@ -1393,7 +1393,7 @@
         </div>
 
         <div class="synth-card undersourced">
-          <div class="synth-head">⚠️ Under-Sourced Assertions</div>
+          <div class="synth-head" id="trmHeadUndersourced">⚠️ Under-Sourced Assertions</div>
           <div id="trmSynthUndersourced">
             <div class="synth-item">
               <div class="synth-item-title">Bennett Purge Confrontation Timeline</div>
@@ -3699,8 +3699,34 @@ flowchart TD
     if (findings && (findings.contradictions?.length || findings.undersourced?.length || findings.adjacent?.length || findings.followup?.length || findings.total_questions > 0)) {
       if (titleEl) titleEl.textContent = `Findings for ${findings.title || notebookId}`;
       const vectorCount = findings.total_questions || ((findings.contradictions ? findings.contradictions.length : 0) + (findings.undersourced ? findings.undersourced.length : 0) + (findings.adjacent ? findings.adjacent.length : 0) + (findings.followup ? findings.followup.length : 0));
+
+      const allContradictionsResolved = Array.isArray(findings.contradictions) && findings.contradictions.length > 0 &&
+        findings.contradictions.every(c => c.resolved || c.status === 'RESOLVED' || (c.title && c.title.includes('[RECONCILED:')));
+      const allUndersourcedResolved = Array.isArray(findings.undersourced) && findings.undersourced.length > 0 &&
+        findings.undersourced.every(u => u.resolved || u.status === 'RESOLVED' || (u.title && u.title.includes('[RECONCILED:')));
+      const isReconciled = (findings.extraction_status && findings.extraction_status.includes('RESOLVED')) || (allContradictionsResolved && allUndersourcedResolved);
+
+      const statusText = findings.extraction_status || (isReconciled ? `RESOLVED (${vectorCount} Vectors Reconciled)` : `COMPLETE (${vectorCount} Vectors Mined)`);
       if (metaEl) {
-        metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span style="color:#5a9e6f;">COMPLETE (${vectorCount} Vectors Mined)</span>`;
+        metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span class="status-badge ${isReconciled ? 'live' : 'progress'}" style="font-size:0.75rem; padding:0.15rem 0.5rem; vertical-align:middle;">● ${escapeHtml(statusText)}</span>`;
+      }
+
+      const headContradictions = document.getElementById('trmHeadContradictions');
+      if (headContradictions) {
+        if (allContradictionsResolved) {
+          headContradictions.innerHTML = `⚖️ Reconciled Contradictions <span class="status-badge live" style="font-size:0.65rem; margin-left:0.4rem; vertical-align:middle;">● ALL RESOLVED</span>`;
+        } else {
+          headContradictions.innerHTML = `⚖️ Unresolved Contradictions Identified`;
+        }
+      }
+
+      const headUndersourced = document.getElementById('trmHeadUndersourced');
+      if (headUndersourced) {
+        if (allUndersourcedResolved) {
+          headUndersourced.innerHTML = `⚠️ Corroborated Historical Assertions <span class="status-badge live" style="font-size:0.65rem; margin-left:0.4rem; vertical-align:middle;">● ALL RECONCILED</span>`;
+        } else {
+          headUndersourced.innerHTML = `⚠️ Under-Sourced Assertions`;
+        }
       }
 
       renderSynthesisQuadrant('trmSynthContradictions', findings.contradictions);
@@ -3719,6 +3745,11 @@ flowchart TD
         metaEl.innerHTML = `ID: <code>${notebookId}</code> · Extraction Status: <span style="color:var(--ash);">AWAITING MINING SWEEP</span>`;
       }
 
+      const headContradictions = document.getElementById('trmHeadContradictions');
+      if (headContradictions) headContradictions.innerHTML = `⚖️ Unresolved Contradictions Identified`;
+      const headUndersourced = document.getElementById('trmHeadUndersourced');
+      if (headUndersourced) headUndersourced.innerHTML = `⚠️ Under-Sourced Assertions`;
+
       renderSynthesisQuadrant('trmSynthContradictions', []);
       renderSynthesisQuadrant('trmSynthUndersourced', []);
       renderSynthesisQuadrant('trmSynthAdjacent', []);
@@ -3735,12 +3766,16 @@ flowchart TD
       return;
     }
 
-    el.innerHTML = items.map(item => `
-      <div class="synth-item">
-        <div class="synth-item-title">${escapeHtml(item.title)}</div>
-        <div class="synth-item-desc">${escapeHtml(item.desc || item.excerpt || item.text || '')}</div>
-      </div>
-    `).join('');
+    el.innerHTML = items.map(item => {
+      const isResolved = item.resolved || item.status === 'RESOLVED' || (item.title && item.title.includes('[RECONCILED:'));
+      const badge = isResolved ? `<span class="status-badge live" style="font-size:0.6rem; padding:0.1rem 0.4rem; margin-left:0.5rem; vertical-align:middle;">● RESOLVED</span>` : '';
+      return `
+        <div class="synth-item${isResolved ? ' resolved' : ''}" style="${isResolved ? 'border-left: 2px solid #5a9e6f; padding-left: 0.6rem;' : ''}">
+          <div class="synth-item-title">${escapeHtml(item.title)}${badge}</div>
+          <div class="synth-item-desc">${escapeHtml(item.desc || item.excerpt || item.text || '')}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   function selectTrmNotebook(notebookId) {
