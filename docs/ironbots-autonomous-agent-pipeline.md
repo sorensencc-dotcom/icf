@@ -2,10 +2,9 @@
 
 Ironbots is the background automated robot subsystem operating within Toolforge and supervised by the Iron Command Forge (ICF) telemetry aggregator.
 
-![Ironbots Autonomous Architecture](ironbots-architecture-diagram.png)
+![Ironbots Autonomous Architecture](ironbots-autonomous-agent-pipeline.png)
 
-<details>
-<summary>Mermaid source...</summary>
+<details><summary>Mermaid source...</summary>
 
 ```mermaid
 flowchart TD

@@ -1007,8 +1007,8 @@ export function createGatewayServer(options = {}) {
                     cardsMap.set(id, {
                       id,
                       target: data.target || data.domain || rcpt?.target_notebook || 'toolforge',
-                      intent: data.intent || data.title || rcpt?.intent || id,
-                      summary: data.summary || rcpt?.summary || data.intent || '',
+                      intent: data.title || data.intent || rcpt?.intent || id,
+                      summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
                       status: rcpt?.status || data.status || defaultStatus,
                       priority: data.priority || 'P2',
                       issue_url: rcpt?.issue_url || data.issue_url || null,
@@ -1022,8 +1022,14 @@ export function createGatewayServer(options = {}) {
                   } else {
                     const existing = cardsMap.get(id);
                     // Ledger rows are flat; fill in the structured card sections from the archived card.
-                    for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path']) {
+                    for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path', 'title', 'raw_preview']) {
                       if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
+                    }
+                    if (data.title && (!existing.title || existing.intent === existing.id || existing.intent.startsWith('act_'))) {
+                      existing.intent = data.title;
+                    }
+                    if (data.summary && (!existing.summary || existing.summary.startsWith('Mobile action item'))) {
+                      existing.summary = data.summary;
                     }
                     if (rcpt?.status && existing.status !== 'COMPLETED' && existing.status !== 'DONE') {
                       existing.status = rcpt.status;

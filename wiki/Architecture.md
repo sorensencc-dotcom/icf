@@ -20,10 +20,9 @@ Iron Command Forge (ICF) consolidates workspace operations into four decoupled s
 
 ## Architectural diagram
 
-![Iron Command Forge Architecture](icf-architecture-diagram.png)
+![Iron Command Forge Architecture](Architecture.png)
 
-<details>
-<summary>Mermaid source...</summary>
+<details><summary>Mermaid source...</summary>
 
 ```mermaid
 flowchart TD
