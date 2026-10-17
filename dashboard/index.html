@@ -1485,11 +1485,13 @@
           </div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('ALL')">All</button>
-          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('STAGED')">⏳ Needs Triage</button>
-          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('RESEARCH')">🔬 Research</button>
-          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('IN_PROGRESS')">🛠️ In Progress</button>
-          <button type="button" class="btn-secondary" onclick="filterTrmBacklog('DEFERRED')">🚫 Deferred (YAGNI)</button>
+          <button type="button" class="btn-secondary active" id="btnBacklogFilterOpen" onclick="filterTrmBacklog('OPEN')">Open</button>
+          <button type="button" class="btn-secondary" id="btnBacklogFilterAll" onclick="filterTrmBacklog('ALL')">All</button>
+          <button type="button" class="btn-secondary" id="btnBacklogFilterStaged" onclick="filterTrmBacklog('STAGED')">⏳ Needs Triage</button>
+          <button type="button" class="btn-secondary" id="btnBacklogFilterResearch" onclick="filterTrmBacklog('RESEARCH')">🔬 Research</button>
+          <button type="button" class="btn-secondary" id="btnBacklogFilterProgress" onclick="filterTrmBacklog('IN_PROGRESS')">🛠️ In Progress</button>
+          <button type="button" class="btn-secondary" id="btnBacklogFilterDeferred" onclick="filterTrmBacklog('DEFERRED')">🚫 Deferred (YAGNI)</button>
+          <button type="button" class="btn-secondary" id="btnBacklogFilterCompleted" onclick="filterTrmBacklog('COMPLETED')">✅ Completed</button>
           <button type="button" class="panel-action" onclick="loadTrmBacklog()">Refresh Backlog →</button>
         </div>
       </div>
@@ -5140,7 +5142,7 @@ flowchart TD
   applyTheme(savedTheme);
 
   let cachedTrmBacklogCards = [];
-  let currentTrmBacklogFilter = 'ALL';
+  let currentTrmBacklogFilter = 'OPEN';
 
   async function loadTrmBacklog() {
     const tableBody = document.getElementById('trmBacklogTableBody');
@@ -5168,7 +5170,7 @@ flowchart TD
       if (quickDeferred) quickDeferred.textContent = String(deferred);
       if (quickBadge) quickBadge.textContent = staged > 0 ? `● ${staged} NEEDS TRIAGE` : '● ALL TRIAGED';
 
-      renderTrmBacklogTable();
+      filterTrmBacklog(currentTrmBacklogFilter);
     } catch (e) {
       console.error('Failed to load TRM backlog', e);
     }
@@ -5176,15 +5178,37 @@ flowchart TD
 
   function filterTrmBacklog(filter) {
     currentTrmBacklogFilter = filter;
+
+    const filterBtns = {
+      'OPEN': document.getElementById('btnBacklogFilterOpen'),
+      'ALL': document.getElementById('btnBacklogFilterAll'),
+      'STAGED': document.getElementById('btnBacklogFilterStaged'),
+      'RESEARCH': document.getElementById('btnBacklogFilterResearch'),
+      'IN_PROGRESS': document.getElementById('btnBacklogFilterProgress'),
+      'DEFERRED': document.getElementById('btnBacklogFilterDeferred'),
+      'COMPLETED': document.getElementById('btnBacklogFilterCompleted')
+    };
+    Object.entries(filterBtns).forEach(([k, btn]) => {
+      if (btn) {
+        if (k === filter) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+
     renderTrmBacklogTable();
   }
+  window.filterTrmBacklog = filterTrmBacklog;
 
   function renderTrmBacklogTable() {
     const tableBody = document.getElementById('trmBacklogTableBody');
     if (!tableBody) return;
 
     let filtered = cachedTrmBacklogCards;
-    if (currentTrmBacklogFilter === 'STAGED') {
+    if (currentTrmBacklogFilter === 'OPEN') {
+      filtered = cachedTrmBacklogCards.filter(c => c.status !== 'DONE' && c.status !== 'COMPLETED' && c.status !== 'ARCHIVED');
+    } else if (currentTrmBacklogFilter === 'COMPLETED') {
+      filtered = cachedTrmBacklogCards.filter(c => c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED');
+    } else if (currentTrmBacklogFilter === 'STAGED') {
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE');
     } else if (currentTrmBacklogFilter === 'RESEARCH') {
       filtered = cachedTrmBacklogCards.filter(c => c.target === 'RESEARCH' || c.status === 'RESEARCH' || c.status === 'STAGED_FOR_RESEARCH');

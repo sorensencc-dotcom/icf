@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ironbots Autonomous Architecture (ironbots-autonomous-agent-pipeline)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 2rem;
+    }
+    .frame {
+      max-width: 1150px;
+      width: 100%;
+      background: #f5f5f5;
+      border: 2px solid #4f5d75;
+      padding: 32px;
+      box-shadow: 6px 6px 0px #4f5d75;
+    }
+    .header {
+      border-bottom: 2px solid #bf4520;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .title-group h1 {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-ink);
+      letter-spacing: -0.5px;
+    }
+    .title-group p {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+    .badge {
+      background-color: var(--color-ink);
+      color: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 2px;
+      letter-spacing: 0.5px;
+    }
+    svg { width: 100%; display: block; height: auto; }
+    .footer-note {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--color-muted);
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div class="title-group">
+        <h1>Ironbots Autonomous Architecture (ironbots-autonomous-agent-pipeline)</h1>
+        <p>ARCHITECTURE SPECIFICATION • IRONBOTS-AUTONOMOUS-AGENT-PIPELINE</p>
+      </div>
+      <div class="badge">CATHRYN LAVERY SPEC</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="diag-title diag-desc" viewBox="0 0 1086 340">
+      <title id="diag-title">Ironbots Autonomous Architecture (ironbots-autonomous-agent-pipeline)</title>
+      <desc id="diag-desc">ARCHITECTURE SPECIFICATION • IRONBOTS-AUTONOMOUS-AGENT-PIPELINE</desc>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#2d3142"/>
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#bf4520"/>
+        </marker>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2d3142" flood-opacity="0.08"/>
+        </filter>
+      </defs>
+      <g class="diagram-elements">
+        <path d="M 230 170 L 1070 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 1330 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 1590 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 1850 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 2110 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 2370 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 2630 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 2890 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 1070 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 1330 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 1590 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 1850 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 2110 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 2370 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 490 170 L 2630 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1270 170 L 3150 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1270 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1530 170 L 3410 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1530 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1790 170 L 3670 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1790 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2050 170 L 3930 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2050 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2310 170 L 4190 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2310 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2570 170 L 4450 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2570 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2830 170 L 4710 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 2830 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 3090 170 L 5490 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 3090 170 L 4970 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 5170 170 L 5230 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 5170 170 L 550 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+      <g class="node" transform="translate(30, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#bf4520" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Windows Task Scheduler (\Ironbots\)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::A</text>
+      </g>
+      <g class="node" transform="translate(290, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Manual / CI Invocation (npm run bot:all)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::B</text>
+      </g>
+      <g class="node" transform="translate(550, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Agent Status Probing (<100 tokens)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::C</text>
+      </g>
+      <g class="node" transform="translate(810, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Fleet Engineering Policy Contract</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::P</text>
+      </g>
+      <g class="node" transform="translate(1070, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Notebook-Ingester Bot (Daily 02:00 AM)\nscripts/notebook-ingester-bot.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::NB</text>
+      </g>
+      <g class="node" transform="translate(1330, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">KB-Sentinel Bot (Daily 03:00 AM)\nscripts/kb-sentinel-bot.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::D</text>
+      </g>
+      <g class="node" transform="translate(1590, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">TRM-Bot (Daily 04:00 AM)\nscripts/trm-bot-runner.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::E</text>
+      </g>
+      <g class="node" transform="translate(1850, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Watchlist-Miner Bot (Daily 05:00 AM)\nscripts/watchlist-miner-bot.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::WM</text>
+      </g>
+      <g class="node" transform="translate(2110, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Daemon-Healer Bot (Every 15 Min)\nscripts/daemon-healer-bot.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::K</text>
+      </g>
+      <g class="node" transform="translate(2370, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">IronLedger-Sentinel Bot (Every 15 Min)\nscripts/ironledger-sentinel-bot.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::ILS</text>
+      </g>
+      <g class="node" transform="translate(2630, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">CI-Watchdog Bot (Daily 06:00 AM)\nscripts/ci-watchdog-bot.mjs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::L</text>
+      </g>
+      <g class="node" transform="translate(2890, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">IronBot Task Monitor (Every 4 Hours)\nC:/dev/kb-sync/scripts/ironbot/ironbot-task-monitor.ps1</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::IB</text>
+      </g>
+      <g class="node" transform="translate(3150, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">SQLite FTS5 Knowledge Base (.kb_cache/knowledge_fts5.db)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::FTS</text>
+      </g>
+      <g class="node" transform="translate(3410, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Wiki Frontmatter & Link Autoheal</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::F</text>
+      </g>
+      <g class="node" transform="translate(3670, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">RFC Decision Notes (wiki/research/rfc-gap-*.md)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::G</text>
+      </g>
+      <g class="node" transform="translate(3930, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Competitor Drift Reports (wiki/research/competitor-drift-*.md)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::CD</text>
+      </g>
+      <g class="node" transform="translate(4190, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Port 8080 Process Recovery & Uptime</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::M</text>
+      </g>
+      <g class="node" transform="translate(4450, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">IronLedger Workbench Port 8000, DB Invariants & Sync Tasks</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::ILM</text>
+      </g>
+      <g class="node" transform="translate(4710, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">CI Failure Detection & Error Logs</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::N</text>
+      </g>
+      <g class="node" transform="translate(4970, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Telemetry Hub (_status-feed/*.json)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::I</text>
+      </g>
+      <g class="node" transform="translate(5230, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">Iron Command Forge (ICF Snapshot Store)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::J</text>
+      </g>
+      <g class="node" transform="translate(5490, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#bf4520" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">IronBot Audit Log (C:/dev/kb-sync/docs/audit/ironbot/)</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::IA</text>
+      </g>
+    </g>
+    </svg>
+    <div class="footer-note">
+      <span>SYSTEM: ARCHITECTURE SPECIFICATION</span>
+      <span>PALETTE: CATHRYN LAVERY DIAGRAM-DESIGN SKIN (#f5f5f5 / #bf4520)</span>
+    </div>
+  </div>
+</body>
+</html>

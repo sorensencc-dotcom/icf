@@ -27,10 +27,9 @@ ICF combines an SQLite-backed reporting engine with bounded trend projection, a 
 
 ## Architecture overview
 
-![Iron Command Forge Architecture](icf-architecture-diagram.png)
+![Iron Command Forge Architecture](Home.png)
 
-<details>
-<summary>Mermaid source...</summary>
+<details><summary>Mermaid source...</summary>
 
 ```mermaid
 flowchart TD
