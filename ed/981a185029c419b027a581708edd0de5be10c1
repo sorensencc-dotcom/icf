@@ -1,0 +1,22 @@
+reporting/src/weekly-retro-contract.mjs
+  s_368a2d912b4ec1::t_82dc89c26a70ed 139
+  s_368a2d912b4ec1::t_06dcc77085e858 176-179
+reporting/test/weekly-retro-contract.test.mjs
+  s_368a2d912b4ec1::t_d33d06135763a5 86-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ed981a185029c419b027a581708edd0de5be10c1",
+  "prompts": {},
+  "sessions": {
+    "s_368a2d912b4ec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "574e2b73-c2e9-4e32-bfea-e54837634393",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
