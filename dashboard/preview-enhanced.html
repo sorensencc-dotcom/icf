@@ -2712,7 +2712,7 @@ flowchart TD
           <div class="panel-title">Filter by Category &amp; Keywords</div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <input type="text" id="skillSearchInput" placeholder="Search skills..." oninput="handleSkillSearch(this.value)" style="background: var(--black); border: 1px solid rgba(154, 144, 136, 0.2); color: var(--bone); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 0.05em; padding: 0.45rem 0.8rem; outline: none;" onfocus="this.style.borderColor='var(--ember)'" onblur="this.style.borderColor='rgba(154, 144, 136, 0.2)'">
+          <input type="text" id="skillSearchInput" aria-label="Search skills" placeholder="Search skills..." oninput="handleSkillSearch(this.value)" style="background: var(--black); border: 1px solid rgba(154, 144, 136, 0.2); color: var(--bone); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 0.05em; padding: 0.45rem 0.8rem; outline: none;" onfocus="this.style.borderColor='var(--ember)'" onblur="this.style.borderColor='rgba(154, 144, 136, 0.2)'">
           <button type="button" class="btn-secondary" onclick="reloadSkillsInventory()">Refresh Skills</button>
         </div>
       </div>
