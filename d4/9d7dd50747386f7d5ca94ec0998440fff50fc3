@@ -1,0 +1,21 @@
+docs/trm-mobile-inbox-triage-pipeline.html
+  s_c74226617cd7b9::t_4cab97ab462e42 1-271
+docs/trm-mobile-inbox-triage-pipeline.md
+  s_c74226617cd7b9::t_e45f58035fdb2f 1-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d49d7dd50747386f7d5ca94ec0998440fff50fc3",
+  "prompts": {},
+  "sessions": {
+    "s_c74226617cd7b9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15648-52f1-74e1-9328-bfd34e28d815",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
