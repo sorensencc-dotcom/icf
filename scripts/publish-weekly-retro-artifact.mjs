@@ -1,5 +1,6 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildWeeklyRetroArtifact } from '../reporting/src/publication-artifact.mjs';
 import { CATEGORY_REGISTRY, normalizeCategoryMetrics } from '../reporting/src/category-contract.mjs';
 
@@ -23,7 +24,7 @@ function getPath(source, path) {
   return path.split('.').reduce((value, key) => value?.[key], source);
 }
 
-function deriveProjections(report) {
+export function deriveProjections(report) {
   const normalized = normalizeCategoryMetrics(report, { registry: CATEGORY_REGISTRY, allowPartial: true });
   const definitions = new Map(CATEGORY_REGISTRY.categories.map(category => [category.id, category]));
   const categories = normalized.map(category => {
@@ -52,25 +53,32 @@ function deriveProjections(report) {
   };
 }
 
-const reportPath = argument('--report');
-const runPath = argument('--run');
-const latestPath = argument('--latest');
-const projectionPath = process.argv.includes('--projection')
-  ? argument('--projection')
-  : undefined;
+const isDirectEntry = process.argv[1] && (
+  resolve(process.argv[1]).toLowerCase() === resolve(fileURLToPath(import.meta.url)).toLowerCase() ||
+  process.argv[1].replace(/\\/g, '/').endsWith('scripts/publish-weekly-retro-artifact.mjs')
+);
 
-const report = await readJson(reportPath);
-let projections = {};
-if (projectionPath) {
-  const supplied = await readJson(projectionPath);
-  if (supplied === null || typeof supplied !== 'object' || Array.isArray(supplied)) {
-    throw new TypeError('Projection sidecar must be an object');
+if (isDirectEntry) {
+  const reportPath = argument('--report');
+  const runPath = argument('--run');
+  const latestPath = argument('--latest');
+  const projectionPath = process.argv.includes('--projection')
+    ? argument('--projection')
+    : undefined;
+
+  const report = await readJson(reportPath);
+  let projections = {};
+  if (projectionPath) {
+    const supplied = await readJson(projectionPath);
+    if (supplied === null || typeof supplied !== 'object' || Array.isArray(supplied)) {
+      throw new TypeError('Projection sidecar must be an object');
+    }
+    projections = supplied;
+  } else {
+    projections = deriveProjections(report);
   }
-  projections = supplied;
-} else {
-  projections = deriveProjections(report);
-}
 
-const artifact = buildWeeklyRetroArtifact({ report, ...projections });
-await atomicWrite(runPath, artifact);
-await atomicWrite(latestPath, artifact);
+  const artifact = buildWeeklyRetroArtifact({ report, ...projections });
+  await atomicWrite(runPath, artifact);
+  await atomicWrite(latestPath, artifact);
+}
