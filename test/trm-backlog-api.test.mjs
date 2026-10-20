@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGatewayServer } from '../src/server.mjs';
+import { createGatewayServer, resolveTargetRepo } from '../src/server.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -126,3 +126,74 @@ test('ICF Gateway - promote hydrates card body and formats title with commit pre
   });
 });
 
+test('ICF Gateway - resolveTargetRepo and promote fallback deterministically map target domains', async () => {
+  assert.equal(resolveTargetRepo('icf'), 'sorensencc-dotcom/icf');
+  assert.equal(resolveTargetRepo('kb-sync'), 'sorensencc-dotcom/kb-sync');
+  assert.equal(resolveTargetRepo('personal-os'), 'sorensencc-dotcom/personal-os');
+  assert.equal(resolveTargetRepo('ironledger'), 'sorensencc-dotcom/IronLedger');
+  assert.equal(resolveTargetRepo('toolforge'), 'sorensencc-dotcom/toolforge');
+
+  const row = { id: 'card-repo-route', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'icf', intent: 'test_routing' };
+  await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/promote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-repo-route', dryRun: true })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.match(body.card.issue_url, /github\.com\/sorensencc-dotcom\/icf\/issues/);
+  });
+});
+
+test('ICF Gateway - run-spike executes research spike and marks card DONE', async () => {
+  const row = { id: 'card-spike-test', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'kb-sync', intent: 'test_spike_execution', category: 'RESEARCH' };
+  await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/run-spike`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-spike-test', dryRun: true })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.ok(body.result.rfcFilename);
+
+    const updated = readRows().find(r => r.id === 'card-spike-test');
+    assert.equal(updated.status, 'DONE');
+    assert.ok(updated.completed_at);
+  });
+});
+
+test('ICF Gateway - batch-triage routes cards into spikes and promotions', async () => {
+  const row1 = { id: 'card-batch-spike', status: 'STAGED_FOR_TRIAGE', target: 'cic-kb', intent: 'test_research_spike', category: 'RESEARCH' };
+  const row2 = { id: 'card-batch-code', status: 'STAGED_FOR_TRIAGE', target: 'toolforge', intent: 'test_code_promoted', category: 'IMPLEMENT', direction: 'NEW_IMPLEMENTATION' };
+  await withPromoteInbox([row1, row2], [], async ({ baseUrl }) => {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/batch-triage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun: true, limit: 2 })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.ok(body.results.total >= 1);
+  });
+});
+
+test('ICF Gateway - stage-pr creates branch name and test scaffold path', async () => {
+  const row = { id: 'card-stage-test', status: 'IN_PROGRESS', target: 'toolforge', intent: 'test_stage_pr', deliverables: ['Pass all tests'] };
+  await withPromoteInbox([row], [], async ({ baseUrl }) => {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/stage-pr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-stage-test', dryRun: true })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.equal(body.results.branchName, 'trm/card-stage-test');
+    assert.match(body.results.testFilePath, /trm-card-stage-test\.test\.mjs/);
+  });
+});

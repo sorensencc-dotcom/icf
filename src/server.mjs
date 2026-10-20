@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execSync, execFileSync, spawn } from 'node:child_process';
 import os from 'node:os';
 import zlib from 'node:zlib';
@@ -83,6 +83,30 @@ const DAY_PARAM = /^\d{4}-\d{2}-\d{2}$/;
 // Meridian reports carry AI-written text about the operator's day; serve them to this machine only.
 export function isLoopback(address) {
   return LOOPBACK_ADDRESSES.has(address);
+}
+
+export const DEFAULT_REPO_MAP = {
+  'toolforge': 'sorensencc-dotcom/toolforge',
+  'sigil': 'sorensencc-dotcom/sigil',
+  'kb-sync': 'sorensencc-dotcom/kb-sync',
+  'personal-os': 'sorensencc-dotcom/personal-os',
+  'icf': 'sorensencc-dotcom/icf',
+  'rewrite': 'sorensencc-dotcom/rewrite-mcp',
+  'rewrite-mcp': 'sorensencc-dotcom/rewrite-mcp',
+  'rewrite-docs': 'sorensencc-dotcom/rewrite-docs',
+  'ironledger': 'sorensencc-dotcom/IronLedger',
+  'IronLedger': 'sorensencc-dotcom/IronLedger'
+};
+
+export function resolveTargetRepo(targetOrDomain) {
+  if (!targetOrDomain) return DEFAULT_REPO_MAP['toolforge'];
+  const key = String(targetOrDomain).trim();
+  if (key.includes('/')) return key;
+  const lower = key.toLowerCase();
+  for (const [k, v] of Object.entries(DEFAULT_REPO_MAP)) {
+    if (k.toLowerCase() === lower) return v;
+  }
+  return `sorensencc-dotcom/${lower}`;
 }
 
 function importTelemetry(file) {
@@ -1130,7 +1154,6 @@ export function createGatewayServer(options = {}) {
         try {
           const body = await parseJsonBody(req);
           const cardId = body.cardId;
-          const repo = body.repo || 'sorensencc-dotcom/toolforge';
 
           // Re-promotion lock: refuse completed or already-promoted cards, and reconcile rows whose receipt says completed.
           const promoteInboxDir = trmInboxDir();
@@ -1147,6 +1170,7 @@ export function createGatewayServer(options = {}) {
 
           const commitType = commitTypeForCard(cardData);
           const target = cardData.target || cardData.domain || 'core';
+          const repo = body.repo || resolveTargetRepo(target);
           const intent = cardData.intent || cardData.title || cardId;
           const title = body.title || `${commitType}(${target}): ${intent}`;
 
@@ -1242,7 +1266,7 @@ export function createGatewayServer(options = {}) {
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
             try {
-              const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
+              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
               refreshLedgerMarkdown();
             } catch {}
           }
@@ -1251,8 +1275,152 @@ export function createGatewayServer(options = {}) {
             updatedCard = { id: body.cardId, status: 'IN_PROGRESS', issue_url: issueUrl };
           }
 
+          if (!isDryRun && issueUrl && !issueUrl.includes('mock-')) {
+            try {
+              const enricherScript = resolve(ROOT, '../scripts/trm-post-promote-enricher.mjs');
+              if (existsSync(enricherScript)) {
+                const child = spawn(process.execPath, [enricherScript, `--card-id=${body.cardId}`, `--issue-url=${issueUrl}`], {
+                  detached: true,
+                  stdio: 'ignore'
+                });
+                child.unref();
+              }
+            } catch (enrichErr) {
+              console.warn(`[promote] Failed to spawn post-promote enricher: ${enrichErr.message}`);
+            }
+          }
+
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', issue_url: issueUrl, card: updatedCard }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/run-spike') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const cardId = body.cardId;
+          if (!cardId) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ status: 'ERROR', error: 'Missing cardId' }));
+            return;
+          }
+
+          const promoteInboxDir = trmInboxDir();
+          const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
+          const lockRow = existsSync(lockLedgerPath)
+            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === cardId)
+            : null;
+
+          const archivedCard = loadArchivedCard(cardId, lockRow, promoteInboxDir);
+          const cardData = {
+            ...(lockRow || {}),
+            ...(archivedCard || {})
+          };
+
+          const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test');
+
+          const kbSyncRoot = resolve(ROOT, '../kb-sync');
+          const { evaluateActionCard } = await import(pathToFileURL(resolve(kbSyncRoot, 'modules/trm/gap-triage-engine.mjs')).href);
+
+          const outputDir = resolve(kbSyncRoot, 'wiki/research');
+          const outboxDir = resolve(promoteInboxDir, 'outbox');
+
+          const spikeResult = await evaluateActionCard(cardData, {
+            outputDir,
+            outboxDir,
+            writeReceipt: true,
+            commentOnIssue: !isDryRun && Boolean(cardData.issue_url),
+            dryRun: isDryRun
+          });
+
+          if (existsSync(lockLedgerPath)) {
+            const lines = readFileSync(lockLedgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const updatedLines = [];
+            for (const l of lines) {
+              try {
+                const item = JSON.parse(l);
+                if (item.id === cardId) {
+                  item.status = 'DONE';
+                  item.completed_at = new Date().toISOString();
+                  item.research_ref = spikeResult.rfcPath || spikeResult.rfcFilename || item.research_ref;
+                }
+                updatedLines.push(JSON.stringify(item));
+              } catch {
+                updatedLines.push(l);
+              }
+            }
+            writeFileSync(lockLedgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            try {
+              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+              refreshLedgerMarkdown();
+            } catch {}
+          }
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', result: spikeResult }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/batch-triage') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test');
+          const lane = body.lane || 'all';
+          const limit = body.limit || null;
+          const target = body.target || null;
+          const stagePr = Boolean(body.stagePr);
+
+          const { processBatchTriage } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-batch-triage.mjs')).href);
+          const results = await processBatchTriage({
+            dryRun: isDryRun,
+            lane,
+            limit,
+            target,
+            stagePr
+          });
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', results }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/stage-pr') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        try {
+          const body = await parseJsonBody(req);
+          const cardId = body.cardId;
+          const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test');
+          const createBranch = Boolean(body.createBranch);
+
+          const promoteInboxDir = trmInboxDir();
+          const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
+          const { stagePr } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-stage-pr.mjs')).href);
+          const results = stagePr(cardId, {
+            dryRun: isDryRun,
+            createBranch,
+            inboxDir: promoteInboxDir,
+            ledgerPath: lockLedgerPath
+          });
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', results }));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
