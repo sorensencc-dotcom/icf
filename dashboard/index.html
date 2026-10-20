@@ -1493,6 +1493,7 @@
           <button type="button" class="btn-secondary" id="btnBacklogFilterDeferred" onclick="filterTrmBacklog('DEFERRED')">🚫 Deferred (YAGNI)</button>
           <button type="button" class="btn-secondary" id="btnBacklogFilterCompleted" onclick="filterTrmBacklog('COMPLETED')">✅ Completed</button>
           <button type="button" class="panel-action" onclick="loadTrmBacklog()">Refresh Backlog →</button>
+          <button type="button" class="btn-secondary" style="color: var(--accent-terracotta); border-color: var(--accent-terracotta); font-weight: 600;" onclick="runBatchTriage()">⚡ Batch Triage (25+ Cards)</button>
         </div>
       </div>
       <table class="table-clean">
@@ -3278,6 +3279,10 @@ flowchart TD
       targetBtn.classList.add('active');
       const tag = targetBtn.querySelector('.tag');
       if (tag) tag.className = 'tag high';
+    }
+
+    if (tabId === 'tab-trm') {
+      loadTrmBacklog();
     }
   }
 
@@ -5218,6 +5223,12 @@ flowchart TD
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI');
     }
 
+    if (cachedTrmBacklogCards.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">Loading action cards...</td></tr>`;
+      loadTrmBacklog();
+      return;
+    }
+
     if (filtered.length === 0) {
       tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No cards match the active filter.</td></tr>`;
       return;
@@ -5248,6 +5259,7 @@ flowchart TD
             <div style="font-size:0.75rem; color:var(--fg-muted); margin-top:0.2rem;">${escapeHtml(card.raw_preview || card.summary || '')}</div>
             <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center; margin-top:0.35rem;">
               ${card.issue_url ? `<a href="${escapeHtml(card.issue_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(196,80,26,0.15); color:var(--accent-terracotta); padding:0.12rem 0.4rem; border:1px solid rgba(196,80,26,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">Issue #${escapeHtml(card.issue_url.split('/').pop())} ↗</a>` : ''}
+              ${card.pr_branch ? `<span style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.12rem 0.4rem; border:1px solid rgba(90,158,111,0.4); font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">🌿 ${escapeHtml(card.pr_branch)}</span>` : ''}
               ${card.pr_url ? `<a href="${escapeHtml(card.pr_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.12rem 0.4rem; border:1px solid rgba(90,158,111,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">PR #${escapeHtml(String(card.pr_number || card.pr_url.split('/').pop()))} (${escapeHtml(card.pr_state || 'MERGED')}) ↗</a>` : ''}
               ${card.research_ref ? `<a href="${escapeHtml(card.research_ref)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; background:rgba(184,146,42,0.15); color:var(--fg-muted); padding:0.12rem 0.4rem; border:1px solid rgba(184,146,42,0.3); font-size:0.68rem; font-family:monospace; text-decoration:none; border-radius:2px;">RFC Note ↗</a>` : ''}
               ${card.tags && card.tags.length ? card.tags.map(t => `<span class="tag date" style="font-size:0.65rem;">#${escapeHtml(t)}</span>`).join('') : ''}
@@ -5263,8 +5275,10 @@ flowchart TD
             </select>
           </td>
           <td>
-            <div style="display:flex; gap:0.4rem; align-items:center;">
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
               ${(isDone || card.completed_at || card.issue_url) ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">Promote →</button>`}
+              ${(!isDone && !card.completed_at && (isResearch || card.category === 'RESEARCH' || card.category === 'EVALUATE' || card.direction === 'FEASIBILITY_SPIKE')) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="runResearchSpike('${escapeHtml(card.id)}')">🔬 Run Spike</button>` : ''}
+              ${(!isDone && !card.pr_branch && (card.issue_url || isInProgress)) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="stagePrForCard('${escapeHtml(card.id)}')">🌿 Stage PR</button>` : ''}
             </div>
           </td>
         </tr>
@@ -5303,8 +5317,12 @@ flowchart TD
     'sigil': 'sorensencc-dotcom/sigil',
     'rewrite-mcp': 'sorensencc-dotcom/rewrite-mcp',
     'rewrite-docs': 'sorensencc-dotcom/rewrite-docs',
+    'rewrite': 'sorensencc-dotcom/rewrite-mcp',
     'cic-kb': 'sorensencc-dotcom/toolforge',
-    'kb-sync': 'sorensencc-dotcom/toolforge',
+    'kb-sync': 'sorensencc-dotcom/kb-sync',
+    'personal-os': 'sorensencc-dotcom/personal-os',
+    'icf': 'sorensencc-dotcom/icf',
+    'ironledger': 'sorensencc-dotcom/IronLedger',
     'cic': 'sorensencc-dotcom/toolforge',
     'cross-fleet': 'sorensencc-dotcom/toolforge',
     'strategic-intelligence': 'sorensencc-dotcom/toolforge'
@@ -5399,6 +5417,87 @@ flowchart TD
     } catch (e) {
       console.error('Promotion error', e);
       alert('Promotion request error');
+    }
+  }
+
+  async function runResearchSpike(cardId) {
+    if (!confirm(`Run autonomous research spike on ${cardId}?`)) return;
+    try {
+      if (typeof showToast === 'function') {
+        showToast(`Running research spike for ${cardId}...`);
+      }
+      const res = await fetch('/api/reporting/trm-backlog/run-spike', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'SUCCESS') {
+        if (typeof showToast === 'function') {
+          showToast(`Spike completed: ${data.result?.rfcFilename || 'Success'}`);
+        }
+        loadTrmBacklog();
+      } else {
+        alert(`Spike failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error('Spike error', e);
+      alert('Spike request error: ' + e.message);
+    }
+  }
+
+  async function runBatchTriage() {
+    if (!confirm('Run Batch Triage across all pending action cards? This executes autonomous spikes for research cards and promotes/enriches coding cards.')) return;
+    try {
+      if (typeof showToast === 'function') {
+        showToast('Running high-throughput batch triage...');
+      }
+      const res = await fetch('/api/reporting/trm-backlog/batch-triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false, stagePr: true })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'SUCCESS') {
+        const { spikesExecuted, codingPromoted, prStaged, errors } = data.results || {};
+        if (typeof showToast === 'function') {
+          showToast(`Batch Triage complete: ${spikesExecuted} spikes, ${codingPromoted} promoted, ${prStaged} staged for PR`);
+        } else {
+          alert(`Batch Triage complete!\n- Spikes executed: ${spikesExecuted}\n- Coding promoted: ${codingPromoted}\n- PR staged: ${prStaged}\n- Errors: ${errors?.length || 0}`);
+        }
+        loadTrmBacklog();
+      } else {
+        alert(`Batch triage failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error('Batch triage error', e);
+      alert('Batch triage request error: ' + e.message);
+    }
+  }
+
+  async function stagePrForCard(cardId) {
+    if (!confirm(`Stage PR branch and test scaffold for ${cardId}?`)) return;
+    try {
+      if (typeof showToast === 'function') {
+        showToast(`Staging PR contract for ${cardId}...`);
+      }
+      const res = await fetch('/api/reporting/trm-backlog/stage-pr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId, createBranch: true })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'SUCCESS') {
+        if (typeof showToast === 'function') {
+          showToast(`PR staged: ${data.results?.branchName}`);
+        }
+        loadTrmBacklog();
+      } else {
+        alert(`Stage PR failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error('Stage PR error', e);
+      alert('Stage PR error: ' + e.message);
     }
   }
 
