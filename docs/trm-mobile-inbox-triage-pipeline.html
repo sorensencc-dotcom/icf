@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TRM Mobile Inbox Triage & PR Staging Pipeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f2ece2;
+      --color-ink:     #2c2420;
+      --color-muted:   #5c5349;
+      --color-accent:  #c4501a;
+      --font-sans:     'Barlow Condensed', 'Geist', system-ui, sans-serif;
+      --font-serif:    'Playfair Display', Georgia, serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+    .frame {
+      max-width: 1180px;
+      width: 100%;
+      background: #f2ece2;
+      border: 2px solid #5c5349;
+      padding: 28px 32px;
+      box-shadow: 6px 6px 0px #5c5349;
+    }
+    .header {
+      border-bottom: 2px solid #c4501a;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .title-group h1 {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-ink);
+      letter-spacing: -0.5px;
+    }
+    .title-group p {
+      font-family: var(--font-sans);
+      font-size: 15px;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-top: 4px;
+    }
+    .badge {
+      background-color: var(--color-ink);
+      color: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 2px;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    svg { width: 100%; display: block; height: auto; }
+    .footer-note {
+      margin-top: 18px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--color-muted);
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div class="title-group">
+        <h1>TRM Mobile Inbox Triage & PR Staging Pipeline</h1>
+        <p>INGESTION UNSTRANDING • DUAL-LANE BATCH TRIAGE • TDD PR BRIDGE</p>
+      </div>
+      <div class="badge">ICF ARCHITECTURE SPEC</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="diag-title diag-desc" viewBox="0 0 1116 770">
+      <title id="diag-title">TRM Mobile Inbox Triage and PR Staging Pipeline</title>
+      <desc id="diag-desc">End to end flow from Mobile Inbox through Ingestion Unstranding, Dual Lane Batch Triage, and PR Triage Bridge</desc>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#2c2420"/>
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#c4501a"/>
+        </marker>
+        <filter id="shadow" x="-3%" y="-3%" width="106%" height="110%">
+          <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#2c2420" flood-opacity="0.08"/>
+        </filter>
+      </defs>
+
+      <!-- STAGE 1: INGESTION & UNSTRANDING -->
+      <g filter="url(#shadow)">
+        <!-- Mobile Inbox Box -->
+        <rect x="20" y="15" width="260" height="95" rx="5" fill="#ffffff" stroke="#5c5349" stroke-width="1.5"/>
+        <rect x="20" y="15" width="260" height="28" rx="5" fill="#2c2420"/>
+        <rect x="20" y="38" width="260" height="5" fill="#2c2420"/>
+        <text x="32" y="34" font-family="'Barlow Condensed', sans-serif" font-size="14" font-weight="700" fill="#f2ece2" letter-spacing="0.5">MOBILE INBOX (DRIVE / GDOC)</text>
+        <text x="32" y="60" font-family="'Geist Mono', monospace" font-size="11" fill="#2c2420">• GDrive mobile-inbox</text>
+        <text x="32" y="78" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">• .gdoc pointers & JSON items</text>
+        <text x="32" y="96" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">• Mobile voice / quick notes</text>
+
+        <!-- Connector Arrow -->
+        <path d="M 280 62 L 320 62" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)"/>
+
+        <!-- Ingestion & Unstranding Engine Box -->
+        <rect x="325" y="15" width="771" height="95" rx="5" fill="#ffffff" stroke="#c4501a" stroke-width="2"/>
+        <rect x="325" y="15" width="771" height="28" rx="5" fill="#c4501a"/>
+        <rect x="325" y="38" width="771" height="5" fill="#c4501a"/>
+        <text x="340" y="34" font-family="'Barlow Condensed', sans-serif" font-size="15" font-weight="700" fill="#f2ece2" letter-spacing="0.5">1. INGESTION & UNSTRANDING ENGINE (scripts/trm-ingress-watcher.mjs)</text>
+        
+        <!-- Left Column -->
+        <text x="340" y="60" font-family="'Geist', sans-serif" font-size="12.5" font-weight="600" fill="#2c2420">• Inspects raw_content: extracts true category, direction, priority & target</text>
+        <text x="340" y="80" font-family="'Geist', sans-serif" font-size="12.5" fill="#5c5349">• Targets: toolforge, sigil, kb-sync, rewrite-mcp, personal-os, ironledger, icf</text>
+        <text x="340" y="98" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">• Bypasses 401 gdoc errors; unstrands valid items into .harness/tasks/pending/</text>
+
+        <!-- Right Column -->
+        <text x="800" y="60" font-family="'Geist Mono', monospace" font-size="11" fill="#2c2420">STATUS: STAGED_FOR_TRIAGE</text>
+        <text x="800" y="78" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">LEDGER: trm-drive/inbox/ledger.jsonl</text>
+        <text x="800" y="96" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">TELEMETRY: _status-feed/trm_ingress</text>
+      </g>
+
+      <!-- CONNECTOR TO BATCH TRIAGE -->
+      <path d="M 710 110 L 710 145" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- BATCH TRIAGE GATEWAY BADGE -->
+      <rect x="380" y="145" width="370" height="34" rx="4" fill="#2c2420" stroke="#2c2420"/>
+      <text x="565" y="167" text-anchor="middle" font-family="'Barlow Condensed', sans-serif" font-size="15" font-weight="700" fill="#f2ece2" letter-spacing="0.8">2. DUAL-LANE BATCH TRIAGE (trm-batch-triage.mjs / ICF Gateway)</text>
+
+      <!-- SPLIT ARROWS -->
+      <path d="M 440 179 L 440 195 L 285 195 L 285 210" fill="none" stroke="#2c2420" stroke-width="2" marker-end="url(#arrow)"/>
+      <path d="M 690 179 L 690 195 L 845 195 L 845 210" fill="none" stroke="#c4501a" stroke-width="2" marker-end="url(#arrow-accent)"/>
+
+      <!-- STAGE 2: DUAL-LANE BATCH TRIAGE -->
+      <!-- LANE A: RESEARCH SPIKES -->
+      <g filter="url(#shadow)">
+        <rect x="20" y="215" width="530" height="260" rx="5" fill="#ffffff" stroke="#5c5349" stroke-width="1.5"/>
+        <rect x="20" y="215" width="530" height="30" rx="5" fill="#2c2420"/>
+        <rect x="20" y="240" width="530" height="5" fill="#2c2420"/>
+        <text x="35" y="235" font-family="'Barlow Condensed', sans-serif" font-size="14.5" font-weight="700" fill="#f2ece2" letter-spacing="0.5">LANE A: AUTONOMOUS RESEARCH SPIKES (ZERO TOKENS)</text>
+        <text x="400" y="235" font-family="'Geist Mono', monospace" font-size="11" fill="#f2ece2">--lane=spikes</text>
+
+        <!-- Lane A Card 1 -->
+        <rect x="35" y="255" width="500" height="42" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <text x="48" y="272" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Trigger & Scope</text>
+        <text x="48" y="289" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">Target: cic-kb, research, FEASIBILITY_SPIKE • evaluateActionCard</text>
+
+        <!-- Lane A Card 2 -->
+        <rect x="35" y="305" width="500" height="42" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <text x="48" y="322" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">RRF Hybrid Context Retrieval</text>
+        <text x="48" y="339" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">SQLite FTS5 BM25 + dense vector match (RRF k=60) over knowledge.db</text>
+
+        <!-- Lane A Card 3 -->
+        <rect x="35" y="355" width="500" height="42" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <text x="48" y="372" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Materialization & Outbox Receipts</text>
+        <text x="48" y="389" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">Emits RFC note to wiki/research/ & writes receipt to outbox (Drive sync)</text>
+
+        <!-- Lane A Card 4 -->
+        <rect x="35" y="405" width="500" height="42" rx="4" fill="#f2ece2" stroke="#c4501a" stroke-width="1.2"/>
+        <text x="48" y="422" font-family="'Geist', sans-serif" font-size="12" font-weight="700" fill="#c4501a">State Transition: DONE</text>
+        <text x="48" y="439" font-family="'Geist Mono', monospace" font-size="11" fill="#2c2420">Ledger marked DONE • Research complete • Zero coding agent tokens used</text>
+      </g>
+
+      <!-- LANE B: CODING & IMPLEMENTATION -->
+      <g filter="url(#shadow)">
+        <rect x="566" y="215" width="530" height="260" rx="5" fill="#ffffff" stroke="#c4501a" stroke-width="2"/>
+        <rect x="566" y="215" width="530" height="30" rx="5" fill="#c4501a"/>
+        <rect x="566" y="240" width="530" height="5" fill="#c4501a"/>
+        <text x="581" y="235" font-family="'Barlow Condensed', sans-serif" font-size="14.5" font-weight="700" fill="#f2ece2" letter-spacing="0.5">LANE B: CODING & IMPLEMENTATION PROMOTION</text>
+        <text x="940" y="235" font-family="'Geist Mono', monospace" font-size="11" fill="#f2ece2">--lane=coding</text>
+
+        <!-- Lane B Card 1 -->
+        <rect x="581" y="255" width="500" height="42" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <text x="594" y="272" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">GitHub Issue Promotion</text>
+        <text x="594" y="289" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">gh issue create --repo sorensencc-dotcom/{target} with commit prefix</text>
+
+        <!-- Lane B Card 2 -->
+        <rect x="581" y="305" width="500" height="42" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <text x="594" y="322" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Out-of-Band Context Pack Enricher</text>
+        <text x="594" y="339" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">trm-post-promote-enricher.mjs runs out-of-band; never blocks promotion</text>
+
+        <!-- Lane B Card 3 -->
+        <rect x="581" y="355" width="500" height="42" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <text x="594" y="372" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Deterministic AST Grounding & Probes</text>
+        <text x="594" y="389" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">Attaches Graft AST spans, target path commits & local port 8765 health</text>
+
+        <!-- Lane B Card 4 -->
+        <rect x="581" y="405" width="500" height="42" rx="4" fill="#f2ece2" stroke="#2c2420" stroke-width="1.2"/>
+        <text x="594" y="422" font-family="'Geist', sans-serif" font-size="12" font-weight="700" fill="#2c2420">State Transition: IN_PROGRESS</text>
+        <text x="594" y="439" font-family="'Geist Mono', monospace" font-size="11" fill="#5c5349">Issue URL recorded in ledger • Ready for PR staging & coding agents</text>
+      </g>
+
+      <!-- CONNECTOR FROM LANE B TO STAGE 3 -->
+      <path d="M 831 475 L 831 510" fill="none" stroke="#c4501a" stroke-width="2.5" marker-end="url(#arrow-accent)"/>
+
+      <!-- STAGE 3: PR TRIAGE BRIDGE -->
+      <g filter="url(#shadow)">
+        <rect x="20" y="515" width="1076" height="235" rx="5" fill="#ffffff" stroke="#2c2420" stroke-width="2"/>
+        <rect x="20" y="515" width="1076" height="32" rx="5" fill="#2c2420"/>
+        <rect x="20" y="542" width="1076" height="5" fill="#2c2420"/>
+        <text x="35" y="537" font-family="'Barlow Condensed', sans-serif" font-size="15" font-weight="700" fill="#f2ece2" letter-spacing="0.6">3. PR TRIAGE BRIDGE & CONTRACT ENFORCEMENT (scripts/trm-stage-pr.mjs)</text>
+        <text x="830" y="537" font-family="'Geist Mono', monospace" font-size="11.5" fill="#c4501a">BRIDGE CONTRACT: CARD → PR</text>
+
+        <!-- Subcard 1: Branch Isolation -->
+        <rect x="35" y="560" width="250" height="175" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <rect x="35" y="560" width="250" height="26" rx="4" fill="#5c5349"/>
+        <text x="45" y="578" font-family="'Barlow Condensed', sans-serif" font-size="13" font-weight="700" fill="#f2ece2">GIT BRANCH ISOLATION</text>
+        <text x="45" y="605" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Dedicated Topic Branch</text>
+        <text x="45" y="623" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">Branch: trm/&lt;cardId&gt;</text>
+        <text x="45" y="643" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Cuts clean from main</text>
+        <text x="45" y="661" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Multi-target repo mapping</text>
+        <text x="45" y="679" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Safe worktree switching</text>
+        <text x="45" y="697" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Fast context boundary</text>
+
+        <!-- Subcard 2: TDD Test Contract -->
+        <rect x="300" y="560" width="255" height="175" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <rect x="300" y="560" width="255" height="26" rx="4" fill="#5c5349"/>
+        <text x="310" y="578" font-family="'Barlow Condensed', sans-serif" font-size="13" font-weight="700" fill="#f2ece2">EXECUTABLE TDD CONTRACT</text>
+        <text x="310" y="605" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Failing Test Scaffold</text>
+        <text x="310" y="623" font-family="'Geist Mono', monospace" font-size="10.5" fill="#c4501a">tests/trm-&lt;cardId&gt;.test.mjs</text>
+        <text x="310" y="643" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Standard library node:test</text>
+        <text x="310" y="661" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• test_trm_&lt;id&gt;.py (IronLedger)</text>
+        <text x="310" y="679" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Encodes deliverables as tests</text>
+        <text x="310" y="697" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Agent runs test until passing</text>
+
+        <!-- Subcard 3: Conventional Commit Template -->
+        <rect x="570" y="560" width="255" height="175" rx="4" fill="#faf7f2" stroke="#5c5349" stroke-width="1"/>
+        <rect x="570" y="560" width="255" height="26" rx="4" fill="#5c5349"/>
+        <text x="580" y="578" font-family="'Barlow Condensed', sans-serif" font-size="13" font-weight="700" fill="#f2ece2">CONVENTIONAL PR STAGING</text>
+        <text x="580" y="605" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Contract Injection</text>
+        <text x="580" y="623" font-family="'Geist Mono', monospace" font-size="10.5" fill="#2c2420">feat(domain): title &lt;#issue&gt;</text>
+        <text x="580" y="643" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Injects context pack & checks</text>
+        <text x="580" y="661" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Conventional Commit headers</text>
+        <text x="580" y="679" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• CI pre-commit check guard</text>
+        <text x="580" y="697" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Verified PR contract ready</text>
+
+        <!-- Subcard 4: ICF Dashboard Telemetry -->
+        <rect x="840" y="560" width="240" height="175" rx="4" fill="#f2ece2" stroke="#c4501a" stroke-width="1.5"/>
+        <rect x="840" y="560" width="240" height="26" rx="4" fill="#c4501a"/>
+        <text x="850" y="578" font-family="'Barlow Condensed', sans-serif" font-size="13" font-weight="700" fill="#f2ece2">ICF DASHBOARD TELEMETRY</text>
+        <text x="850" y="605" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#2c2420">Live Operational Surface</text>
+        <text x="850" y="623" font-family="'Geist Mono', monospace" font-size="11" fill="#c4501a">🌿 trm/&lt;cardId&gt; Badge</text>
+        <text x="850" y="643" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Action button: 🌿 Stage PR</text>
+        <text x="850" y="661" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Port 8080 API dispatch</text>
+        <text x="850" y="679" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Auto-refresh on tab-trm</text>
+        <text x="850" y="697" font-family="'Geist', sans-serif" font-size="11.5" fill="#5c5349">• Real-time branch audit</text>
+      </g>
+    </svg>
+    <div class="footer-note">
+      <span>SYSTEM: TOPIC RESEARCH MINING (TRM) & IRON COMMAND FORGE (ICF)</span>
+      <span>PALETTE: CATHRYN LAVERY DIAGRAM-DESIGN SKIN (#f2ece2 / #c4501a / #2c2420)</span>
+    </div>
+  </div>
+</body>
+</html>
