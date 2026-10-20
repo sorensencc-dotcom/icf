@@ -3,7 +3,7 @@ import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PI
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execSync, execFileSync, spawn } from 'node:child_process';
+import cp from 'node:child_process';
 import os from 'node:os';
 import zlib from 'node:zlib';
 import { LocalFileAdapterTransport } from './adapters/LocalFileAdapterTransport.mjs';
@@ -25,7 +25,7 @@ export function getPullRequests() {
     return prCache.prs;
   }
   try {
-    const raw = execSync('gh pr list --repo sorensencc-dotcom/toolforge --limit 20 --state all --json number,title,state,url,createdAt,mergedAt,headRefName', {
+    const raw = cp.execSync('gh pr list --repo sorensencc-dotcom/toolforge --limit 20 --state all --json number,title,state,url,createdAt,mergedAt,headRefName', {
       cwd: resolve(ROOT, '..'),
       encoding: 'utf8',
       timeout: 8000,
@@ -622,7 +622,7 @@ export function createGatewayServer(options = {}) {
 
       const [cmd, cmdArgs] = runner;
       try {
-        const proc = spawn(cmd, cmdArgs, {
+        const proc = cp.spawn(cmd, cmdArgs, {
           cwd: action === 'run-skill' ? toolforgeRoot : resolve(ROOT, '..'),
           detached: true,
           stdio: 'ignore'
@@ -1222,7 +1222,7 @@ export function createGatewayServer(options = {}) {
                   for (const lbl of labelList) {
                     args.push('--label', lbl);
                   }
-                  const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                  const out = cp.execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
                   issueUrl = out.trim().split(/\r?\n/).pop();
                 } catch (err) {
                   // If failed (e.g. label does not exist on target repo), retry without labels
@@ -1234,7 +1234,7 @@ export function createGatewayServer(options = {}) {
               if (!issueUrl) {
                 try {
                   const args = ['issue', 'create', '--repo', repo, '--title', title, '--body-file', tmpFile];
-                  const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                  const out = cp.execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
                   issueUrl = out.trim().split(/\r?\n/).pop();
                 } catch (err) {
                   console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
@@ -1279,7 +1279,7 @@ export function createGatewayServer(options = {}) {
             try {
               const enricherScript = resolve(ROOT, '../scripts/trm-post-promote-enricher.mjs');
               if (existsSync(enricherScript)) {
-                const child = spawn(process.execPath, [enricherScript, `--card-id=${body.cardId}`, `--issue-url=${issueUrl}`], {
+                const child = cp.spawn(process.execPath, [enricherScript, `--card-id=${body.cardId}`, `--issue-url=${issueUrl}`], {
                   detached: true,
                   stdio: 'ignore'
                 });
