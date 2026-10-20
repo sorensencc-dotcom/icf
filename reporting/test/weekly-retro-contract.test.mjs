@@ -83,6 +83,16 @@ test('rejects missing, unknown, and incorrectly typed metrics', async () => {
   assert.ok(result.errors.includes('extra_field: is not part of the frozen current report contract'));
 });
 
+test('accepts a null focus_score and rejects an out-of-range one', async () => {
+  const report = await loadJson('valid-report.json');
+  report.metrics.focus_score = null;
+  assert.equal(validateWeeklyRetroReport(report).ok, true);
+  report.metrics.focus_score = 1.5;
+  const result = validateWeeklyRetroReport(report);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('metrics.focus_score: must be a number from 0 to 1 or null'));
+});
+
 test('preserves and validates optional canonical provenance fields when present', async () => {
   const report = await loadJson('valid-report.json');
   report.since = '2026-09-06T00:00:00.000Z';

@@ -136,7 +136,7 @@ const METRIC_RULES = Object.freeze({
   chore_pct: 'ratio',
   peak_hour: 'hour',
   ai_assisted_commits: 'nonNegativeInteger',
-  focus_score: 'ratio',
+  focus_score: 'nullableRatio',
   focus_area: 'string'
 });
 
@@ -173,6 +173,10 @@ function validateMetricValue(field, value, errors) {
     if (!validInteger || value < 0) addError(errors, `metrics.${field}`, 'must be a non-negative integer');
   } else if (rule === 'integer') {
     if (!validInteger) addError(errors, `metrics.${field}`, 'must be an integer');
+  } else if (rule === 'nullableRatio') {
+    if (value !== null && (!validNumber || value < 0 || value > 1)) {
+      addError(errors, `metrics.${field}`, 'must be a number from 0 to 1 or null');
+    }
   } else if (rule === 'ratio') {
     if (!validNumber || value < 0 || value > 1) addError(errors, `metrics.${field}`, 'must be a number from 0 to 1');
   } else if (rule === 'hour') {

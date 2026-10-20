@@ -2,10 +2,9 @@
 
 Ironbots is the background automated robot subsystem operating within Toolforge and supervised by the Iron Command Forge (ICF) telemetry aggregator.
 
-![Ironbots Autonomous Architecture](ironbots-architecture-diagram.png)
+![Ironbots Autonomous Architecture](ironbots-autonomous-agent-pipeline.png)
 
-<details>
-<summary>Mermaid source...</summary>
+<details><summary>Mermaid source...</summary>
 
 ```mermaid
 flowchart TD
@@ -22,6 +21,7 @@ flowchart TD
         E["TRM-Bot (Daily 04:00 AM)\nscripts/trm-bot-runner.mjs"]
         WM["Watchlist-Miner Bot (Daily 05:00 AM)\nscripts/watchlist-miner-bot.mjs"]
         K["Daemon-Healer Bot (Every 15 Min)\nscripts/daemon-healer-bot.mjs"]
+        ILS["IronLedger-Sentinel Bot (Every 15 Min)\nscripts/ironledger-sentinel-bot.mjs"]
         L["CI-Watchdog Bot (Daily 06:00 AM)\nscripts/ci-watchdog-bot.mjs"]
         IB["IronBot Task Monitor (Every 4 Hours)\nC:/dev/kb-sync/scripts/ironbot/ironbot-task-monitor.ps1"]
     end
@@ -32,6 +32,7 @@ flowchart TD
         G["RFC Decision Notes (wiki/research/rfc-gap-*.md)"]
         CD["Competitor Drift Reports (wiki/research/competitor-drift-*.md)"]
         M["Port 8080 Process Recovery & Uptime"]
+        ILM["IronLedger Workbench Port 8000, DB Invariants & Sync Tasks"]
         N["CI Failure Detection & Error Logs"]
         I["Telemetry Hub (_status-feed/*.json)"]
         J["Iron Command Forge (ICF Snapshot Store)"]
@@ -43,6 +44,7 @@ flowchart TD
     A -->|Daily 04:00 AM| E
     A -->|Daily 05:00 AM| WM
     A -->|Every 15 Min| K
+    A -->|Every 15 Min| ILS
     A -->|Daily 06:00 AM| L
     A -->|Every 4 Hours| IB
 
@@ -51,6 +53,7 @@ flowchart TD
     B --> E
     B --> WM
     B --> K
+    B --> ILS
     B --> L
 
     NB --> FTS
@@ -63,6 +66,8 @@ flowchart TD
     WM --> I
     K --> M
     K --> I
+    ILS --> ILM
+    ILS --> I
     L --> N
     L --> I
     IB --> IA
@@ -100,6 +105,7 @@ All background automation bots added to the `\Ironbots\` fleet must adhere to th
 | **TRM-Bot** | `scripts/trm-bot-runner.mjs` | Daily 04:00 AM | `\Ironbots\` | `_status-feed/trm_bot_report.json` |
 | **Watchlist-Miner** | `scripts/watchlist-miner-bot.mjs` | Daily 05:00 AM | `\Ironbots\` | `_status-feed/watchlist_miner_report.json` |
 | **Daemon-Healer** | `scripts/daemon-healer-bot.mjs` | Every 15 Minutes | `\Ironbots\` | `_status-feed/daemon_health.json` |
+| **IronLedger-Sentinel** | `scripts/ironledger-sentinel-bot.mjs` | Every 15 Minutes | `\Ironbots\` | `_status-feed/ironledger_health.json` |
 | **CI-Watchdog** | `scripts/ci-watchdog-bot.mjs` | Daily 06:00 AM | `\Ironbots\` | `_status-feed/ci_alerts.json` |
 | **IronBot Task Monitor** | `C:/dev/kb-sync/scripts/ironbot/ironbot-task-monitor.ps1` | Every 4 Hours | `\IronBot\` | `C:/dev/kb-sync/docs/audit/ironbot/` |
 
@@ -120,6 +126,7 @@ npm run bot:kb:sentinel
 npm run bot:trm:triage
 npm run bot:watchlist:mine
 npm run bot:daemon:heal
+npm run bot:ironledger:sentinel
 npm run bot:ci:watchdog
 ```
 
@@ -149,6 +156,7 @@ pwsh -NoProfile -File scripts/schedule-task-wrapper-KB-Sentinel.ps1 -Action Regi
 pwsh -NoProfile -File scripts/schedule-task-wrapper-TRM-Bot.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-Watchlist-Miner.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-Daemon-Healer.ps1 -Action Register -Unattended -Force
+pwsh -NoProfile -File scripts/schedule-task-wrapper-IronLedger-Sentinel.ps1 -Action Register -Unattended -Force
 pwsh -NoProfile -File scripts/schedule-task-wrapper-CI-Watchdog.ps1 -Action Register -Unattended -Force
 ```
 

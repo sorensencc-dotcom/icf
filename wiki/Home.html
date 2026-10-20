@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Iron Command Forge Architecture (Home)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 2rem;
+    }
+    .frame {
+      max-width: 1150px;
+      width: 100%;
+      background: #f5f5f5;
+      border: 2px solid #4f5d75;
+      padding: 32px;
+      box-shadow: 6px 6px 0px #4f5d75;
+    }
+    .header {
+      border-bottom: 2px solid #bf4520;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .title-group h1 {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-ink);
+      letter-spacing: -0.5px;
+    }
+    .title-group p {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+    .badge {
+      background-color: var(--color-ink);
+      color: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 2px;
+      letter-spacing: 0.5px;
+    }
+    svg { width: 100%; display: block; height: auto; }
+    .footer-note {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--color-muted);
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div class="title-group">
+        <h1>Iron Command Forge Architecture (Home)</h1>
+        <p>ARCHITECTURE SPECIFICATION • HOME</p>
+      </div>
+      <div class="badge">CATHRYN LAVERY SPEC</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="diag-title diag-desc" viewBox="0 0 1086 340">
+      <title id="diag-title">Iron Command Forge Architecture (Home)</title>
+      <desc id="diag-desc">ARCHITECTURE SPECIFICATION • HOME</desc>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#2d3142"/>
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#bf4520"/>
+        </marker>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2d3142" flood-opacity="0.08"/>
+        </filter>
+      </defs>
+      <g class="diagram-elements">
+        <path d="M 230 170 L 290 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 550 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 230 170 L 810 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 1270 170 L 30 170" stroke="#2d3142" stroke-width="2" marker-end="url(#arrow)"/>
+      <g class="node" transform="translate(30, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#bf4520" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">G2</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::G2</text>
+      </g>
+      <g class="node" transform="translate(290, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">R1</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::R1</text>
+      </g>
+      <g class="node" transform="translate(550, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">R2</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::R2</text>
+      </g>
+      <g class="node" transform="translate(810, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#4f5d75" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">R3</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::R3</text>
+      </g>
+      <g class="node" transform="translate(1070, 135)">
+        <rect width="200" height="70" rx="4" fill="#ffffff" stroke="#bf4520" stroke-width="2" filter="url(#shadow)"/>
+        <text x="100" y="32" text-anchor="middle" font-family="'Geist', sans-serif" font-weight="600" font-size="13" fill="#2d3142">G3</text>
+        <text x="100" y="50" text-anchor="middle" font-family="'Geist Mono', monospace" font-size="10" fill="#4f5d75">NODE::G3</text>
+      </g>
+    </g>
+    </svg>
+    <div class="footer-note">
+      <span>SYSTEM: ARCHITECTURE SPECIFICATION</span>
+      <span>PALETTE: CATHRYN LAVERY DIAGRAM-DESIGN SKIN (#f5f5f5 / #bf4520)</span>
+    </div>
+  </div>
+</body>
+</html>

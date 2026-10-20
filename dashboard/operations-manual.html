@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="parchment">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iron Command Forge · Operations Manual</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,400&family=Barlow+Condensed:wght@400;600;700;800&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root, [data-theme="parchment"] {
+      --bg-canvas: #f2ece2;
+      --bg-surface: #ffffff;
+      --bg-card-hover: #faf6f0;
+      --bg-subtle: #ebe4d8;
+      --fg-primary: #2c2420;
+      --fg-secondary: #5c5349;
+      --fg-muted: #8c8278;
+      --border-main: #2c2420;
+      --border-subtle: rgba(44, 36, 32, 0.15);
+      --accent-terracotta: #c4501a;
+      --accent-brass: #b8922a;
+      --accent-sage: #3d6b4f;
+      --card-shadow: 0 4px 12px rgba(44, 36, 32, 0.05);
+      --card-shadow-hover: 0 6px 16px rgba(44, 36, 32, 0.1);
+      --code-bg: #2c2420;
+      --code-fg: #f2ece2;
+    }
+
+    [data-theme="forge"] {
+      --bg-canvas: #0d0a08;
+      --bg-surface: #181310;
+      --bg-card-hover: #221a15;
+      --bg-subtle: #120e0b;
+      --fg-primary: #faf6f0;
+      --fg-secondary: #a39990;
+      --fg-muted: #736b63;
+      --border-main: rgba(250, 246, 240, 0.22);
+      --border-subtle: rgba(250, 246, 240, 0.12);
+      --accent-terracotta: #e06228;
+      --accent-brass: #d4a738;
+      --accent-sage: #528c68;
+      --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --card-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.6);
+      --code-bg: #120e0b;
+      --code-fg: #faf6f0;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--fg-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      padding: 2.5rem 1.5rem;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header.doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid var(--border-main);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .doc-title h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+    }
+
+    .doc-title p {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--fg-secondary);
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      padding: 8px 16px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--fg-primary);
+      text-decoration: none;
+      border-radius: 2px;
+      box-shadow: var(--card-shadow);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-terracotta);
+      color: var(--accent-terracotta);
+    }
+
+    .theme-toggle {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      padding: 8px 14px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--fg-primary);
+      border-radius: 2px;
+    }
+
+    /* Content styling */
+    h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 0.5rem;
+      color: var(--fg-primary);
+    }
+
+    h3 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 1.75rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent-terracotta);
+    }
+
+    p, li {
+      font-size: 1rem;
+      color: var(--fg-secondary);
+      margin-bottom: 1rem;
+    }
+
+    ul, ol {
+      padding-left: 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    li {
+      margin-bottom: 0.4rem;
+    }
+
+    code {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.9rem;
+      background: var(--bg-subtle);
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--border-subtle);
+      color: var(--fg-primary);
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 1.25rem;
+      border-radius: 3px;
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-subtle);
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      border: none;
+      color: inherit;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    /* Card Panels */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      padding: 1.5rem;
+      border-radius: 3px;
+      margin-bottom: 1.75rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      margin-right: 6px;
+    }
+    .badge-sage { background: rgba(61, 107, 79, 0.15); color: var(--accent-sage); border: 1px solid var(--accent-sage); }
+    .badge-terra { background: rgba(196, 80, 26, 0.15); color: var(--accent-terracotta); border: 1px solid var(--accent-terracotta); }
+    .badge-brass { background: rgba(184, 146, 42, 0.15); color: var(--accent-brass); border: 1px solid var(--accent-brass); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      margin-bottom: 1.75rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+    }
+
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 0.95rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    th {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--bg-subtle);
+      color: var(--fg-primary);
+      border-bottom: 2px solid var(--border-main);
+    }
+
+    tr:hover td {
+      background: var(--bg-card-hover);
+    }
+
+    /* Callout */
+    .callout {
+      border-left: 4px solid var(--accent-terracotta);
+      background: var(--bg-subtle);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      border-radius: 0 3px 3px 0;
+    }
+
+    .callout strong {
+      color: var(--fg-primary);
+    }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-subtle);
+      text-align: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.95rem;
+      color: var(--fg-muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <header class="doc-header">
+    <div class="doc-title">
+      <h1>Iron Command Forge</h1>
+      <p>Operations Manual · Unified Fleet Control &amp; Telemetry Suite</p>
+    </div>
+    <div class="header-actions">
+      <a href="/dashboard" class="nav-btn">← Back to Dashboard</a>
+      <a href="/wiki/Operations-Guide.md" target="_blank" class="nav-btn">Raw Markdown ↗</a>
+      <button class="theme-toggle" id="themeToggleBtn" onclick="toggleManualTheme()">Theme: Parchment</button>
+    </div>
+  </header>
+
+  <!-- SECTION 1 -->
+  <h2>1. System Overview and Topology</h2>
+  <p>
+    Iron Command Forge (ICF) serves as the primary operator console, telemetry matrix, and automation control plane across the zero-token local bot fleet. ICF consolidates observability across knowledge synthesis (KB-Sync), autonomous bot runners (IronBots), topic research mining (TRM), ledger accounting (IronLedger), and model headroom optimization.
+  </p>
+
+  <div class="card">
+    <pre><code>+--------------------------------------------------------------------------+
+|                        Browser Client (Neo / Local)                      |
+|                 http://127.0.0.1:8080/dashboard (Parchment/Forge)        |
++--------------------------------------------------------------------------+
+       |                                                    |
+  HTTP REST &amp; Action Dispatch                         SSE Stream (/api/events)
+       |                                                    |
++--------------------------------------------------------------------------+
+|                     ICF Gateway Server (Port 8080)                       |
+|                      c:\dev\icf\src\server.mjs                           |
+|  - Loopback Security Guard                                               |
+|  - Action Dispatcher (POST /api/actions/run, POST /api/actions/clear)    |
+|  - Static Asset Resolver (Dashboard, Modules, Wiki Markdown)             |
+|  - SSE Live Telemetry Broadcaster (15s Heartbeat, FS Watcher)            |
++--------------------------------------------------------------------------+
+       |                           |                         |
++---------------+          +---------------+         +---------------------+
+| Scheduled Task|          | Status Feeds  |         | Knowledge Base      |
+| Daemon-Healer |          | c:\dev\_status|         | Obsidian Vault      |
+| Watchdog Loop |          | *.json feeds  |         | c:\dev\wiki\*.md    |
++---------------+          +---------------+         +---------------------+</code></pre>
+  </div>
+
+  <!-- SECTION 2 -->
+  <h2>2. Server Lifecycle &amp; Supervisor Daemon</h2>
+  <p>
+    The ICF server runs as an elevated Node.js service binding to loopback host <code>127.0.0.1</code> on port <code>8080</code>.
+  </p>
+
+  <h3>Manual Foreground Startup</h3>
+  <p>To run the standalone server in the terminal:</p>
+  <pre><code>cd C:\dev\icf
+npm run start</code></pre>
+
+  <h3>Background Watchdog Probe</h3>
+  <p>To verify server health and launch it silently if offline:</p>
+  <pre><code>pwsh -NoProfile -File C:\dev\icf\scripts\ensure-dashboard-server.ps1</code></pre>
+
+  <h3>Zero-Downtime Daemon Restart</h3>
+  <div class="callout">
+    <strong>Elevated Task Security:</strong> Because the background process runs under Windows Task Scheduler with highest administrative privileges, standard user-level <code>taskkill</code> commands will fail with <code>Access Denied</code>.
+  </div>
+  <p>To execute a clean daemon restart, write the sentinel trigger file and start the supervisor task:</p>
+  <pre><code>New-Item -ItemType File -Path "C:\dev\.restart-trigger" -Force
+Start-ScheduledTask -TaskPath "\Ironbots\" -TaskName "Daemon-Healer"</code></pre>
+  <p>
+    The <code>daemon-healer-bot.mjs</code> supervisor detects the trigger, terminates stale workers, launches a fresh daemon rooted at <code>C:\dev\icf</code>, and purges the trigger file.
+  </p>
+
+  <!-- SECTION 3 -->
+  <h2>3. Dashboard Navigation &amp; Tab Reference</h2>
+  <p>The dashboard contains 10 domain tabs designed for rapid operational triage:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tab Identifier</th>
+        <th>Display Name</th>
+        <th>Operational Domain</th>
+        <th>Key Artifacts</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>tab-daily</code></td>
+        <td>01. Daily Feed</td>
+        <td>Priority burn-down, operator calendar, daily action items.</td>
+        <td><code>latest-weekly-retro.json</code>, Daily Logs</td>
+      </tr>
+      <tr>
+        <td><code>tab-trm</code></td>
+        <td>02. TRM Research</td>
+        <td>Topic Research Mining queue, gap triage tickets, research notes.</td>
+        <td><code>trm_ingress_status.json</code>, <code>trm_history/</code></td>
+      </tr>
+      <tr>
+        <td><code>tab-wiki</code></td>
+        <td>03. Knowledge Base</td>
+        <td>Vault wikilink health, dead links, schema linting, drift detection.</td>
+        <td><code>wiki_status.json</code>, <code>kb_drift_status.json</code></td>
+      </tr>
+      <tr>
+        <td><code>tab-fleet</code></td>
+        <td>04. IronBots Fleet</td>
+        <td>Autonomous bot roster, health indicators, last execution timestamps.</td>
+        <td><code>ironbots_fleet.json</code>, <code>daemon_health.json</code></td>
+      </tr>
+      <tr>
+        <td><code>tab-reporting</code></td>
+        <td>05. Weekly Retro</td>
+        <td>Weekly performance KPIs, historical trends, category health metrics.</td>
+        <td><code>/api/reporting/retro</code>, <code>/api/reporting/history</code></td>
+      </tr>
+      <tr>
+        <td><code>tab-mcp</code></td>
+        <td>06. MCP Matrix</td>
+        <td>Model Context Protocol server status (Headroom, IronLedger, NotebookLM).</td>
+        <td>Proxy port 8787, HTTP port 8000, stdio</td>
+      </tr>
+      <tr>
+        <td><code>tab-ops</code></td>
+        <td>07. Operations</td>
+        <td>Scheduled task triggers, inter-stage pipelines, process runbooks.</td>
+        <td>Windows Scheduled Tasks (<code>\Ironbots\</code>, <code>\KB-SYNC\</code>)</td>
+      </tr>
+      <tr>
+        <td><code>tab-headroom</code></td>
+        <td>08. Headroom Engine</td>
+        <td>Prompt cache alignment, context compression, cost savings metrics.</td>
+        <td><code>/api/reporting/headroom</code>, Port 8787</td>
+      </tr>
+      <tr>
+        <td><code>tab-ledger</code></td>
+        <td>09. IronLedger</td>
+        <td>Balance invariants, capital gains tax lots, bank statement matching.</td>
+        <td>Port 8000 Daemon, <code>ironledger_status.json</code></td>
+      </tr>
+      <tr>
+        <td><code>tab-mobile</code></td>
+        <td>10. Mobile Outbox</td>
+        <td>Mobile push notifications, dispatch receipts, queue state.</td>
+        <td><code>trm-drive/inbox/outbox/</code>, <code>.trm/inbox/outbox/</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 4 -->
+  <h2>4. Dual-Action Execution Engine</h2>
+  <p>
+    Buttons across ICF feature live dispatch capabilities backed by fallback clipboard copy.
+  </p>
+
+  <div class="card">
+    <h3>Direct Execution Flow</h3>
+    <ol>
+      <li>Clicking an actionable button invokes <code>runAction(action, script, btn, fallbackCmd)</code>.</li>
+      <li>Dispatches a <code>POST /api/actions/run</code> request containing the action and target script.</li>
+      <li>The server verifies loopback origin (<code>127.0.0.1</code>), enforces the security whitelist, and spawns the background worker.</li>
+      <li>Button transitions to <code>Running... ⏳</code>, followed by toast notification with the operating system PID: <code>Process dispatched (PID: 12345)</code>.</li>
+      <li>Button state updates to <code>Triggered ✓</code>.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>Manual Copy Fallback</h3>
+    <p>
+      Hold the <code>Shift</code> key while clicking any button, or click buttons marked with terminal commands to copy shell syntax directly to the operating system clipboard.
+    </p>
+  </div>
+
+  <!-- SECTION 5 -->
+  <h2>5. Scheduled Tasks Automation Roster</h2>
+  <p>
+    Unattended fleet automation runs through Windows Scheduled Tasks configured with highest execution privileges:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Task Path</th>
+        <th>Schedule / Cadence</th>
+        <th>Target Script</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>\Ironbots\Daemon-Healer</code></td>
+        <td>Every 5 minutes</td>
+        <td><code>scripts/daemon-healer-bot.mjs</code></td>
+        <td>Health watchdog; auto-restarts port 8080 daemon.</td>
+      </tr>
+      <tr>
+        <td><code>\Ironbots\Ironbots-Reporter</code></td>
+        <td>Daily 06:00 ET</td>
+        <td><code>scripts/ironbots-daily-reporter.mjs</code></td>
+        <td>Compiles daily zero-token operations report in status feed.</td>
+      </tr>
+      <tr>
+        <td><code>\Ironbots\KB-Sentinel</code></td>
+        <td>Every 30 minutes</td>
+        <td><code>scripts/kb-sentinel-bot.mjs</code></td>
+        <td>Verifies vault wikilink health and metadata schema integrity.</td>
+      </tr>
+      <tr>
+        <td><code>\KB-SYNC\KB-Sync-Master-Pipeline</code></td>
+        <td>Daily 06:30 ET</td>
+        <td><code>kb-sync/pipeline/master-sync.mjs</code></td>
+        <td>Executes full wiki synchronization and ingestion.</td>
+      </tr>
+      <tr>
+        <td><code>\KB-SYNC\KB-Sync-TRM-Triage</code></td>
+        <td>Daily 07:00 ET</td>
+        <td><code>scripts/trm-bot-runner.mjs</code></td>
+        <td>Triage and resolution of pending TRM research gaps.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 6 -->
+  <h2>6. Diagnostic &amp; Runbook Procedures</h2>
+
+  <h3>Runbook A: Diagnose HTTP 500 or Unresponsive Dashboard</h3>
+  <ol>
+    <li>Check listening ports:
+      <pre><code>Get-NetTCPConnection -LocalPort 8080</code></pre>
+    </li>
+    <li>Check server log for uncaught exceptions:
+      <pre><code>Get-Content C:\dev\icf\daemon.log -Tail 50</code></pre>
+    </li>
+    <li>Execute self-healing restart trigger:
+      <pre><code>New-Item -ItemType File -Path "C:\dev\.restart-trigger" -Force
+Start-ScheduledTask -TaskPath "\Ironbots\" -TaskName "Daemon-Healer"</code></pre>
+    </li>
+  </ol>
+
+  <h3>Runbook B: Remediate Broken Wikilinks in Tab 03</h3>
+  <ol>
+    <li>Run wikilink validation:
+      <pre><code>cd C:\dev\kb-sync
+npm run wiki:validate</code></pre>
+    </li>
+    <li>Run automated repair for missing stub targets:
+      <pre><code>npm run wiki:autoheal</code></pre>
+    </li>
+  </ol>
+
+  <h3>Runbook C: Purge Browser and Backend Caches</h3>
+  <p>
+    Click the <strong>CLEAR CACHE</strong> button in the dashboard header. This empties browser <code>localStorage</code>, <code>sessionStorage</code>, dispatches <code>POST /api/actions/clear-cache</code>, and reloads the page with clean SSE telemetry.
+  </p>
+
+  <footer>
+    <p>Iron Command Forge · Operations Manual · Version 1.5.0 · Updated 2026-10-08</p>
+  </footer>
+
+</div>
+
+<script>
+  function toggleManualTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.getAttribute('data-theme') || 'parchment';
+    const nextTheme = currentTheme === 'parchment' ? 'forge' : 'parchment';
+    html.setAttribute('data-theme', nextTheme);
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.innerText = 'Theme: ' + (nextTheme === 'parchment' ? 'Parchment' : 'Forge');
+    }
+    localStorage.setItem('icf-theme', nextTheme);
+  }
+
+  // Restore saved theme
+  const saved = localStorage.getItem('icf-theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.innerText = 'Theme: ' + (saved === 'parchment' ? 'Parchment' : 'Forge');
+    }
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-10-07T17:50:04.550Z",
+  "status": "HEALTHY",
+  "provider": "torquequery-mcp / cost-routing-gateway",
+  "frontierPricingBaseline": {
+    "model": "anthropic/claude-3-5-sonnet",
+    "inputCostPer1M": 3,
+    "outputCostPer1M": 15,
+    "version": "2024-10-22-baseline"
+  },
+  "tiers": {
+    "tier_0_local": {
+      "displayName": "Local Ollama Substrate",
+      "reliability": "offline_local",
+      "circuitBreakerState": "CLOSED",
+      "hits": 1
+    },
+    "tier_0_5_freellmapi": {
+      "displayName": "FreeLLMAPI Unified Router (Best-Effort Proxy)",
+      "reliability": "best_effort",
+      "circuitBreakerState": "CLOSED",
+      "hits": 0
+    },
+    "tier_1_muscle": {
+      "displayName": "Paid Muscle Cloud (OpenRouter / DeepSeek / Mistral)",
+      "reliability": "commercial_sla",
+      "circuitBreakerState": "CLOSED",
+      "hits": 0
+    },
+    "tier_2_frontier": {
+      "displayName": "Frontier Reasoning (Claude 3.5 Sonnet / GPT-4o)",
+      "reliability": "guaranteed",
+      "circuitBreakerState": "CLOSED",
+      "hits": 0
+    }
+  },
+  "metrics": {
+    "totalRequests": 1,
+    "tierHits": {
+      "tier_0_local": 1,
+      "tier_0_5_freellmapi": 0,
+      "tier_1_muscle": 0,
+      "tier_2_frontier": 0
+    },
+    "circuitBreakerTrips": {
+      "tier_0_local": 0,
+      "tier_0_5_freellmapi": 0,
+      "tier_1_muscle": 0,
+      "tier_2_frontier": 0
+    },
+    "qualityEscalations": 0,
+    "totalSpentUsd": 0,
+    "totalSavedVsFrontierUsd": 0.003987,
+    "averageLatencyMs": 48345
+  }
+}
