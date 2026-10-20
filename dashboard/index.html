@@ -890,7 +890,7 @@
         <button class="filter-pill" onclick="filterFleetCards('supervised', this)">● SUPERVISED (1)</button>
       </div>
       <div>
-        <input type="text" class="search-box" id="fleetSearchInput" placeholder="Filter bots or logs... (/)" oninput="searchFleetCards(this.value)" />
+        <input type="text" class="search-box" id="fleetSearchInput" aria-label="Filter bots or logs" placeholder="Filter bots or logs... (/)" oninput="searchFleetCards(this.value)" />
       </div>
     </div>
 
@@ -1447,7 +1447,7 @@
           </div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <input type="text" id="trmGapsSearchInput" placeholder="Filter target or excerpt..." 
+          <input type="text" id="trmGapsSearchInput" aria-label="Filter target or excerpt" placeholder="Filter target or excerpt..."
                  oninput="filterTrmGaps(currentTrmGapsFilter)" 
                  style="font-family: var(--font-ui); background: var(--bg-canvas); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 5px 10px; font-size: 0.75rem; border-radius: 2px; width: 190px;">
           <button type="button" class="btn-secondary active" id="btnGapFilterAll" onclick="filterTrmGaps('ALL')">All (<span id="trmGapCountAll">0</span>)</button>
@@ -3046,7 +3046,7 @@ flowchart TD
           <div class="panel-title">Filter by Category &amp; Keywords</div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <input type="text" id="skillSearchInput" placeholder="Search skills..." oninput="handleSkillSearch(this.value)" style="background: var(--black); border: 1px solid rgba(154, 144, 136, 0.2); color: var(--bone); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 0.05em; padding: 0.45rem 0.8rem; outline: none;" onfocus="this.style.borderColor='var(--ember)'" onblur="this.style.borderColor='rgba(154, 144, 136, 0.2)'">
+          <input type="text" id="skillSearchInput" aria-label="Search skills" placeholder="Search skills..." oninput="handleSkillSearch(this.value)" style="background: var(--black); border: 1px solid rgba(154, 144, 136, 0.2); color: var(--bone); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 0.05em; padding: 0.45rem 0.8rem; outline: none;" onfocus="this.style.borderColor='var(--ember)'" onblur="this.style.borderColor='rgba(154, 144, 136, 0.2)'">
           <button type="button" class="btn-secondary" onclick="reloadSkillsInventory()">Refresh Skills</button>
         </div>
       </div>
