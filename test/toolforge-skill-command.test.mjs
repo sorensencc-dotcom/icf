@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import {
   skillCommandText,
   skillEntrypointPath,
+  skillRelativeEntrypoint,
   skillRunner,
   quotePowerShell
 } from '../src/toolforge-skill-command.mjs';
@@ -233,6 +234,33 @@ test('skill paths normalize manifest entrypoints without duplicating skills dire
   assert.deepEqual(
     skillRunner({ id: 'parallel-search', entrypoint: 'skills/parallel-search/dist/index.js' }, 'C:\\dev'),
     ['node', ['C:\\dev\\skills\\parallel-search\\dist\\index.js']]
+  );
+});
+
+test('skillRelativeEntrypoint normalizes slashes and strips redundant skill directory prefix', () => {
+  assert.equal(
+    skillRelativeEntrypoint({ id: 'my-skill' }),
+    'SKILL.md'
+  );
+  assert.equal(
+    skillRelativeEntrypoint({ id: 'my-skill', entrypoint: 'src/main.js' }),
+    'src\\main.js'
+  );
+  assert.equal(
+    skillRelativeEntrypoint({ id: 'my-skill', entrypoint: 'skills/my-skill/src/main.js' }),
+    'src\\main.js'
+  );
+  assert.equal(
+    skillRelativeEntrypoint({ id: 'my-skill', entrypoint: 'SKILLS/MY-SKILL/src/main.js' }),
+    'src\\main.js'
+  );
+  assert.equal(
+    skillRelativeEntrypoint({ id: 'my-skill', entrypoint: 'skills\\my-skill\\src\\main.js' }),
+    'src\\main.js'
+  );
+  assert.equal(
+    skillRelativeEntrypoint({ id: 'my-skill', entrypoint: 'skills/other-skill/src/main.js' }),
+    'skills\\other-skill\\src\\main.js'
   );
 });
 
