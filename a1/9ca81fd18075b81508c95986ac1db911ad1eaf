@@ -1,0 +1,18 @@
+src/server.mjs
+  h_5c172e9b435f5a 71,567-568,573-587,593-597,721-728
+test/gateway.test.mjs
+  h_5c172e9b435f5a 6-7,259-260,270-283,298-334,341-346,348,351,358,360-374,382,390,398,403,406,418-438,441-464,473,475-476,486-487,489-559,563
+test/toolforge-inventory.test.mjs
+  h_5c172e9b435f5a 48,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a19ca81fd18075b81508c95986ac1db911ad1eaf",
+  "prompts": {},
+  "humans": {
+    "h_5c172e9b435f5a": {
+      "author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
