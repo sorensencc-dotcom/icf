@@ -1,0 +1,16 @@
+src/server.mjs
+  h_5c172e9b435f5a 349-357,543,549-571,597-598,656-664,667,673-694,697,699-705,708,714
+test/gateway.test.mjs
+  h_5c172e9b435f5a 319-381,383
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e48dce06aa050687bbcc3f315edbd12d6ae0a4c5",
+  "prompts": {},
+  "humans": {
+    "h_5c172e9b435f5a": {
+      "author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
