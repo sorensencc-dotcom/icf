@@ -316,7 +316,71 @@ test('Action execution routes dispatch valid tasks and reject invalid inputs', a
       body: '{ malformed json'
     });
     assert.equal(malformedRes.status, 400);
+
+    // 7. Webhook trigger shorthand & single-flight coalescing
+    const statusRes = await fetch(`${baseUrl}/api/webhooks/status`);
+    assert.equal(statusRes.status, 200);
+    const statusData = await statusRes.json();
+    assert.equal(statusData.ok, true);
+    assert.ok(Array.isArray(statusData.activeJobs));
+    assert.ok(Array.isArray(statusData.recentHistory));
   } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('Webhook trigger enforces single-flight coalescing and records job lifecycle', async () => {
+  const cp = await import('node:child_process');
+  const { EventEmitter } = await import('node:events');
+  const originalSpawn = cp.default.spawn;
+  const children = [];
+
+  cp.default.spawn = () => {
+    const child = new EventEmitter();
+    child.pid = 40000 + children.length;
+    child.unref = () => {};
+    children.push(child);
+    return child;
+  };
+
+  const server = createGatewayServer({ disableWatcher: true });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    // First webhook call dispatches
+    const first = await fetch(`${baseUrl}/api/webhooks/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: 'kb-sentinel' })
+    });
+    assert.equal(first.status, 200);
+    const firstBody = await first.json();
+    assert.equal(firstBody.status, 'DISPATCHED');
+    assert.equal(firstBody.pid, 40000);
+
+    // Second concurrent call for the same job coalesces (202 ALREADY_RUNNING)
+    const second = await fetch(`${baseUrl}/api/webhooks/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: 'kb-sentinel' })
+    });
+    assert.equal(second.status, 202);
+    const secondBody = await second.json();
+    assert.equal(secondBody.status, 'ALREADY_RUNNING');
+    assert.equal(secondBody.coalesced, true);
+    assert.equal(secondBody.pid, 40000);
+    assert.equal(children.length, 1);
+
+    // Complete first job and verify history + re-dispatch unlocked
+    children[0].emit('exit', 0);
+    const statusRes = await fetch(`${baseUrl}/api/webhooks/status`);
+    const statusBody = await statusRes.json();
+    assert.equal(statusBody.activeCount, 0);
+    assert.equal(statusBody.recentHistory[0].jobKey, 'run-bot:kb-sentinel');
+    assert.equal(statusBody.recentHistory[0].status, 'COMPLETED');
+  } finally {
+    cp.default.spawn = originalSpawn;
     await new Promise((resolve) => server.close(resolve));
   }
 });

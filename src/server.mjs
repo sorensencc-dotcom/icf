@@ -346,6 +346,15 @@ export function createGatewayServer(options = {}) {
     }
   }
 
+  // Single-flight job registry and recent history for webhook/action execution
+  const activeJobs = new Map();
+  const jobHistory = [];
+  const MAX_JOB_HISTORY = 50;
+  function recordJobHistory(entry) {
+    jobHistory.unshift(entry);
+    if (jobHistory.length > MAX_JOB_HISTORY) jobHistory.length = MAX_JOB_HISTORY;
+  }
+
   const commitCache = new Map();
   let gitAuthor = options.gitAuthor || null;
   async function countCommits(since, until) {
@@ -531,10 +540,33 @@ export function createGatewayServer(options = {}) {
       return;
     }
 
-    if (pathname === '/api/actions/run') {
+    if (pathname === '/api/actions/status' || pathname === '/api/webhooks/status') {
       if (!isLoopback(req.socket.remoteAddress)) {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: 'Forbidden: loopback only' }));
+        return;
+      }
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({
+        ok: true,
+        activeCount: activeJobs.size,
+        activeJobs: Array.from(activeJobs.values()),
+        recentHistory: jobHistory
+      }));
+      return;
+    }
+
+    if (pathname === '/api/actions/run' || pathname === '/api/webhooks/trigger') {
+      const webhookToken = options.webhookToken ?? process.env.ICF_WEBHOOK_TOKEN;
+      const bearerValid = Boolean(webhookToken && req.headers.authorization === `Bearer ${webhookToken}`);
+      if (!isLoopback(req.socket.remoteAddress) && !bearerValid) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: loopback or valid Bearer token required' }));
         return;
       }
       if (req.method !== 'POST') {
@@ -562,7 +594,8 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
-      const { action, target } = payload;
+      const action = payload.action || (payload.job ? 'run-bot' : undefined);
+      const target = payload.target || payload.job;
       const ACTION_WHITELIST = {
         'run-bot': {
           'kb-sentinel': ['node', [resolve(ROOT, '../scripts/kb-sentinel-bot.mjs')]],
@@ -620,25 +653,65 @@ export function createGatewayServer(options = {}) {
         return;
       }
 
+      const jobKey = `${action}:${target || 'default'}`;
+      if (activeJobs.has(jobKey) && !payload.force) {
+        const active = activeJobs.get(jobKey);
+        broadcastSseEvent('action_coalesced', { jobKey, action, target, pid: active.pid, startedAt: active.startedAt, timestamp: new Date().toISOString() });
+        res.writeHead(202, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: true, action, target, pid: active.pid, startedAt: active.startedAt, status: 'ALREADY_RUNNING', coalesced: true }));
+        return;
+      }
+
       const [cmd, cmdArgs] = runner;
       try {
+        const startedAt = new Date().toISOString();
         const proc = cp.spawn(cmd, cmdArgs, {
           cwd: action === 'run-skill' ? toolforgeRoot : resolve(ROOT, '..'),
           detached: true,
           stdio: 'ignore'
         });
+
+        const jobRecord = { jobKey, action, target: target || 'default', pid: proc.pid, startedAt, status: 'RUNNING' };
+        activeJobs.set(jobKey, jobRecord);
+
+        const finalizeJob = (status, code = null, error = null) => {
+          if (activeJobs.get(jobKey) !== jobRecord) return;
+          activeJobs.delete(jobKey);
+          const completedAt = new Date().toISOString();
+          const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+          const summary = { ...jobRecord, status, exitCode: code, error, completedAt, durationMs };
+          recordJobHistory(summary);
+          broadcastSseEvent(status === 'COMPLETED' ? 'action_completed' : 'action_error', summary);
+          const notifyUrl = options.outboundWebhookUrl ?? process.env.ICF_OUTBOUND_WEBHOOK_URL;
+          if (notifyUrl && status !== 'COMPLETED') {
+            fetch(notifyUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: `[ICF Webhook Broker] Job ${jobKey} failed (status=${status}, exit=${code ?? error})`, job: summary })
+            }).catch(() => {});
+          }
+        };
+
         proc.on('error', (procErr) => {
           console.error(`[ICF-ACTION-ENGINE] Async execution error for ${action}/${target}:`, procErr.message);
-          broadcastSseEvent('action_error', { action, target, error: procErr.message, timestamp: new Date().toISOString() });
+          finalizeJob('FAILED', null, procErr.message);
         });
+        if (typeof proc.once === 'function') {
+          proc.once('exit', (code) => {
+            finalizeJob(code === 0 || code === null ? 'COMPLETED' : 'FAILED', code, code ? `Exit code ${code}` : null);
+          });
+        } else {
+          activeJobs.delete(jobKey);
+        }
         proc.unref();
 
-        broadcastSseEvent('action_dispatched', { action, target, pid: proc.pid, timestamp: new Date().toISOString() });
+        broadcastSseEvent('action_dispatched', { action, target, pid: proc.pid, timestamp: startedAt });
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: true, action, target, pid: proc.pid, status: 'DISPATCHED' }));
         return;
       } catch (err) {
+        activeJobs.delete(jobKey);
         res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: err.message }));
         return;
