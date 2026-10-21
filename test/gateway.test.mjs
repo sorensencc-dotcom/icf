@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { createGatewayServer, isLoopback } from '../src/server.mjs';
+import { tmpdir, networkInterfaces } from 'node:os';
+import { createGatewayServer, isLoopback, HOST } from '../src/server.mjs';
 import { createMobileSnapshotService } from '../src/mobile-snapshot.mjs';
 import { createSnapshotStore } from '../reporting/src/snapshot-store.mjs';
 
@@ -256,7 +256,8 @@ test('gateway serves Meridian day and week reports with commit counts', async ()
   }
 });
 
-test('Meridian routes only answer loopback clients', () => {
+test('Meridian routes only answer loopback clients and default HOST is 127.0.0.1', () => {
+  assert.equal(HOST, process.env.ICF_HOST || '127.0.0.1');
   assert.ok(isLoopback('127.0.0.1'));
   assert.ok(isLoopback('::1'));
   assert.ok(isLoopback('::ffff:127.0.0.1'));
@@ -266,7 +267,20 @@ test('Meridian routes only answer loopback clients', () => {
 });
 
 test('Action execution routes dispatch valid tasks and reject invalid inputs', async () => {
-  const server = createGatewayServer();
+  const cp = await import('node:child_process');
+  const { EventEmitter } = await import('node:events');
+  const originalSpawn = cp.default.spawn;
+  const spawnedCalls = [];
+
+  cp.default.spawn = (...args) => {
+    spawnedCalls.push(args);
+    const child = new EventEmitter();
+    child.pid = 30000 + spawnedCalls.length;
+    child.unref = () => {};
+    return child;
+  };
+
+  const server = createGatewayServer({ disableWatcher: true });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
@@ -281,27 +295,83 @@ test('Action execution routes dispatch valid tasks and reject invalid inputs', a
     const getRes = await fetch(`${baseUrl}/api/actions/run`, { method: 'GET' });
     assert.equal(getRes.status, 405);
 
-    // 3. Reject invalid target
+    // 3. Reject missing or non-JSON Content-Type (prevents browser simple-POST CSRF)
+    const plainRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'validate-wiki', target: 'all' })
+    });
+    assert.equal(plainRes.status, 400);
+    assert.equal(spawnedCalls.length, 0);
+
+    // 4. Reject cross-origin Origin headers and DNS-rebinding Host headers
+    for (const badOrigin of ['http://evil.test', 'https://attacker.example', 'null']) {
+      const csrfRes = await fetch(`${baseUrl}/api/actions/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: badOrigin },
+        body: JSON.stringify({ action: 'validate-wiki', target: 'all' })
+      });
+      assert.equal(csrfRes.status, 403, `Origin ${badOrigin} must be rejected`);
+    }
+    const rebindRes = await new Promise((resolve, reject) => {
+      const req = request(`${baseUrl}/api/actions/run`, {
+        method: 'POST',
+        headers: {
+          Host: 'evil-rebind.attacker.test:8080',
+          'Content-Type': 'application/json'
+        }
+      }, (res) => {
+        let raw = '';
+        res.on('data', (c) => { raw += c; });
+        res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(raw) }));
+      });
+      req.on('error', reject);
+      req.end(JSON.stringify({ action: 'validate-wiki', target: 'all' }));
+    });
+    assert.equal(rebindRes.status, 403);
+    assert.equal(spawnedCalls.length, 0);
+
+    // 5. Reject invalid target
     const invalidRes = await fetch(`${baseUrl}/api/actions/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'run-bot', target: 'nonexistent-bot' })
     });
     assert.equal(invalidRes.status, 400);
-
-    // 4. Accept valid action
-    const validRes = await fetch(`${baseUrl}/api/actions/run`, {
+    const invalidTaskRes = await fetch(`${baseUrl}/api/actions/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'run-task', target: 'NotAllowedTask' })
+    });
+    assert.equal(invalidTaskRes.status, 400);
+
+    // 6. Accept valid actions across action types with same-origin header
+    const validRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: baseUrl },
       body: JSON.stringify({ action: 'validate-wiki', target: 'all' })
     });
     assert.equal(validRes.status, 200);
     const validData = await validRes.json();
     assert.equal(validData.ok, true);
     assert.equal(validData.status, 'DISPATCHED');
-    assert.ok(typeof validData.pid === 'number');
+    assert.equal(validData.pid, 30001);
 
-    // 5. Reject payload too large (>64KB)
+    const taskRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'run-task', target: 'Daemon-Healer' })
+    });
+    assert.equal(taskRes.status, 200);
+
+    const healRes = await fetch(`${baseUrl}/api/actions/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'autoheal-wiki', target: 'frontmatter' })
+    });
+    assert.equal(healRes.status, 200);
+
+    // 7. Reject payload too large (>64KB)
     const largeRes = await fetch(`${baseUrl}/api/actions/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -309,7 +379,7 @@ test('Action execution routes dispatch valid tasks and reject invalid inputs', a
     });
     assert.equal(largeRes.status, 413);
 
-    // 6. Reject invalid JSON
+    // 8. Reject invalid JSON
     const malformedRes = await fetch(`${baseUrl}/api/actions/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -317,7 +387,7 @@ test('Action execution routes dispatch valid tasks and reject invalid inputs', a
     });
     assert.equal(malformedRes.status, 400);
 
-    // 7. Webhook trigger shorthand & single-flight coalescing
+    // 9. Webhook status endpoint
     const statusRes = await fetch(`${baseUrl}/api/webhooks/status`);
     assert.equal(statusRes.status, 200);
     const statusData = await statusRes.json();
@@ -325,13 +395,15 @@ test('Action execution routes dispatch valid tasks and reject invalid inputs', a
     assert.ok(Array.isArray(statusData.activeJobs));
     assert.ok(Array.isArray(statusData.recentHistory));
   } finally {
+    cp.default.spawn = originalSpawn;
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
-test('Webhook trigger enforces single-flight coalescing and records job lifecycle', async () => {
+test('Webhook trigger enforces single-flight coalescing, force override, failure/signal outcomes, outbound alerts, and history cap', async () => {
   const cp = await import('node:child_process');
   const { EventEmitter } = await import('node:events');
+  const { createServer: createHttpServer } = await import('node:http');
   const originalSpawn = cp.default.spawn;
   const children = [];
 
@@ -343,12 +415,53 @@ test('Webhook trigger enforces single-flight coalescing and records job lifecycl
     return child;
   };
 
-  const server = createGatewayServer({ disableWatcher: true });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const outboundPayloads = [];
+  const alertReceiver = createHttpServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      outboundPayloads.push(JSON.parse(raw));
+      res.writeHead(200);
+      res.end('ok');
+    });
+  });
+  await new Promise((resolve) => alertReceiver.listen(0, '127.0.0.1', resolve));
+  const outboundWebhookUrl = `http://127.0.0.1:${alertReceiver.address().port}/alert`;
+
+  const server = createGatewayServer({
+    disableWatcher: true,
+    webhookToken: 'secret-webhook-token',
+    outboundWebhookUrl
+  });
+  await new Promise((resolve) => server.listen(0, '0.0.0.0', resolve));
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
-    // First webhook call dispatches
+    // 1. Non-loopback socket without bearer token is rejected (403); with bearer token succeeds (200)
+    const lanAddress = Object.values(networkInterfaces()).flat().find((v) => v && v.family === 'IPv4' && !v.internal)?.address;
+    if (lanAddress) {
+      const lanUrl = `http://${lanAddress}:${port}/api/webhooks/trigger`;
+      const noTokenRes = await fetch(lanUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job: 'kb-sentinel' })
+      });
+      assert.equal(noTokenRes.status, 403);
+
+      const withTokenRes = await fetch(lanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer secret-webhook-token'
+        },
+        body: JSON.stringify({ job: 'kb-sentinel' })
+      });
+      assert.equal(withTokenRes.status, 200);
+      children.at(-1).emit('exit', 0, null);
+    }
+
+    // 2. First webhook call dispatches
     const first = await fetch(`${baseUrl}/api/webhooks/trigger`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -357,9 +470,10 @@ test('Webhook trigger enforces single-flight coalescing and records job lifecycl
     assert.equal(first.status, 200);
     const firstBody = await first.json();
     assert.equal(firstBody.status, 'DISPATCHED');
-    assert.equal(firstBody.pid, 40000);
+    const firstChild = children.at(-1);
 
-    // Second concurrent call for the same job coalesces (202 ALREADY_RUNNING)
+    // 3. Second concurrent call for the same job coalesces (202 ALREADY_RUNNING)
+    const countBeforeSecond = children.length;
     const second = await fetch(`${baseUrl}/api/webhooks/trigger`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -369,18 +483,83 @@ test('Webhook trigger enforces single-flight coalescing and records job lifecycl
     const secondBody = await second.json();
     assert.equal(secondBody.status, 'ALREADY_RUNNING');
     assert.equal(secondBody.coalesced, true);
-    assert.equal(secondBody.pid, 40000);
-    assert.equal(children.length, 1);
+    assert.equal(secondBody.pid, firstChild.pid);
+    assert.equal(children.length, countBeforeSecond);
 
-    // Complete first job and verify history + re-dispatch unlocked
-    children[0].emit('exit', 0);
-    const statusRes = await fetch(`${baseUrl}/api/webhooks/status`);
-    const statusBody = await statusRes.json();
-    assert.equal(statusBody.activeCount, 0);
-    assert.equal(statusBody.recentHistory[0].jobKey, 'run-bot:kb-sentinel');
-    assert.equal(statusBody.recentHistory[0].status, 'COMPLETED');
+    // 4. force: true bypasses single-flight coalescing
+    const forced = await fetch(`${baseUrl}/api/webhooks/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: 'kb-sentinel', force: true })
+    });
+    assert.equal(forced.status, 200);
+    const forcedChild = children.at(-1);
+    assert.notEqual(forcedChild.pid, firstChild.pid);
+
+    // Complete active job (exit 0, no signal -> COMPLETED, no outbound alert)
+    const alertsBeforeComplete = outboundPayloads.length;
+    forcedChild.emit('exit', 0, null);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(outboundPayloads.length, alertsBeforeComplete);
+
+    // 5. Signal kill (code = null, signal = 'SIGTERM') is recorded as FAILED and triggers outbound alert
+    await fetch(`${baseUrl}/api/webhooks/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: 'ci-watchdog' })
+    });
+    children.at(-1).emit('exit', null, 'SIGTERM');
+    await new Promise((r) => setTimeout(r, 40));
+
+    let statusBody = await (await fetch(`${baseUrl}/api/webhooks/status`)).json();
+    assert.equal(statusBody.recentHistory[0].jobKey, 'run-bot:ci-watchdog');
+    assert.equal(statusBody.recentHistory[0].status, 'FAILED');
+    assert.equal(statusBody.recentHistory[0].exitCode, null);
+    assert.match(statusBody.recentHistory[0].error, /Killed by signal SIGTERM/);
+    assert.ok(outboundPayloads.some((p) => p.job?.jobKey === 'run-bot:ci-watchdog' && p.job?.status === 'FAILED'));
+
+    // 6. Non-zero exit code (code = 2) is recorded as FAILED and triggers outbound alert
+    await fetch(`${baseUrl}/api/webhooks/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: 'trm-bot' })
+    });
+    children.at(-1).emit('exit', 2, null);
+    await new Promise((r) => setTimeout(r, 40));
+
+    statusBody = await (await fetch(`${baseUrl}/api/webhooks/status`)).json();
+    assert.equal(statusBody.recentHistory[0].jobKey, 'run-bot:trm-bot');
+    assert.equal(statusBody.recentHistory[0].status, 'FAILED');
+    assert.equal(statusBody.recentHistory[0].exitCode, 2);
+
+    // 7. Async child 'error' event is recorded as FAILED
+    await fetch(`${baseUrl}/api/webhooks/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: 'storage-pruner' })
+    });
+    children.at(-1).emit('error', new Error('ENOENT spawn failure'));
+    await new Promise((r) => setTimeout(r, 40));
+
+    statusBody = await (await fetch(`${baseUrl}/api/webhooks/status`)).json();
+    assert.equal(statusBody.recentHistory[0].jobKey, 'run-bot:storage-pruner');
+    assert.equal(statusBody.recentHistory[0].status, 'FAILED');
+    assert.match(statusBody.recentHistory[0].error, /ENOENT spawn failure/);
+
+    // 8. History cap is bounded to 50 entries
+    for (let i = 0; i < 55; i++) {
+      await fetch(`${baseUrl}/api/webhooks/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job: 'kb-sentinel', force: true })
+      });
+      children.at(-1).emit('exit', 0, null);
+    }
+    statusBody = await (await fetch(`${baseUrl}/api/webhooks/status`)).json();
+    assert.equal(statusBody.recentHistory.length, 50);
   } finally {
     cp.default.spawn = originalSpawn;
     await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => alertReceiver.close(resolve));
   }
 });

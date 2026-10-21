@@ -68,7 +68,7 @@ export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 // TRM_INBOX_DIR lets tests mutate a temp ledger instead of the live trm-drive inbox.
 export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(ROOT, '../trm-drive/inbox'));
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
-export const HOST = process.env.ICF_HOST || '0.0.0.0';
+export const HOST = process.env.ICF_HOST || '127.0.0.1';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
 export const REPORTING_HISTORY_SOURCE_SYSTEM = 'icf';
 export const REPORTING_HISTORY_SOURCE_ID = 'weekly-retro';
@@ -564,14 +564,35 @@ export function createGatewayServer(options = {}) {
     if (pathname === '/api/actions/run' || pathname === '/api/webhooks/trigger') {
       const webhookToken = options.webhookToken ?? process.env.ICF_WEBHOOK_TOKEN;
       const bearerValid = Boolean(webhookToken && req.headers.authorization === `Bearer ${webhookToken}`);
-      if (!isLoopback(req.socket.remoteAddress) && !bearerValid) {
+      const loopback = isLoopback(req.socket.remoteAddress);
+      if (!loopback && !bearerValid) {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: 'Forbidden: loopback or valid Bearer token required' }));
         return;
       }
+      if (!bearerValid) {
+        const hostHeader = String(req.headers.host || '').trim().toLowerCase();
+        const validHost = /^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(hostHeader);
+        const originHeader = req.headers.origin;
+        const allowedOrigins = new Set([
+          toolforgeDashboardOrigin.toLowerCase(),
+          ...(hostHeader && validHost ? [`http://${hostHeader}`, `https://${hostHeader}`] : [])
+        ]);
+        const validOrigin = originHeader === undefined || allowedOrigins.has(String(originHeader).trim().toLowerCase());
+        if (!validHost || !validOrigin) {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: valid loopback Host and Origin required' }));
+          return;
+        }
+      }
       if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
+        return;
+      }
+      if (!/^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(req.headers['content-type'] || '')) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Unsupported Content-Type: application/json required' }));
         return;
       }
 
@@ -697,8 +718,14 @@ export function createGatewayServer(options = {}) {
           finalizeJob('FAILED', null, procErr.message);
         });
         if (typeof proc.once === 'function') {
-          proc.once('exit', (code) => {
-            finalizeJob(code === 0 || code === null ? 'COMPLETED' : 'FAILED', code, code ? `Exit code ${code}` : null);
+          proc.once('exit', (code, signal) => {
+            const succeeded = code === 0 && !signal;
+            const errDetail = succeeded
+              ? null
+              : signal
+                ? `Killed by signal ${signal}`
+                : `Exit code ${code}`;
+            finalizeJob(succeeded ? 'COMPLETED' : 'FAILED', code, errDetail);
           });
         } else {
           activeJobs.delete(jobKey);

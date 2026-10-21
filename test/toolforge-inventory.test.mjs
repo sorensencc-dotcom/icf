@@ -45,6 +45,7 @@ test('legacy run-skill dispatch uses the same configured owner and manifest as i
       assert.equal(inventory.skills[0].runnable, true);
       for (const target of [f.skill.id, f.skill.name]) {
         const response = await fetch(`${url}/api/actions/run`, { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'run-skill', target }) });
         assert.equal(response.status, 200);
         assert.deepEqual(await response.json(), { ok: true, action: 'run-skill', target, pid: 12345, status: 'DISPATCHED' });
@@ -55,6 +56,7 @@ test('legacy run-skill dispatch uses the same configured owner and manifest as i
       for (const content of ['{broken', JSON.stringify({ skills: [] })]) {
         await writeFile(manifestPath || f.manifest, content);
         const response = await fetch(`${url}/api/actions/run`, { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'run-skill', target: f.skill.id }) });
         assert.equal(response.status, 400);
         assert.deepEqual(await response.json(), { ok: false, error: 'Invalid action or target: run-skill/demo' });
