@@ -1,0 +1,19 @@
+src/server.mjs
+  s_b4d4b303f7948a::t_5c460694e69411 27-28,30-52,54-55,280-282,1103,1158-1159,1161-1162,1182,1188-1196,1204-1218,1223-1228,1341-1342,1344-1346,1548-1551,1580-1583
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1892abc535853c49ecbecb16ae53fb12305b4e6c",
+  "prompts": {},
+  "sessions": {
+    "s_b4d4b303f7948a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5dac1001-dc6d-497c-bb01-a38128f66f45",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
