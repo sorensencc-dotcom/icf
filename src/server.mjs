@@ -24,18 +24,35 @@ export function getPullRequests() {
   if (now - prCache.timestamp < PR_CACHE_TTL_MS && prCache.prs.length > 0) {
     return prCache.prs;
   }
+  const repos = ['sorensencc-dotcom/toolforge', 'sorensencc-dotcom/sigil'];
+  const allPrs = [];
   try {
-    const raw = cp.execSync('gh pr list --repo sorensencc-dotcom/toolforge --limit 20 --state all --json number,title,state,url,createdAt,mergedAt,headRefName', {
-      cwd: resolve(ROOT, '..'),
-      encoding: 'utf8',
-      timeout: 8000,
-      stdio: ['ignore', 'pipe', 'ignore']
-    });
-    const parsed = JSON.parse(raw);
-    prCache = { timestamp: now, prs: parsed };
-    return parsed;
+    for (const repo of repos) {
+      try {
+        const raw = cp.execFileSync('gh', [
+          'pr', 'list',
+          '--repo', repo,
+          '--limit', '25',
+          '--state', 'all',
+          '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
+        ], {
+          cwd: resolve(ROOT, '..'),
+          encoding: 'utf8',
+          timeout: 4000,
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'ignore']
+        });
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          allPrs.push(...parsed);
+        }
+      } catch {}
+    }
+    prCache = { timestamp: now, prs: allPrs.length > 0 ? allPrs : (prCache.prs || []) };
+    return prCache.prs;
   } catch {
-    return prCache.prs || [];
+    prCache = { timestamp: now, prs: prCache.prs || [] };
+    return prCache.prs;
   }
 }
 
@@ -259,6 +276,9 @@ export function buildCardDetailSections(card = {}) {
   }
   if (card.direction) {
     out += '\n### Direction\n' + (typeof card.direction === 'string' ? card.direction : JSON.stringify(card.direction, null, 2)) + '\n';
+  }
+  if (card.research_ref) {
+    out += `\n### Research reference\n- RFC Document: \`${card.research_ref}\`\n`;
   }
   return out;
 }
@@ -1080,7 +1100,7 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
-          const ledgerPath = resolve(ROOT, '../trm-drive/inbox/ledger.jsonl');
+          const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
           const pendingDir = resolve(ROOT, '../.harness/tasks/pending');
           const archiveDir = resolve(ROOT, '../.harness/tasks/archive');
           const outboxDir = resolve(ROOT, '../trm-drive/inbox/outbox');
@@ -1135,7 +1155,11 @@ export function createGatewayServer(options = {}) {
                       summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
                       status: rcpt?.status || data.status || defaultStatus,
                       priority: data.priority || 'P2',
+                      created_at: data.created_at || data.created || data.timestamp || data.processed_at || rcpt?.timestamp || null,
+                      timestamp: data.timestamp || rcpt?.timestamp || null,
                       issue_url: rcpt?.issue_url || data.issue_url || null,
+                      pr_url: rcpt?.pr_url || data.pr_url || null,
+                      pr_branch: rcpt?.pr_branch || data.pr_branch || null,
                       research_ref: rcpt?.research_ref || data.research_ref || null,
                       action_type: data.action_type,
                       category: data.category,
@@ -1155,11 +1179,20 @@ export function createGatewayServer(options = {}) {
                     if (data.summary && (!existing.summary || existing.summary.startsWith('Mobile action item'))) {
                       existing.summary = data.summary;
                     }
-                    if (rcpt?.status && existing.status !== 'COMPLETED' && existing.status !== 'DONE') {
+                    if (rcpt?.status && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
                       existing.status = rcpt.status;
                     }
                     if (rcpt?.issue_url && !existing.issue_url) {
                       existing.issue_url = rcpt.issue_url;
+                    }
+                    if (data?.issue_url && !existing.issue_url) {
+                      existing.issue_url = data.issue_url;
+                    }
+                    if (data?.pr_url && !existing.pr_url) {
+                      existing.pr_url = data.pr_url;
+                    }
+                    if (data?.pr_branch && !existing.pr_branch) {
+                      existing.pr_branch = data.pr_branch;
                     }
                   }
                 } catch {}
@@ -1168,10 +1201,31 @@ export function createGatewayServer(options = {}) {
           }
 
           const cards = Array.from(cardsMap.values());
+          for (const card of cards) {
+            const raw = card.created_date || card.created_at || card.created || card.timestamp || card.processed_at;
+            if (raw) {
+              const m = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
+              if (m) card.created_date = m[1];
+            }
+            if (!card.created_date && card.id) {
+              const m = card.id.match(/^act-(\d{4})(\d{2})(\d{2})/);
+              if (m) card.created_date = `${m[1]}-${m[2]}-${m[3]}`;
+            }
+            if (!card.created_date && card.archived_path) {
+              const m = card.archived_path.match(/(\d{4}-\d{2}-\d{2})/);
+              if (m) card.created_date = m[1];
+            }
+          }
           const prs = getPullRequests();
           for (const card of cards) {
             if (!card.pr_url) {
               const matchedPr = prs.find(p => {
+                if (card.pr_branch && p.headRefName === card.pr_branch) {
+                  return true;
+                }
+                if (card.id && p.headRefName && p.headRefName.includes(card.id)) {
+                  return true;
+                }
                 if (card.issue_url) {
                   const issueNum = card.issue_url.split('/').pop();
                   if (issueNum && (p.title.includes(`#${issueNum}`) || p.title.toLowerCase().includes(`closes #${issueNum}`) || p.title.toLowerCase().includes(`fixes #${issueNum}`))) {
@@ -1284,11 +1338,12 @@ export function createGatewayServer(options = {}) {
             const receiptName = `receipt-${lockRow.id}-completed.json`;
             const hasReceipt = ['completed/outbox', 'outbox']
               .some(d => existsSync(resolve(promoteInboxDir, d, receiptName)));
-            const rowCompleted = lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at);
+            const isResearchCard = Boolean(lockRow.research_ref || cardData.research_ref);
+            const rowCompleted = (lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at)) && !isResearchCard;
             let reason = null;
-            if (rowCompleted) reason = 'card already completed';
-            else if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
-            else if (hasReceipt) reason = 'completion receipt exists';
+            if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
+            else if (rowCompleted) reason = 'card already completed';
+            else if (hasReceipt && !isResearchCard) reason = 'completion receipt exists';
             if (reason) {
               if (hasReceipt && lockRow.status !== 'COMPLETED') {
                 const reconciled = readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => {
@@ -1490,6 +1545,10 @@ export function createGatewayServer(options = {}) {
             target,
             stagePr
           });
+          try {
+            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+            refreshLedgerMarkdown();
+          } catch {}
 
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', results }));
@@ -1518,6 +1577,10 @@ export function createGatewayServer(options = {}) {
             inboxDir: promoteInboxDir,
             ledgerPath: lockLedgerPath
           });
+          try {
+            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+            refreshLedgerMarkdown();
+          } catch {}
 
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', results }));

@@ -99,6 +99,28 @@ test('ICF Gateway - promote refuses completed, already-promoted, and receipt-bac
   });
 });
 
+test('ICF Gateway - promote allows promoting researched cards with an RFC reference', async () => {
+  const row = {
+    id: 'card-researched',
+    status: 'DONE',
+    completed_at: '2026-10-01T11:45:04.621Z',
+    issue_url: null,
+    target: 'kb-sync',
+    intent: 'researched_idea',
+    research_ref: 'wiki/research/rfc-card-researched.md'
+  };
+  await withPromoteInbox([row], ['card-researched'], async ({ promote, readRows }) => {
+    const res = await promote('card-researched');
+    assert.equal(res.status, 200, 'researched card with RFC can be promoted into an issue');
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.ok(body.issue_url);
+    const updated = readRows().find(r => r.id === 'card-researched');
+    assert.equal(updated.status, 'IN_PROGRESS');
+    assert.equal(updated.issue_url, body.issue_url);
+  });
+});
+
 test('ICF Gateway - promote hydrates card body and formats title with commit prefix from archived card', async () => {
   const row = { id: 'card-hydrate', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'toolforge', intent: 'test_hydration' };
   await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
@@ -195,5 +217,24 @@ test('ICF Gateway - stage-pr creates branch name and test scaffold path', async 
     assert.equal(body.status, 'SUCCESS');
     assert.equal(body.results.branchName, 'trm/card-stage-test');
     assert.match(body.results.testFilePath, /trm-card-stage-test\.test\.mjs/);
+  });
+});
+
+test('ICF Gateway - backlog card reconciles pr_branch and preserves active status over stale receipt', async () => {
+  const row = {
+    id: 'card-staged-active',
+    status: 'IN_PROGRESS',
+    pr_branch: 'trm/card-staged-active',
+    pr_stage: 'STAGED_FOR_DEV',
+    issue_url: 'https://github.com/sorensencc-dotcom/toolforge/issues/999'
+  };
+  await withPromoteInbox([row], ['card-staged-active'], async ({ baseUrl }) => {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const card = body.cards.find(c => c.id === 'card-staged-active');
+    assert.ok(card);
+    assert.equal(card.status, 'IN_PROGRESS', 'stale outbox receipt does not revert active status');
+    assert.equal(card.pr_branch, 'trm/card-staged-active');
   });
 });

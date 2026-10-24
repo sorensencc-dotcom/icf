@@ -1499,11 +1499,11 @@
       <table class="table-clean">
         <thead>
           <tr>
-            <th style="width: 90px;">Priority</th>
-            <th style="width: 220px;">Card ID &amp; Target</th>
-            <th>Intent / Summary</th>
-            <th style="width: 140px;">Status</th>
-            <th style="width: 180px;">Actions</th>
+            <th style="width: 90px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('priority')" title="Sort by Priority">Priority <span id="sortIconPriority" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
+            <th style="width: 220px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('id')" title="Sort by Card ID &amp; Target">Card ID &amp; Target <span id="sortIconId" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
+            <th style="cursor: pointer; user-select: none;" onclick="sortTrmBacklog('intent')" title="Sort by Intent / Summary">Intent / Summary <span id="sortIconIntent" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
+            <th style="width: 140px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('status')" title="Sort by Status">Status <span id="sortIconStatus" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
+            <th style="width: 180px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('actions')" title="Sort by Actions">Actions <span id="sortIconActions" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
           </tr>
         </thead>
         <tbody id="trmBacklogTableBody">
@@ -5204,19 +5204,49 @@ flowchart TD
   }
   window.filterTrmBacklog = filterTrmBacklog;
 
+  let trmBacklogSortColumn = null;
+  let trmBacklogSortAsc = true;
+
+  function sortTrmBacklog(col) {
+    if (trmBacklogSortColumn === col) {
+      trmBacklogSortAsc = !trmBacklogSortAsc;
+    } else {
+      trmBacklogSortColumn = col;
+      trmBacklogSortAsc = true;
+    }
+    renderTrmBacklogTable();
+  }
+  window.sortTrmBacklog = sortTrmBacklog;
+
   function renderTrmBacklogTable() {
     const tableBody = document.getElementById('trmBacklogTableBody');
     if (!tableBody) return;
 
+    const sortIcons = {
+      priority: document.getElementById('sortIconPriority'),
+      id: document.getElementById('sortIconId'),
+      intent: document.getElementById('sortIconIntent'),
+      status: document.getElementById('sortIconStatus'),
+      actions: document.getElementById('sortIconActions')
+    };
+    for (const [k, el] of Object.entries(sortIcons)) {
+      if (el) el.textContent = (trmBacklogSortColumn === k) ? (trmBacklogSortAsc ? '▲' : '▼') : '↕';
+    }
+
     let filtered = cachedTrmBacklogCards;
     if (currentTrmBacklogFilter === 'OPEN') {
-      filtered = cachedTrmBacklogCards.filter(c => c.status !== 'DONE' && c.status !== 'COMPLETED' && c.status !== 'ARCHIVED');
+      filtered = cachedTrmBacklogCards.filter(c => {
+        if (c.status === 'ARCHIVED' || c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI') return false;
+        if (c.issue_url && (c.status === 'DONE' || c.status === 'COMPLETED')) return false;
+        if (c.research_ref && !c.issue_url) return true;
+        return c.status !== 'DONE' && c.status !== 'COMPLETED';
+      });
     } else if (currentTrmBacklogFilter === 'COMPLETED') {
-      filtered = cachedTrmBacklogCards.filter(c => c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED');
+      filtered = cachedTrmBacklogCards.filter(c => (c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED') && !(c.research_ref && !c.issue_url));
     } else if (currentTrmBacklogFilter === 'STAGED') {
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE');
     } else if (currentTrmBacklogFilter === 'RESEARCH') {
-      filtered = cachedTrmBacklogCards.filter(c => c.target === 'RESEARCH' || c.status === 'RESEARCH' || c.status === 'STAGED_FOR_RESEARCH');
+      filtered = cachedTrmBacklogCards.filter(c => c.target === 'RESEARCH' || c.status === 'RESEARCH' || c.status === 'STAGED_FOR_RESEARCH' || Boolean(c.research_ref));
     } else if (currentTrmBacklogFilter === 'IN_PROGRESS') {
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS');
     } else if (currentTrmBacklogFilter === 'DEFERRED') {
@@ -5234,12 +5264,49 @@ flowchart TD
       return;
     }
 
+    if (trmBacklogSortColumn) {
+      filtered = [...filtered].sort((a, b) => {
+        let cmp = 0;
+        if (trmBacklogSortColumn === 'priority') {
+          const rank = { 'P1': 1, 'P2': 2, 'P3': 3 };
+          cmp = (rank[a.priority] || 9) - (rank[b.priority] || 9);
+        } else if (trmBacklogSortColumn === 'id') {
+          cmp = String(a.id || '').localeCompare(String(b.id || ''));
+        } else if (trmBacklogSortColumn === 'intent') {
+          cmp = String(a.intent || a.title || '').localeCompare(String(b.intent || b.title || ''));
+        } else if (trmBacklogSortColumn === 'status') {
+          cmp = String(a.status || '').localeCompare(String(b.status || ''));
+        } else if (trmBacklogSortColumn === 'actions') {
+          const actA = a.issue_url ? 2 : (a.pr_branch ? 1 : 0);
+          const actB = b.issue_url ? 2 : (b.pr_branch ? 1 : 0);
+          cmp = actA - actB;
+        }
+        return trmBacklogSortAsc ? cmp : -cmp;
+      });
+    }
+
     tableBody.innerHTML = filtered.map(card => {
       const isStaged = card.status === 'STAGED' || card.status === 'PENDING' || card.status === 'STAGED_FOR_TRIAGE';
       const isResearch = card.status === 'RESEARCH' || card.status === 'STAGED_FOR_RESEARCH';
       const isInProgress = card.status === 'IN_PROGRESS';
       const isDeferred = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI';
       const isDone = card.status === 'DONE' || card.status === 'COMPLETED';
+      const cardDate = (function(c) {
+        const raw = c.created_date || c.created_at || c.created || c.timestamp || c.processed_at;
+        if (raw) {
+          const m = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
+          if (m) return m[1];
+        }
+        if (c.id) {
+          const m = c.id.match(/^act-(\d{4})(\d{2})(\d{2})/);
+          if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+        }
+        if (c.archived_path) {
+          const m = c.archived_path.match(/(\d{4}-\d{2}-\d{2})/);
+          if (m) return m[1];
+        }
+        return '';
+      })(card);
 
       return `
         <tr>
@@ -5253,15 +5320,17 @@ flowchart TD
           <td>
             <strong style="color:var(--fg-primary); font-family:monospace; font-size:0.8rem;">${escapeHtml(card.id)}</strong>
             <br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Target: ${escapeHtml(card.target || 'toolforge')}</span>
+            ${cardDate ? `<br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Created: ${escapeHtml(cardDate)}</span>` : ''}
           </td>
           <td>
             <div style="font-weight:600; color:var(--fg-primary);">${escapeHtml(card.intent || card.title || 'Untitled Card')}</div>
             <div style="font-size:0.75rem; color:var(--fg-muted); margin-top:0.2rem;">${escapeHtml(card.raw_preview || card.summary || '')}</div>
             <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center; margin-top:0.35rem;">
-              ${card.issue_url ? `<a href="${escapeHtml(card.issue_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(196,80,26,0.15); color:var(--accent-terracotta); padding:0.12rem 0.4rem; border:1px solid rgba(196,80,26,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">Issue #${escapeHtml(card.issue_url.split('/').pop())} ↗</a>` : ''}
+              ${card.issue_url ? `<a href="${escapeHtml(card.issue_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(196,80,26,0.15); color:var(--accent-terracotta); padding:0.12rem 0.4rem; border:1px solid rgba(196,80,26,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">Issue #${escapeHtml(card.issue_url.split('/').pop())}${cardDate ? ` (${escapeHtml(cardDate)})` : ''} ↗</a>` : ''}
               ${card.pr_branch ? `<span style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.12rem 0.4rem; border:1px solid rgba(90,158,111,0.4); font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">🌿 ${escapeHtml(card.pr_branch)}</span>` : ''}
               ${card.pr_url ? `<a href="${escapeHtml(card.pr_url)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(90,158,111,0.15); color:#5a9e6f; padding:0.12rem 0.4rem; border:1px solid rgba(90,158,111,0.4); text-decoration:none; font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">PR #${escapeHtml(String(card.pr_number || card.pr_url.split('/').pop()))} (${escapeHtml(card.pr_state || 'MERGED')}) ↗</a>` : ''}
               ${card.research_ref ? `<a href="${escapeHtml(card.research_ref)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; background:rgba(184,146,42,0.15); color:var(--fg-muted); padding:0.12rem 0.4rem; border:1px solid rgba(184,146,42,0.3); font-size:0.68rem; font-family:monospace; text-decoration:none; border-radius:2px;">RFC Note ↗</a>` : ''}
+              ${(card.research_ref && !card.issue_url) ? `<span style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(184,146,42,0.18); color:var(--accent-brass); padding:0.12rem 0.4rem; border:1px solid rgba(184,146,42,0.4); font-size:0.68rem; font-family:monospace; font-weight:600; border-radius:2px;">🔬 RFC Ready</span>` : ''}
               ${card.tags && card.tags.length ? card.tags.map(t => `<span class="tag date" style="font-size:0.65rem;">#${escapeHtml(t)}</span>`).join('') : ''}
             </div>
           </td>
@@ -5276,9 +5345,10 @@ flowchart TD
           </td>
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-              ${(isDone || card.completed_at || card.issue_url) ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">Promote →</button>`}
+              ${card.issue_url ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">${card.research_ref ? 'Promote RFC →' : 'Promote →'}</button>`}
               ${(!isDone && !card.completed_at && (isResearch || card.category === 'RESEARCH' || card.category === 'EVALUATE' || card.direction === 'FEASIBILITY_SPIKE')) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="runResearchSpike('${escapeHtml(card.id)}')">🔬 Run Spike</button>` : ''}
-              ${(!isDone && !card.pr_branch && (card.issue_url || isInProgress)) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="stagePrForCard('${escapeHtml(card.id)}')">🌿 Stage PR</button>` : ''}
+              ${(!card.pr_branch && (card.issue_url || isInProgress)) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="stagePrForCard('${escapeHtml(card.id)}')">🌿 Stage PR</button>` : ''}
+              ${(card.pr_branch && !card.pr_url) ? `<span style="display:inline-flex; align-items:center; color:var(--fg-muted); font-size:0.68rem; font-family:monospace; font-style:italic;">🌿 Branch staged · Awaiting PR</span>` : ''}
             </div>
           </td>
         </tr>
@@ -5348,6 +5418,9 @@ flowchart TD
     }
     if (card.deliverables) {
       out += '\n### Deliverables & acceptance criteria\n' + (typeof card.deliverables === 'string' ? card.deliverables : JSON.stringify(card.deliverables, null, 2)) + '\n';
+    }
+    if (card.research_ref) {
+      out += '\n### Research Reference\n- RFC Document: `' + card.research_ref + '`\n- Review research findings in `' + card.research_ref + '` before starting implementation.\n';
     }
     return out;
   }
