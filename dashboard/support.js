@@ -771,7 +771,9 @@
   function contentKey(el) {
     const clone = el.cloneNode(true);
     for (const d of clone.querySelectorAll("*")) {
-      while (d.attributes.length) d.removeAttribute(d.attributes[0].name);
+      for (const name of d.getAttributeNames()) {
+        d.removeAttribute(name);
+      }
     }
     const s = clone.innerHTML;
     let h2 = 5381;
