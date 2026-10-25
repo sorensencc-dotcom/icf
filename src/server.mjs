@@ -1126,10 +1126,21 @@ export function createGatewayServer(options = {}) {
 
           // 1. Ingest historical and active items from ledger.jsonl
           if (existsSync(ledgerPath)) {
-            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
-            for (const l of lines) {
+            const raw = readFileSync(ledgerPath, 'utf8');
+            let start = 0;
+            let end = 0;
+            while ((end = raw.indexOf('\n', start)) !== -1) {
+              if (end > start) {
+                try {
+                  const item = JSON.parse(raw.substring(start, end));
+                  if (item.id) cardsMap.set(item.id, item);
+                } catch {}
+              }
+              start = end + 1;
+            }
+            if (start < raw.length) {
               try {
-                const item = JSON.parse(l);
+                const item = JSON.parse(raw.substring(start));
                 if (item.id) cardsMap.set(item.id, item);
               } catch {}
             }
