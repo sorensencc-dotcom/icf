@@ -1312,9 +1312,21 @@ export function createGatewayServer(options = {}) {
           // Re-promotion lock: refuse completed or already-promoted cards, and reconcile rows whose receipt says completed.
           const promoteInboxDir = trmInboxDir();
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
-          const lockRow = existsSync(lockLedgerPath)
-            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === cardId)
-            : null;
+
+          let lockRow = null;
+          if (existsSync(lockLedgerPath)) {
+            const lines = readFileSync(lockLedgerPath, 'utf8').split('\n');
+            for (const line of lines) {
+              if (!line || !line.includes(String(cardId))) continue;
+              try {
+                const item = JSON.parse(line);
+                if (item.id === cardId) {
+                  lockRow = item;
+                  break;
+                }
+              } catch {}
+            }
+          }
 
           const archivedCard = loadArchivedCard(cardId, lockRow, promoteInboxDir);
           const cardData = {
@@ -1468,9 +1480,21 @@ export function createGatewayServer(options = {}) {
 
           const promoteInboxDir = trmInboxDir();
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
-          const lockRow = existsSync(lockLedgerPath)
-            ? readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).find(r => r && r.id === cardId)
-            : null;
+
+          let lockRow = null;
+          if (existsSync(lockLedgerPath)) {
+            const lines = readFileSync(lockLedgerPath, 'utf8').split('\n');
+            for (const line of lines) {
+              if (!line || !line.includes(String(cardId))) continue;
+              try {
+                const item = JSON.parse(line);
+                if (item.id === cardId) {
+                  lockRow = item;
+                  break;
+                }
+              } catch {}
+            }
+          }
 
           const archivedCard = loadArchivedCard(cardId, lockRow, promoteInboxDir);
           const cardData = {
