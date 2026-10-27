@@ -1885,6 +1885,13 @@ flowchart TD
           </div>
           <div class="stat-sub">Port 8080 · Auto-Recovery</div>
         </div>
+        <div>
+          <div class="stat-block">
+            <div class="stat-number" id="financeReconcileStatus" style="color: var(--bone);">No snapshot</div>
+            <div class="stat-label">Finance Reconcile</div>
+          </div>
+          <div class="stat-sub" id="financeReconcileSub">Copilot vs IronLedger · counts only</div>
+        </div>
       </div>
 
       <!-- Live Ironbots Activity Table -->
@@ -4640,6 +4647,22 @@ flowchart TD
     }).join('');
   }
 
+  function buildFinanceReconcileView(fr) {
+    if (!fr || !fr.status || fr.status === 'UNKNOWN') {
+      return { text: 'No snapshot', color: 'var(--bone)', sub: 'Run copilot-ironledger-reconcile' };
+    }
+    const matched = `${fr.match ?? 0}/${fr.mapped ?? 0} matched`;
+    const unmapped = `${fr.unmappedCopilot ?? 0} unmapped`;
+    if (fr.status === 'OK') return { text: 'OK', color: '#5a9e6f', sub: `${matched} · ${unmapped}` };
+    if (fr.status === 'STALE_PROJECTION') {
+      const days = fr.projectionAgeHours == null ? null : Math.floor(fr.projectionAgeHours / 24);
+      const age = days == null ? 'age unknown' : `${days}d old`;
+      return { text: 'Stale', color: 'var(--brass)', sub: `Projection ${age} · ${unmapped}` };
+    }
+    if (fr.status === 'DRIFT') return { text: `${fr.drift ?? 0} drift`, color: 'var(--ember)', sub: `${matched} · ${unmapped}` };
+    return { text: String(fr.status), color: 'var(--brass)', sub: `${matched} · ${unmapped}` };
+  }
+
   async function loadIronbotsDailyReport() {
     try {
       let data = null;
@@ -4691,6 +4714,14 @@ flowchart TD
       }
       if (daemonEl && data.summaryMetrics) {
         daemonEl.textContent = data.summaryMetrics.daemonStatus || 'OK';
+      }
+      const financeEl = document.getElementById('financeReconcileStatus');
+      const financeSubEl = document.getElementById('financeReconcileSub');
+      if (financeEl && financeSubEl) {
+        const view = buildFinanceReconcileView(data.financeReconcile);
+        financeEl.textContent = view.text;
+        financeEl.style.color = view.color;
+        financeSubEl.textContent = view.sub;
       }
 
       function getRelativeTime(iso) {
