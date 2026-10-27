@@ -1,0 +1,23 @@
+test/finance-reconcile-card.test.mjs
+  s_79b8be74801619::t_e14e200ab47a59 1-44
+dashboard/index.html
+  s_79b8be74801619::t_743d2aabfc7fd5 4718-4725
+  s_79b8be74801619::t_86e28eaf81459f 4650-4665
+  s_79b8be74801619::t_2364cbd4fd8e3d 1888-1894
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3e378d4dbc4f6577b3b2210212f328403a461607",
+  "prompts": {},
+  "sessions": {
+    "s_79b8be74801619": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc7858dc-ca6d-4f0d-bd99-7b56505a1919",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
