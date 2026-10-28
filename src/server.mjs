@@ -36,7 +36,7 @@ export function getPullRequests() {
           '--state', 'all',
           '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
         ], {
-          cwd: resolve(ROOT, '..'),
+          cwd: resolve(TOOLFORGE_ROOT),
           encoding: 'utf8',
           timeout: 4000,
           windowsHide: true,
@@ -83,6 +83,10 @@ process.stderr?.on?.('error', () => {});
 export const ROOT = resolve(__dirname, '..');
 // Directory holding the sibling toolforge dirs (modules, scripts, skills, kb-sync, ...).
 export const TOOLFORGE_ROOT = process.env.ICF_TOOLFORGE_ROOT ? resolve(process.env.ICF_TOOLFORGE_ROOT) : resolve(ROOT, '..');
+// A typo'd override would silently point every script, status and wiki lookup at a nonexistent tree.
+if (process.env.ICF_TOOLFORGE_ROOT && !existsSync(TOOLFORGE_ROOT)) {
+  throw new Error('ICF_TOOLFORGE_ROOT does not exist: ' + TOOLFORGE_ROOT);
+}
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 // TRM_INBOX_DIR lets tests mutate a temp ledger instead of the live trm-drive inbox.
 export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(TOOLFORGE_ROOT, 'trm-drive/inbox'));
@@ -384,10 +388,10 @@ export function createGatewayServer(options = {}) {
     if (cached && Date.now() - cached.at < COMMIT_CACHE_TTL_MS) return cached.value;
 
     const { discoverRepos, collectCommitsByDay } = await importTelemetry('git-activity.mjs');
-    const repos = options.commitRepos || discoverRepos(resolve(ROOT, '..'));
+    const repos = options.commitRepos || discoverRepos(resolve(TOOLFORGE_ROOT));
     if (!gitAuthor) {
       const { execFileSync } = await import('node:child_process');
-      gitAuthor = execFileSync('git', ['-C', resolve(ROOT, '..'), 'config', 'user.name'], { encoding: 'utf8' }).trim();
+      gitAuthor = execFileSync('git', ['-C', resolve(TOOLFORGE_ROOT), 'config', 'user.name'], { encoding: 'utf8' }).trim();
     }
     const value = await collectCommitsByDay(repos, { since, until, author: gitAuthor });
     commitCache.set(key, { at: Date.now(), value });
@@ -708,7 +712,7 @@ export function createGatewayServer(options = {}) {
       try {
         const startedAt = new Date().toISOString();
         const proc = cp.spawn(cmd, cmdArgs, {
-          cwd: action === 'run-skill' ? toolforgeRoot : resolve(ROOT, '..'),
+          cwd: action === 'run-skill' ? toolforgeRoot : resolve(TOOLFORGE_ROOT),
           detached: true,
           stdio: 'ignore'
         });
@@ -1689,22 +1693,22 @@ export function createGatewayServer(options = {}) {
     if (pathname.startsWith('/modules/wiki/')) {
       const stripped = pathname.slice('/modules/wiki/'.length);
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'modules', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'modules', 'wiki', stripped)));
     } else if (pathname.startsWith('/_status-feed/')) {
       const stripped = pathname.slice('/_status-feed/'.length);
-      candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, '_status-feed', stripped)));
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, stripped)));
     } else if (pathname.startsWith('/trm_history/')) {
       const filename = pathname.split('/').pop();
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, 'trm_history', filename)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', 'trm_history', filename)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, '_status-feed', 'trm_history', filename)));
     } else if (pathname.startsWith('/wiki/')) {
       const stripped = pathname.slice('/wiki/'.length);
       candidatePaths.push(normalize(resolve(ROOT, 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync-wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'kb-sync', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'kb-sync-wiki', stripped)));
     }
 
     for (const targetPath of candidatePaths) {
