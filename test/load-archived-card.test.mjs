@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadArchivedCard } from '../src/server.mjs';
 
+// existsSync on an unmounted/stalled G: Drive mount can block for minutes.
+process.env.TRM_GDRIVE_ARCHIVE_DIR = join(tmpdir(), 'icf-test-no-gdrive-archive');
+
 test('loadArchivedCard tests', async (t) => {
   let tmpBase;
   let inboxDir;

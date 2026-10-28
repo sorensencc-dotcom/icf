@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAUNCH_CATEGORY_IDS } from './category-contract.mjs';
@@ -751,6 +751,10 @@ export function createSnapshotStore({
   }
   if (onBeforeCommit !== null && typeof onBeforeCommit !== 'function') {
     throw new TypeError('onBeforeCommit must be a function when provided');
+  }
+  if (databasePath !== ':memory:' && !databasePath.startsWith('file:')) {
+    // SQLite creates the file but not its parent directory.
+    mkdirSync(dirname(databasePath), { recursive: true });
   }
   const db = new DatabaseSync(databasePath);
   migrateSchema(db, schemaPath);

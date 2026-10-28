@@ -291,7 +291,7 @@ export function loadArchivedCard(cardId, lockRow = null, inboxDir = null) {
   const harnessPending = resolve(ROOT, '../.harness/tasks/pending');
   const harnessArchive = resolve(ROOT, '../.harness/tasks/archive');
   const inboxCompleted = resolve(baseInbox, 'completed');
-  const gdriveArchive = resolve('G:/My Drive/TRM-Research/04_archive/mobile-inbox');
+  const gdriveArchive = resolve(process.env.TRM_GDRIVE_ARCHIVE_DIR || 'G:/My Drive/TRM-Research/04_archive/mobile-inbox');
 
   candidatePaths.push(
     resolve(harnessPending, `${cardId}.json`),
@@ -991,7 +991,7 @@ export function createGatewayServer(options = {}) {
           const outboxDirs = [
             resolve(ROOT, '../trm-drive/inbox/outbox'),
             resolve(ROOT, '../.trm/inbox/outbox'),
-            'G:/My Drive/TRM-Research/mobile-outbox'
+            process.env.TRM_GDRIVE_OUTBOX_DIR || 'G:/My Drive/TRM-Research/mobile-outbox'
           ];
           const rawReceipts = [];
           for (const dir of outboxDirs) {

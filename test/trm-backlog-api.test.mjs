@@ -5,6 +5,11 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// Avoid probing a possibly stalled G: Drive mount (existsSync can block for minutes).
+process.env.TRM_GDRIVE_ARCHIVE_DIR = join(tmpdir(), 'icf-test-no-gdrive-archive');
+process.env.TRM_GDRIVE_OUTBOX_DIR = join(tmpdir(), 'icf-test-no-gdrive-outbox');
+process.env.ICF_REPORTING_DATABASE_PATH ??= join(mkdtempSync(join(tmpdir(), 'icf-trm-db-')), 'snapshots.sqlite');
+
 test('ICF Gateway - GET /api/reporting/trm-backlog returns structured backlog cards', async () => {
   const server = createGatewayServer();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
