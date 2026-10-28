@@ -36,7 +36,7 @@ export function getPullRequests() {
           '--state', 'all',
           '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
         ], {
-          cwd: resolve(ROOT, '..'),
+          cwd: resolve(TOOLFORGE_ROOT),
           encoding: 'utf8',
           timeout: 4000,
           windowsHide: true,
@@ -81,18 +81,23 @@ const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 process.stdout?.on?.('error', () => {});
 process.stderr?.on?.('error', () => {});
 export const ROOT = resolve(__dirname, '..');
+// Directory holding the sibling toolforge dirs (modules, scripts, skills, kb-sync, ...).
+export const TOOLFORGE_ROOT = process.env.ICF_TOOLFORGE_ROOT ? resolve(process.env.ICF_TOOLFORGE_ROOT) : resolve(ROOT, '..');
+// A typo'd override would silently point every script, status and wiki lookup at a nonexistent tree.
+if (process.env.ICF_TOOLFORGE_ROOT && !existsSync(TOOLFORGE_ROOT)) {
+  throw new Error('ICF_TOOLFORGE_ROOT does not exist: ' + TOOLFORGE_ROOT);
+}
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 // TRM_INBOX_DIR lets tests mutate a temp ledger instead of the live trm-drive inbox.
-export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(ROOT, '../trm-drive/inbox'));
+export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(TOOLFORGE_ROOT, 'trm-drive/inbox'));
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
 export const HOST = process.env.ICF_HOST || '127.0.0.1';
-export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(ROOT, '../.icf-retros/weekly/latest-weekly-retro.json');
+export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(TOOLFORGE_ROOT, '.icf-retros/weekly/latest-weekly-retro.json');
 export const REPORTING_HISTORY_SOURCE_SYSTEM = 'icf';
 export const REPORTING_HISTORY_SOURCE_ID = 'weekly-retro';
-export const TOOLFORGE_ROOT = resolve(ROOT, '..');
 export const TOOLFORGE_MANIFEST = resolve(TOOLFORGE_ROOT, 'manifest.json');
 
-const TELEMETRY_DIR = resolve(ROOT, '../modules/telemetry');
+const TELEMETRY_DIR = resolve(TOOLFORGE_ROOT, 'modules/telemetry');
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const COMMIT_CACHE_TTL_MS = 5 * 60_000;
 const DAY_PARAM = /^\d{4}-\d{2}-\d{2}$/;
@@ -288,8 +293,8 @@ export function loadArchivedCard(cardId, lockRow = null, inboxDir = null) {
   if (lockRow?.archived_path) candidatePaths.push(lockRow.archived_path);
 
   const baseInbox = inboxDir || trmInboxDir();
-  const harnessPending = resolve(ROOT, '../.harness/tasks/pending');
-  const harnessArchive = resolve(ROOT, '../.harness/tasks/archive');
+  const harnessPending = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
+  const harnessArchive = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
   const inboxCompleted = resolve(baseInbox, 'completed');
   const gdriveArchive = resolve(process.env.TRM_GDRIVE_ARCHIVE_DIR || 'G:/My Drive/TRM-Research/04_archive/mobile-inbox');
 
@@ -383,17 +388,17 @@ export function createGatewayServer(options = {}) {
     if (cached && Date.now() - cached.at < COMMIT_CACHE_TTL_MS) return cached.value;
 
     const { discoverRepos, collectCommitsByDay } = await importTelemetry('git-activity.mjs');
-    const repos = options.commitRepos || discoverRepos(resolve(ROOT, '..'));
+    const repos = options.commitRepos || discoverRepos(resolve(TOOLFORGE_ROOT));
     if (!gitAuthor) {
       const { execFileSync } = await import('node:child_process');
-      gitAuthor = execFileSync('git', ['-C', resolve(ROOT, '..'), 'config', 'user.name'], { encoding: 'utf8' }).trim();
+      gitAuthor = execFileSync('git', ['-C', resolve(TOOLFORGE_ROOT), 'config', 'user.name'], { encoding: 'utf8' }).trim();
     }
     const value = await collectCommitsByDay(repos, { since, until, author: gitAuthor });
     commitCache.set(key, { at: Date.now(), value });
     return value;
   }
 
-  const statusFeedDir = resolve(ROOT, '../_status-feed');
+  const statusFeedDir = resolve(TOOLFORGE_ROOT, '_status-feed');
   let feedWatcher = null;
   let debounceTimeout = null;
 
@@ -639,16 +644,16 @@ export function createGatewayServer(options = {}) {
       const target = payload.target || payload.job;
       const ACTION_WHITELIST = {
         'run-bot': {
-          'kb-sentinel': ['node', [resolve(ROOT, '../scripts/kb-sentinel-bot.mjs')]],
-          'notebook-ingester': ['node', [resolve(ROOT, '../scripts/notebook-ingester-bot.mjs')]],
-          'trm-bot': ['node', [resolve(ROOT, '../scripts/trm-bot-runner.mjs')]],
-          'watchlist-miner': ['node', [resolve(ROOT, '../scripts/watchlist-miner-bot.mjs')]],
-          'daemon-healer': ['node', [resolve(ROOT, '../scripts/daemon-healer-bot.mjs')]],
-          'ironledger-sentinel': ['node', [resolve(ROOT, '../scripts/ironledger-sentinel-bot.mjs')]],
-          'ci-watchdog': ['node', [resolve(ROOT, '../scripts/ci-watchdog-bot.mjs')]],
-          'ironbots-reporter': ['node', [resolve(ROOT, '../scripts/ironbots-daily-reporter.mjs')]],
-          'storage-pruner': ['node', [resolve(ROOT, '../scripts/storage-pruner-bot.mjs')]],
-          'trm-drive-sync': ['powershell.exe', ['-NoProfile', '-File', resolve(ROOT, '../scripts/schedule-task-wrapper-TRM-Drive-Sync.ps1')]]
+          'kb-sentinel': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/kb-sentinel-bot.mjs')]],
+          'notebook-ingester': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/notebook-ingester-bot.mjs')]],
+          'trm-bot': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/trm-bot-runner.mjs')]],
+          'watchlist-miner': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/watchlist-miner-bot.mjs')]],
+          'daemon-healer': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/daemon-healer-bot.mjs')]],
+          'ironledger-sentinel': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/ironledger-sentinel-bot.mjs')]],
+          'ci-watchdog': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/ci-watchdog-bot.mjs')]],
+          'ironbots-reporter': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/ironbots-daily-reporter.mjs')]],
+          'storage-pruner': ['node', [resolve(TOOLFORGE_ROOT, 'scripts/storage-pruner-bot.mjs')]],
+          'trm-drive-sync': ['powershell.exe', ['-NoProfile', '-File', resolve(TOOLFORGE_ROOT, 'scripts/schedule-task-wrapper-TRM-Drive-Sync.ps1')]]
         },
         'run-task': (taskName) => {
           const safeTasks = new Set([
@@ -663,15 +668,15 @@ export function createGatewayServer(options = {}) {
         'run-skill': (skillName) => {
           return buildToolforgeSkillRunner(skillName, toolforgeManifestPath, toolforgeRoot);
         },
-        'validate-wiki': () => ['node', [resolve(ROOT, '../modules/wiki/validate-staging-docs.mjs')]],
+        'validate-wiki': () => ['node', [resolve(TOOLFORGE_ROOT, 'modules/wiki/validate-staging-docs.mjs')]],
         'autoheal-wiki': (subtype) => {
           if (subtype === 'frontmatter') {
-            return ['node', [resolve(ROOT, '../scripts/fix-wiki-frontmatter.mjs'), 'wiki', '--allow-dirty']];
+            return ['node', [resolve(TOOLFORGE_ROOT, 'scripts/fix-wiki-frontmatter.mjs'), 'wiki', '--allow-dirty']];
           }
           if (subtype === 'hygiene') {
-            return ['node', [resolve(ROOT, '../modules/wiki/validate-staging-docs.mjs'), '--fix', 'wiki']];
+            return ['node', [resolve(TOOLFORGE_ROOT, 'modules/wiki/validate-staging-docs.mjs'), '--fix', 'wiki']];
           }
-          return ['node', [resolve(ROOT, '../modules/wiki/autoheal-sweeper.mjs'), '--fix', '--allow-dirty', '--target-dir', 'wiki']];
+          return ['node', [resolve(TOOLFORGE_ROOT, 'modules/wiki/autoheal-sweeper.mjs'), '--fix', '--allow-dirty', '--target-dir', 'wiki']];
         }
       };
 
@@ -707,7 +712,7 @@ export function createGatewayServer(options = {}) {
       try {
         const startedAt = new Date().toISOString();
         const proc = cp.spawn(cmd, cmdArgs, {
-          cwd: action === 'run-skill' ? toolforgeRoot : resolve(ROOT, '..'),
+          cwd: action === 'run-skill' ? toolforgeRoot : resolve(TOOLFORGE_ROOT),
           detached: true,
           stdio: 'ignore'
         });
@@ -771,7 +776,7 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
-          const reporterScript = resolve(ROOT, '../scripts/ironbots-daily-reporter.mjs');
+          const reporterScript = resolve(TOOLFORGE_ROOT, 'scripts/ironbots-daily-reporter.mjs');
           if (existsSync(reporterScript)) {
             const { aggregateFleetActivity } = await import(`file://${reporterScript.replace(/\\/g, '/')}`);
             const data = await aggregateFleetActivity({ isDryRun: true });
@@ -779,7 +784,7 @@ export function createGatewayServer(options = {}) {
             res.end(JSON.stringify({ status: 'SUCCESS', data }));
             return;
           }
-          const reportPath = resolve(ROOT, '../_status-feed/ironbots_daily_report.json');
+          const reportPath = resolve(TOOLFORGE_ROOT, '_status-feed/ironbots_daily_report.json');
           if (existsSync(reportPath)) {
             const data = JSON.parse(readFileSync(reportPath, 'utf8'));
             res.writeHead(200);
@@ -839,7 +844,7 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
-          const feedPath = resolve(ROOT, '../_status-feed/trm_ingress_status.json');
+          const feedPath = resolve(TOOLFORGE_ROOT, '_status-feed/trm_ingress_status.json');
           if (existsSync(feedPath)) {
             const data = JSON.parse(readFileSync(feedPath, 'utf8'));
             res.writeHead(200);
@@ -872,7 +877,7 @@ export function createGatewayServer(options = {}) {
         try {
           const date = reqUrl.searchParams.get('date');
           const dirs = [
-            resolve(ROOT, '../_status-feed/trm_history'),
+            resolve(TOOLFORGE_ROOT, '_status-feed/trm_history'),
             resolve(DASHBOARD_DIR, 'trm_history')
           ];
           if (!date) {
@@ -926,7 +931,7 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
-          const prunerFeed = resolve(ROOT, '../_status-feed/storage_pruner_status.json');
+          const prunerFeed = resolve(TOOLFORGE_ROOT, '_status-feed/storage_pruner_status.json');
           if (existsSync(prunerFeed)) {
             const data = JSON.parse(readFileSync(prunerFeed, 'utf8'));
             res.writeHead(200);
@@ -959,7 +964,7 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
-          const feedPath = resolve(ROOT, '../_status-feed/cost_routing_status.json');
+          const feedPath = resolve(TOOLFORGE_ROOT, '_status-feed/cost_routing_status.json');
           const dashboardFeed = resolve(DASHBOARD_DIR, 'cost_routing_status.json');
           let data = null;
           if (existsSync(feedPath)) {
@@ -989,8 +994,8 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const outboxDirs = [
-            resolve(ROOT, '../trm-drive/inbox/outbox'),
-            resolve(ROOT, '../.trm/inbox/outbox'),
+            resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/outbox'),
+            resolve(TOOLFORGE_ROOT, '.trm/inbox/outbox'),
             process.env.TRM_GDRIVE_OUTBOX_DIR || 'G:/My Drive/TRM-Research/mobile-outbox'
           ];
           const rawReceipts = [];
@@ -1101,10 +1106,10 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
-          const pendingDir = resolve(ROOT, '../.harness/tasks/pending');
-          const archiveDir = resolve(ROOT, '../.harness/tasks/archive');
-          const outboxDir = resolve(ROOT, '../trm-drive/inbox/outbox');
-          const completedOutboxDir = resolve(ROOT, '../trm-drive/inbox/completed/outbox');
+          const pendingDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
+          const archiveDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
+          const outboxDir = resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/outbox');
+          const completedOutboxDir = resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/completed/outbox');
 
           // Collect latest receipt metadata for live card reconciliation
           const receipts = new Map();
@@ -1297,7 +1302,7 @@ export function createGatewayServer(options = {}) {
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
             try {
-              const { refreshLedgerMarkdown } = await import(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs'));
+              const { refreshLedgerMarkdown } = await import(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs'));
               refreshLedgerMarkdown();
             } catch {}
           }
@@ -1444,7 +1449,7 @@ export function createGatewayServer(options = {}) {
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
             try {
-              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
               refreshLedgerMarkdown();
             } catch {}
           }
@@ -1455,7 +1460,7 @@ export function createGatewayServer(options = {}) {
 
           if (!isDryRun && issueUrl && !issueUrl.includes('mock-')) {
             try {
-              const enricherScript = resolve(ROOT, '../scripts/trm-post-promote-enricher.mjs');
+              const enricherScript = resolve(TOOLFORGE_ROOT, 'scripts/trm-post-promote-enricher.mjs');
               if (existsSync(enricherScript)) {
                 const child = cp.spawn(process.execPath, [enricherScript, `--card-id=${body.cardId}`, `--issue-url=${issueUrl}`], {
                   detached: true,
@@ -1515,7 +1520,7 @@ export function createGatewayServer(options = {}) {
 
           const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test');
 
-          const kbSyncRoot = resolve(ROOT, '../kb-sync');
+          const kbSyncRoot = resolve(TOOLFORGE_ROOT, 'kb-sync');
           const { evaluateActionCard } = await import(pathToFileURL(resolve(kbSyncRoot, 'modules/trm/gap-triage-engine.mjs')).href);
 
           const outputDir = resolve(kbSyncRoot, 'wiki/research');
@@ -1547,7 +1552,7 @@ export function createGatewayServer(options = {}) {
             }
             writeFileSync(lockLedgerPath, updatedLines.join('\n') + '\n', 'utf8');
             try {
-              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
               refreshLedgerMarkdown();
             } catch {}
           }
@@ -1572,7 +1577,7 @@ export function createGatewayServer(options = {}) {
           const target = body.target || null;
           const stagePr = Boolean(body.stagePr);
 
-          const { processBatchTriage } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-batch-triage.mjs')).href);
+          const { processBatchTriage } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-batch-triage.mjs')).href);
           const results = await processBatchTriage({
             dryRun: isDryRun,
             lane,
@@ -1581,7 +1586,7 @@ export function createGatewayServer(options = {}) {
             stagePr
           });
           try {
-            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
             refreshLedgerMarkdown();
           } catch {}
 
@@ -1605,7 +1610,7 @@ export function createGatewayServer(options = {}) {
 
           const promoteInboxDir = trmInboxDir();
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
-          const { stagePr } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-stage-pr.mjs')).href);
+          const { stagePr } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-stage-pr.mjs')).href);
           const results = stagePr(cardId, {
             dryRun: isDryRun,
             createBranch,
@@ -1613,7 +1618,7 @@ export function createGatewayServer(options = {}) {
             ledgerPath: lockLedgerPath
           });
           try {
-            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(ROOT, '../scripts/trm-ingress-watcher.mjs')).href);
+            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
             refreshLedgerMarkdown();
           } catch {}
 
@@ -1688,22 +1693,22 @@ export function createGatewayServer(options = {}) {
     if (pathname.startsWith('/modules/wiki/')) {
       const stripped = pathname.slice('/modules/wiki/'.length);
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'modules', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'modules', 'wiki', stripped)));
     } else if (pathname.startsWith('/_status-feed/')) {
       const stripped = pathname.slice('/_status-feed/'.length);
-      candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, '_status-feed', stripped)));
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, stripped)));
     } else if (pathname.startsWith('/trm_history/')) {
       const filename = pathname.split('/').pop();
       candidatePaths.push(normalize(resolve(DASHBOARD_DIR, 'trm_history', filename)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', '_status-feed', 'trm_history', filename)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, '_status-feed', 'trm_history', filename)));
     } else if (pathname.startsWith('/wiki/')) {
       const stripped = pathname.slice('/wiki/'.length);
       candidatePaths.push(normalize(resolve(ROOT, 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync', 'wiki', stripped)));
-      candidatePaths.push(normalize(resolve(ROOT, '..', 'kb-sync-wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'kb-sync', 'obsidian', 'vault', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'kb-sync', 'wiki', stripped)));
+      candidatePaths.push(normalize(resolve(TOOLFORGE_ROOT, 'kb-sync-wiki', stripped)));
     }
 
     for (const targetPath of candidatePaths) {
