@@ -1,0 +1,35 @@
+test/trm-backlog-api.test.mjs
+  s_6ecf9d1270c8fd::t_15915d4cce0966 8-12
+dashboard/index.html
+  s_6ecf9d1270c8fd::t_9176e6b5f793dd 1960
+  s_6ecf9d1270c8fd::t_06cc5adb283448 1904
+  s_6ecf9d1270c8fd::t_a8b5f7afcf96ff 550-555
+src/server.mjs
+  s_6ecf9d1270c8fd::t_f25ccc053049a2 994
+  s_6ecf9d1270c8fd::t_1e17d79d19a7e5 294
+reporting/src/snapshot-store.mjs
+  s_6ecf9d1270c8fd::t_7bb70057ba4dc2 1
+  s_6ecf9d1270c8fd::t_233885fe2cab1f 755-758
+test/server.test.mjs
+  s_6ecf9d1270c8fd::t_c3c3e87dc4a5ed 6-8,10,18,20-21,23,25-26,30,32-33,39,45,50,59
+test/gateway.test.mjs
+  s_6ecf9d1270c8fd::t_5be773e76e38ab 10-13
+test/load-archived-card.test.mjs
+  s_6ecf9d1270c8fd::t_f9b1b16f034e1f 8-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b001522062848d75966db5da33b2f7116ee09113",
+  "prompts": {},
+  "sessions": {
+    "s_6ecf9d1270c8fd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c4bbd7d4-8d74-461c-84a6-5776f894f24e",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
