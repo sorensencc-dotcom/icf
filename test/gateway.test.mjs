@@ -7,6 +7,10 @@ import { tmpdir, networkInterfaces } from 'node:os';
 import { createGatewayServer, isLoopback, HOST } from '../src/server.mjs';
 import { createMobileSnapshotService } from '../src/mobile-snapshot.mjs';
 import { createSnapshotStore } from '../reporting/src/snapshot-store.mjs';
+import { mkdtempSync } from 'node:fs';
+
+// Keep default-constructed gateways off the shared ../.icf-retros directory.
+process.env.ICF_REPORTING_DATABASE_PATH ??= join(mkdtempSync(join(tmpdir(), 'icf-gw-db-')), 'snapshots.sqlite');
 
 test('ICF Gateway Server serves static dashboard and reporting routes', async () => {
   const server = createGatewayServer();

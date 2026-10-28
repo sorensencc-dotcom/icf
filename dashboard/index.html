@@ -547,6 +547,12 @@
       color: var(--fg-primary);
     }
 
+    /* Narrow viewports: scroll wide tables inside their card instead of the page */
+    .table-scroll {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
     .table-clean td.key {
       font-family: 'Barlow Condensed', sans-serif;
       text-transform: uppercase;
@@ -1895,6 +1901,7 @@ flowchart TD
       </div>
 
       <!-- Live Ironbots Activity Table -->
+      <div class="table-scroll">
       <table class="table-clean">
         <thead>
           <tr>
@@ -1950,6 +1957,7 @@ flowchart TD
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Ironbots Fleet Architecture Diagram (Cathryn Lavery diagram-design Standard) -->
