@@ -90,6 +90,12 @@ if (process.env.ICF_TOOLFORGE_ROOT && !existsSync(TOOLFORGE_ROOT)) {
 export const DASHBOARD_DIR = resolve(ROOT, 'dashboard');
 // TRM_INBOX_DIR lets tests mutate a temp ledger instead of the live trm-drive inbox.
 export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.env.TRM_INBOX_DIR) : resolve(TOOLFORGE_ROOT, 'trm-drive/inbox'));
+// trm-ingress-watcher binds its ledger, status feed and G: Drive probes at import time, so it can only refresh the live
+// toolforge inbox. With TRM_INBOX_DIR overridden there is nothing for it to refresh, and importing it would stall on the G: mount.
+async function refreshTrmLedgerMarkdown() {
+  if (process.env.TRM_INBOX_DIR) return;
+  await refreshTrmLedgerMarkdown();
+}
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
 export const HOST = process.env.ICF_HOST || '127.0.0.1';
 export const RETRO_PATH = process.env.HELIX_WEEKLY_RETRO_PATH || resolve(TOOLFORGE_ROOT, '.icf-retros/weekly/latest-weekly-retro.json');
@@ -1301,10 +1307,7 @@ export function createGatewayServer(options = {}) {
               }
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
-            try {
-              const { refreshLedgerMarkdown } = await import(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs'));
-              refreshLedgerMarkdown();
-            } catch {}
+            await refreshTrmLedgerMarkdown();
           }
           if (!updatedCard) {
             updatedCard = { id: body.cardId, priority: body.priority, status: body.status };
@@ -1448,10 +1451,7 @@ export function createGatewayServer(options = {}) {
               }
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
-            try {
-              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
-              refreshLedgerMarkdown();
-            } catch {}
+            await refreshTrmLedgerMarkdown();
           }
 
           if (!updatedCard) {
@@ -1551,10 +1551,7 @@ export function createGatewayServer(options = {}) {
               }
             }
             writeFileSync(lockLedgerPath, updatedLines.join('\n') + '\n', 'utf8');
-            try {
-              const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
-              refreshLedgerMarkdown();
-            } catch {}
+            await refreshTrmLedgerMarkdown();
           }
 
           res.writeHead(200);
@@ -1585,10 +1582,7 @@ export function createGatewayServer(options = {}) {
             target,
             stagePr
           });
-          try {
-            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
-            refreshLedgerMarkdown();
-          } catch {}
+          await refreshTrmLedgerMarkdown();
 
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', results }));
@@ -1617,10 +1611,7 @@ export function createGatewayServer(options = {}) {
             inboxDir: promoteInboxDir,
             ledgerPath: lockLedgerPath
           });
-          try {
-            const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
-            refreshLedgerMarkdown();
-          } catch {}
+          await refreshTrmLedgerMarkdown();
 
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', results }));
