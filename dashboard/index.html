@@ -5187,6 +5187,8 @@ flowchart TD
 
   let cachedTrmBacklogCards = [];
   let currentTrmBacklogFilter = 'OPEN';
+  let trmBacklogLoaded = false;
+  let trmBacklogError = null;
 
   async function loadTrmBacklog() {
     const tableBody = document.getElementById('trmBacklogTableBody');
@@ -5198,9 +5200,17 @@ flowchart TD
 
     try {
       const res = await fetch('/api/reporting/trm-backlog', { cache: 'no-store' });
-      if (!res.ok) return;
+      if (!res.ok) {
+        trmBacklogLoaded = true;
+        trmBacklogError = `Server returned HTTP ${res.status}`;
+        if (quickBadge) quickBadge.textContent = '● ERROR';
+        renderTrmBacklogTable();
+        return;
+      }
       const data = await res.json();
       cachedTrmBacklogCards = data.cards || [];
+      trmBacklogLoaded = true;
+      trmBacklogError = null;
 
       // Update Tab 01 quick stats
       const total = cachedTrmBacklogCards.length;
@@ -5217,6 +5227,10 @@ flowchart TD
       filterTrmBacklog(currentTrmBacklogFilter);
     } catch (e) {
       console.error('Failed to load TRM backlog', e);
+      trmBacklogLoaded = true;
+      trmBacklogError = `Connection failed (${e.message || 'Server offline'}). Ensure ICF server is running ('npm run start' in icf/).`;
+      if (quickBadge) quickBadge.textContent = '● OFFLINE';
+      renderTrmBacklogTable();
     }
   }
 
@@ -5292,14 +5306,23 @@ flowchart TD
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI');
     }
 
-    if (cachedTrmBacklogCards.length === 0) {
+    if (!trmBacklogLoaded) {
       tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">Loading action cards...</td></tr>`;
-      loadTrmBacklog();
+      return;
+    }
+
+    if (trmBacklogError) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--accent-terracotta); text-align: center; padding: 1.5rem; font-weight: 500;">⚠️ ${escapeHtml(trmBacklogError)}</td></tr>`;
+      return;
+    }
+
+    if (cachedTrmBacklogCards.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No action cards in backlog.</td></tr>`;
       return;
     }
 
     if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No cards match the active filter.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No cards match the active filter (${escapeHtml(currentTrmBacklogFilter)}).</td></tr>`;
       return;
     }
 
@@ -5427,20 +5450,16 @@ flowchart TD
     'rewrite-mcp': 'sorensencc-dotcom/rewrite-mcp',
     'rewrite-docs': 'sorensencc-dotcom/rewrite-docs',
     'rewrite': 'sorensencc-dotcom/rewrite-mcp',
-    'cic-kb': 'sorensencc-dotcom/toolforge',
     'kb-sync': 'sorensencc-dotcom/kb-sync',
     'personal-os': 'sorensencc-dotcom/personal-os',
     'icf': 'sorensencc-dotcom/icf',
-    'ironledger': 'sorensencc-dotcom/IronLedger',
-    'cic': 'sorensencc-dotcom/toolforge',
-    'cross-fleet': 'sorensencc-dotcom/toolforge',
-    'strategic-intelligence': 'sorensencc-dotcom/toolforge'
+    'ironledger': 'sorensencc-dotcom/IronLedger'
   };
 
   function resolveRepoForCard(card) {
     if (card.repo && card.repo !== 'IronLedger') return card.repo;
     const domainKey = (card.domain || card.target || '').toLowerCase().trim();
-    return BACKLOG_DOMAIN_TO_REPO[domainKey] || 'sorensencc-dotcom/toolforge';
+    return BACKLOG_DOMAIN_TO_REPO[domainKey] || '';
   }
 
   function buildCardDetailSections(card) {
@@ -5504,9 +5523,14 @@ flowchart TD
   async function submitPromoteModal() {
     const cardId = document.getElementById('promoteCardIdInput')?.value;
     const title = document.getElementById('promoteTitleInput')?.value;
-    const repo = document.getElementById('promoteRepoInput')?.value;
+    const repo = (document.getElementById('promoteRepoInput')?.value || '').trim();
     const labelsStr = document.getElementById('promoteLabelsInput')?.value || '';
     const body = document.getElementById('promoteBodyInput')?.value;
+
+    if (!repo) {
+      alert('Routing Gate: Target repository is required before promotion. Please specify a valid repository (e.g. sorensencc-dotcom/kb-sync).');
+      return;
+    }
 
     const labels = labelsStr.split(',').map(s => s.trim()).filter(Boolean);
 

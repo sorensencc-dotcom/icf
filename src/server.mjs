@@ -21,8 +21,8 @@ const PR_CACHE_TTL_MS = 60_000;
 
 export function getPullRequests() {
   const now = Date.now();
-  if (now - prCache.timestamp < PR_CACHE_TTL_MS && prCache.prs.length > 0) {
-    return prCache.prs;
+  if (now - prCache.timestamp < PR_CACHE_TTL_MS) {
+    return prCache.prs || [];
   }
   const repos = ['sorensencc-dotcom/toolforge', 'sorensencc-dotcom/sigil'];
   const allPrs = [];
@@ -38,7 +38,7 @@ export function getPullRequests() {
         ], {
           cwd: resolve(TOOLFORGE_ROOT),
           encoding: 'utf8',
-          timeout: 4000,
+          timeout: 1500,
           windowsHide: true,
           stdio: ['ignore', 'pipe', 'ignore']
         });
@@ -126,15 +126,26 @@ export const DEFAULT_REPO_MAP = {
   'IronLedger': 'sorensencc-dotcom/IronLedger'
 };
 
+export const NON_CODE_TARGETS = new Set([
+  'cic',
+  'cic-kb',
+  'research',
+  'whichllm',
+  'sandboxes',
+  'cross-fleet',
+  'strategic-intelligence'
+]);
+
 export function resolveTargetRepo(targetOrDomain) {
-  if (!targetOrDomain) return DEFAULT_REPO_MAP['toolforge'];
+  if (!targetOrDomain) return null;
   const key = String(targetOrDomain).trim();
   if (key.includes('/')) return key;
   const lower = key.toLowerCase();
+  if (NON_CODE_TARGETS.has(lower)) return null;
   for (const [k, v] of Object.entries(DEFAULT_REPO_MAP)) {
     if (k.toLowerCase() === lower) return v;
   }
-  return `sorensencc-dotcom/${lower}`;
+  return null;
 }
 
 function importTelemetry(file) {
@@ -300,20 +311,26 @@ export function loadArchivedCard(cardId, lockRow = null, inboxDir = null) {
 
   const baseInbox = inboxDir || trmInboxDir();
   const harnessPending = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
+  const harnessInProgress = resolve(TOOLFORGE_ROOT, '.harness/tasks/in-progress');
+  const harnessCompleted = resolve(TOOLFORGE_ROOT, '.harness/tasks/completed');
   const harnessArchive = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
   const inboxCompleted = resolve(baseInbox, 'completed');
   const gdriveArchive = resolve(process.env.TRM_GDRIVE_ARCHIVE_DIR || 'G:/My Drive/TRM-Research/04_archive/mobile-inbox');
 
   candidatePaths.push(
     resolve(harnessPending, `${cardId}.json`),
+    resolve(harnessInProgress, `${cardId}.json`),
+    resolve(harnessCompleted, `${cardId}.json`),
     resolve(harnessArchive, `${cardId}.json`),
     resolve(harnessPending, `${cardId}.md`),
+    resolve(harnessInProgress, `${cardId}.md`),
+    resolve(harnessCompleted, `${cardId}.md`),
     resolve(harnessArchive, `${cardId}.md`),
     resolve(inboxCompleted, `${cardId}.json`),
     resolve(inboxCompleted, `${cardId}.md`)
   );
 
-  for (const dir of [harnessPending, harnessArchive, inboxCompleted, gdriveArchive]) {
+  for (const dir of [harnessPending, harnessInProgress, harnessCompleted, harnessArchive, inboxCompleted, gdriveArchive]) {
     if (existsSync(dir)) {
       try {
         const files = readdirSync(dir);
@@ -1113,6 +1130,8 @@ export function createGatewayServer(options = {}) {
         try {
           const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
           const pendingDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
+          const inProgressDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/in-progress');
+          const completedDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/completed');
           const archiveDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
           const outboxDir = resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/outbox');
           const completedOutboxDir = resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/completed/outbox');
@@ -1157,8 +1176,13 @@ export function createGatewayServer(options = {}) {
             }
           }
 
-          // 2. Discover live cards from .harness/tasks/pending and archive
-          for (const [dir, defaultStatus] of [[pendingDir, 'STAGED'], [archiveDir, 'ARCHIVED']]) {
+          // 2. Discover live cards from .harness/tasks/pending, in-progress, completed, and archive
+          for (const [dir, defaultStatus] of [
+            [pendingDir, 'STAGED'],
+            [inProgressDir, 'IN_PROGRESS'],
+            [completedDir, 'COMPLETED'],
+            [archiveDir, 'ARCHIVED']
+          ]) {
             if (existsSync(dir)) {
               for (const f of readdirSync(dir)) {
                 try {
@@ -1172,7 +1196,7 @@ export function createGatewayServer(options = {}) {
                   if (!cardsMap.has(id)) {
                     cardsMap.set(id, {
                       id,
-                      target: data.target || data.domain || rcpt?.target_notebook || 'toolforge',
+                      target: data.target || data.domain || rcpt?.target_notebook || 'unassigned',
                       intent: data.title || data.intent || rcpt?.intent || id,
                       summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
                       status: rcpt?.status || data.status || defaultStatus,
@@ -1356,6 +1380,19 @@ export function createGatewayServer(options = {}) {
           const commitType = commitTypeForCard(cardData);
           const target = cardData.target || cardData.domain || 'core';
           const repo = body.repo || resolveTargetRepo(target);
+
+          if (NON_CODE_TARGETS.has(String(target).toLowerCase()) && !body.repo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ERROR', error: `CANNOT_PROMOTE_RESEARCH: Target '${target}' is a local research topic, not a code repository. Assign an explicit repository or manage via research notes.` }));
+            return;
+          }
+
+          if (!repo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ERROR', error: `UNROUTABLE_TARGET: Target '${target}' has no mapped repository. Explicitly specify a repository before promotion.` }));
+            return;
+          }
+
           const intent = cardData.intent || cardData.title || cardId;
           const title = body.title || `${commitType}(${target}): ${intent}`;
 
@@ -1398,7 +1435,9 @@ export function createGatewayServer(options = {}) {
           if (isDryRun) {
             issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
           } else {
-            const tmpFile = resolve(os.tmpdir(), `trm-promote-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
+            const tmpDir = resolve(os.homedir(), '.tmp');
+            mkdirSync(tmpDir, { recursive: true });
+            const tmpFile = resolve(tmpDir, `trm-promote-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
             writeFileSync(tmpFile, bodyText, 'utf8');
             try {
               // First attempt: with requested labels
@@ -1424,7 +1463,9 @@ export function createGatewayServer(options = {}) {
                   issueUrl = out.trim().split(/\r?\n/).pop();
                 } catch (err) {
                   console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
-                  issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
+                  res.writeHead(502, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ status: 'ERROR', error: `gh issue create failed: ${err.message}` }));
+                  return;
                 }
               }
             } finally {
