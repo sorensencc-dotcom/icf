@@ -17,7 +17,7 @@ This manual details standard operating procedures, architectural topology, tab c
 
 ## 1. System Overview and Topology
 
-Iron Command Forge (ICF) serves as the central control plane, real-time telemetry matrix, and automation console for the zero-token local bot fleet. ICF consolidates observability across knowledge synthesis (KB-Sync), autonomous bot runners (IronBots), topic research mining (TRM), ledger accounting (IronLedger), and model headroom optimization.
+Iron Command Forge (ICF) serves as the central control plane, real-time telemetry matrix, and automation console for the zero-token local bot fleet. ICF consolidates observability across knowledge synthesis (KB-Sync), autonomous bot runners (IronBots), topic research mining (TRM), ledger accounting (IronLedger), and multi-model cost routing.
 
 ### Architectural Diagram
 
@@ -92,9 +92,9 @@ The ICF dashboard organizes operational domains across 10 specialized views:
 | `tab-wiki` | **03. Knowledge Base** | Vault integrity, wikilink validation, orphan detection, and document drift. | `_status-feed/wiki_status.json`, `_status-feed/kb_drift_status.json`. |
 | `tab-fleet` | **04. IronBots Fleet** | Status of autonomous bots (Sentinel, Watchdog, Reporter, Pruner, Healer). | `_status-feed/ironbots_fleet.json`, `daemon_health.json`. |
 | `tab-reporting` | **05. Weekly Retro** | Historical retrospectives, KPI trends, category health metrics, and commit volume. | `/api/reporting/retro`, `/api/reporting/history`. |
-| `tab-mcp` | **06. MCP Matrix** | Health of Model Context Protocol endpoints (Headroom, IronLedger, NotebookLM). | Port 8787, Port 8000, stdio client states. |
+| `tab-mcp` | **06. MCP Matrix** | Health of Model Context Protocol endpoints (IronLedger, NotebookLM). | Port 8000, stdio client states. |
 | `tab-ops` | **07. Operations** | Scheduled task triggers, inter-stage pipelines, process runbooks, and manual triggers. | Windows Task Scheduler (`\Ironbots\`, `\KB-SYNC\`). |
-| `tab-headroom` | **08. Headroom Engine** | Context compression, prompt cache optimization, and token cost savings telemetry. | `/api/reporting/headroom`, Port 8787 proxy. |
+| `tab-costrouting` | **08. Cost Routing** | Multi-model substrate routing, FreeLLMAPI router, and frontier cost savings telemetry. | `/api/reporting/cost-routing`. |
 | `tab-ledger` | **09. IronLedger** | Financial balances, capital gains tax lots, bank feeds, and statement reconciliation. | Port 8000 daemon, `_status-feed/ironledger_status.json`. |
 | `tab-mobile` | **10. Mobile Outbox** | Mobile push notifications, dispatch receipts, and outbox queue telemetry. | `trm-drive/inbox/outbox/`, `.trm/inbox/outbox/`. |
 

@@ -302,7 +302,7 @@
   <!-- SECTION 1 -->
   <h2>1. System Overview and Topology</h2>
   <p>
-    Iron Command Forge (ICF) serves as the primary operator console, telemetry matrix, and automation control plane across the zero-token local bot fleet. ICF consolidates observability across knowledge synthesis (KB-Sync), autonomous bot runners (IronBots), topic research mining (TRM), ledger accounting (IronLedger), and model headroom optimization.
+    Iron Command Forge (ICF) serves as the primary operator console, telemetry matrix, and automation control plane across the zero-token local bot fleet. ICF consolidates observability across knowledge synthesis (KB-Sync), autonomous bot runners (IronBots), topic research mining (TRM), ledger accounting (IronLedger), and multi-model cost routing.
   </p>
 
   <div class="card">
@@ -402,8 +402,8 @@ Start-ScheduledTask -TaskPath "\Ironbots\" -TaskName "Daemon-Healer"</code></pre
       <tr>
         <td><code>tab-mcp</code></td>
         <td>06. MCP Matrix</td>
-        <td>Model Context Protocol server status (Headroom, IronLedger, NotebookLM).</td>
-        <td>Proxy port 8787, HTTP port 8000, stdio</td>
+        <td>Model Context Protocol server status (IronLedger, NotebookLM).</td>
+        <td>HTTP port 8000, stdio</td>
       </tr>
       <tr>
         <td><code>tab-ops</code></td>
@@ -412,10 +412,10 @@ Start-ScheduledTask -TaskPath "\Ironbots\" -TaskName "Daemon-Healer"</code></pre
         <td>Windows Scheduled Tasks (<code>\Ironbots\</code>, <code>\KB-SYNC\</code>)</td>
       </tr>
       <tr>
-        <td><code>tab-headroom</code></td>
-        <td>08. Headroom Engine</td>
-        <td>Prompt cache alignment, context compression, cost savings metrics.</td>
-        <td><code>/api/reporting/headroom</code>, Port 8787</td>
+        <td><code>tab-costrouting</code></td>
+        <td>08. Cost Routing</td>
+        <td>Multi-model substrate routing, FreeLLMAPI router, and frontier cost savings telemetry.</td>
+        <td><code>/api/reporting/cost-routing</code></td>
       </tr>
       <tr>
         <td><code>tab-ledger</code></td>
