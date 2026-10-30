@@ -47,6 +47,17 @@ test('Task 7 routing facts are bounded and invalid model output cannot replace r
   assert.equal(interpretReport(report, { state: 'fallback', fallbackOutcome: 'deterministic' }).status, 'AVAILABLE');
 });
 
+test('interpretReport catches validateRoutingFacts errors and returns INTERPRETATION_UNAVAILABLE', () => {
+  const report = { date: '2026-09-13' };
+  const invalidRoutingFacts = { unsupportedField: true }; // This will throw a TypeError in validateRoutingFacts
+  const result = interpretReport(report, invalidRoutingFacts);
+  assert.deepEqual(result, {
+    status: 'INTERPRETATION_UNAVAILABLE',
+    report,
+    routingFacts: null
+  });
+});
+
 test('GET /api/reporting/weekly-retro preserves current success response', async t => {
   const server = createReportingServer({ reportPath: DEFAULT_REPORT_PATH });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
