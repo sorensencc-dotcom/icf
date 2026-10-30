@@ -4976,49 +4976,64 @@ flowchart TD
   let currentTrmBacklogFilter = 'OPEN';
   let trmBacklogLoaded = false;
   let trmBacklogError = null;
+  let trmBacklogInFlight = null;
 
   async function loadTrmBacklog() {
-    const tableBody = document.getElementById('trmBacklogTableBody');
+    if (trmBacklogInFlight) return trmBacklogInFlight;
+
     const quickBadge = document.getElementById('trmBacklogQuickBadge');
     const quickTotal = document.getElementById('trmQuickTotalCount');
     const quickStaged = document.getElementById('trmQuickStagedCount');
     const quickProgress = document.getElementById('trmQuickInProgressCount');
     const quickDeferred = document.getElementById('trmQuickDeferredCount');
 
-    try {
-      const res = await fetch('/api/reporting/trm-backlog', { cache: 'no-store' });
-      if (!res.ok) {
+    trmBacklogInFlight = (async () => {
+      try {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timerId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+        const res = await fetch('/api/reporting/trm-backlog', {
+          cache: 'no-store',
+          signal: controller ? controller.signal : undefined
+        });
+        if (timerId) clearTimeout(timerId);
+
+        if (!res.ok) {
+          trmBacklogLoaded = true;
+          trmBacklogError = `Server returned HTTP ${res.status}`;
+          if (quickBadge) quickBadge.textContent = '● ERROR';
+          renderTrmBacklogTable();
+          return;
+        }
+        const data = await res.json();
+        cachedTrmBacklogCards = data.cards || [];
         trmBacklogLoaded = true;
-        trmBacklogError = `Server returned HTTP ${res.status}`;
-        if (quickBadge) quickBadge.textContent = '● ERROR';
+        trmBacklogError = null;
+
+        // Update Tab 01 quick stats
+        const total = cachedTrmBacklogCards.length;
+        const staged = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE' || c.status === 'STAGED_FOR_RESEARCH').length;
+        const inProgress = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS').length;
+        const deferred = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI').length;
+
+        if (quickTotal) quickTotal.textContent = String(total);
+        if (quickStaged) quickStaged.textContent = String(staged);
+        if (quickProgress) quickProgress.textContent = String(inProgress);
+        if (quickDeferred) quickDeferred.textContent = String(deferred);
+        if (quickBadge) quickBadge.textContent = staged > 0 ? `● ${staged} NEEDS TRIAGE` : '● ALL TRIAGED';
+
+        filterTrmBacklog(currentTrmBacklogFilter);
+      } catch (e) {
+        console.error('Failed to load TRM backlog', e);
+        trmBacklogLoaded = true;
+        trmBacklogError = `Connection failed (${e.name === 'AbortError' ? 'Request timed out' : (e.message || 'Server offline')}).`;
+        if (quickBadge) quickBadge.textContent = '● OFFLINE';
         renderTrmBacklogTable();
-        return;
+      } finally {
+        trmBacklogInFlight = null;
       }
-      const data = await res.json();
-      cachedTrmBacklogCards = data.cards || [];
-      trmBacklogLoaded = true;
-      trmBacklogError = null;
+    })();
 
-      // Update Tab 01 quick stats
-      const total = cachedTrmBacklogCards.length;
-      const staged = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE' || c.status === 'STAGED_FOR_RESEARCH').length;
-      const inProgress = cachedTrmBacklogCards.filter(c => c.status === 'IN_PROGRESS').length;
-      const deferred = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI').length;
-
-      if (quickTotal) quickTotal.textContent = String(total);
-      if (quickStaged) quickStaged.textContent = String(staged);
-      if (quickProgress) quickProgress.textContent = String(inProgress);
-      if (quickDeferred) quickDeferred.textContent = String(deferred);
-      if (quickBadge) quickBadge.textContent = staged > 0 ? `● ${staged} NEEDS TRIAGE` : '● ALL TRIAGED';
-
-      filterTrmBacklog(currentTrmBacklogFilter);
-    } catch (e) {
-      console.error('Failed to load TRM backlog', e);
-      trmBacklogLoaded = true;
-      trmBacklogError = `Connection failed (${e.message || 'Server offline'}). Ensure ICF server is running ('npm run start' in icf/).`;
-      if (quickBadge) quickBadge.textContent = '● OFFLINE';
-      renderTrmBacklogTable();
-    }
+    return trmBacklogInFlight;
   }
 
   function filterTrmBacklog(filter) {
@@ -5098,12 +5113,12 @@ flowchart TD
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI');
     }
 
-    if (!trmBacklogLoaded) {
+    if (!trmBacklogLoaded && cachedTrmBacklogCards.length === 0) {
       tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">Loading action cards...</td></tr>`;
       return;
     }
 
-    if (trmBacklogError) {
+    if (trmBacklogError && cachedTrmBacklogCards.length === 0) {
       tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--accent-terracotta); text-align: center; padding: 1.5rem; font-weight: 500;">⚠️ ${escapeHtml(trmBacklogError)}</td></tr>`;
       return;
     }
@@ -5446,13 +5461,13 @@ flowchart TD
   initRealtimeEventStream();
 
   window.addEventListener('hashchange', handleHashRoute);
-  setInterval(fetchCostRoutingMetrics, 10000);
-  setInterval(loadIronbotsDailyReport, 30000);
-  setInterval(loadMeridianFocus, 60000);
-  setInterval(loadMobileOutbox, 15000);
-  setInterval(loadPullRequests, 30000);
-  setInterval(loadStorageAnalytics, 30000);
-  setInterval(loadTrmBacklog, 30000);
+  setInterval(fetchCostRoutingMetrics, 30000);
+  setInterval(loadIronbotsDailyReport, 60000);
+  setInterval(loadMeridianFocus, 120000);
+  setInterval(loadMobileOutbox, 60000);
+  setInterval(loadPullRequests, 60000);
+  setInterval(loadStorageAnalytics, 60000);
+  setInterval(loadTrmBacklog, 60000);
 </script>
 
 <!-- PROMOTE MODAL OVERLAY -->

@@ -17,43 +17,56 @@ import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 import { skillId } from './toolforge-skill-command.mjs';
 
 let prCache = { timestamp: 0, prs: [] };
+let prFetchInProgress = false;
 const PR_CACHE_TTL_MS = 60_000;
+
+function refreshPullRequestsAsync() {
+  if (prFetchInProgress) return;
+  prFetchInProgress = true;
+  const repos = ['sorensencc-dotcom/toolforge', 'sorensencc-dotcom/sigil'];
+  const allPrs = [];
+  (async () => {
+    try {
+      for (const repo of repos) {
+        try {
+          const raw = await new Promise((resolvePromise, rejectPromise) => {
+            cp.execFile('gh', [
+              'pr', 'list',
+              '--repo', repo,
+              '--limit', '25',
+              '--state', 'all',
+              '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
+            ], {
+              cwd: resolve(TOOLFORGE_ROOT),
+              encoding: 'utf8',
+              timeout: 3000,
+              windowsHide: true
+            }, (err, stdout) => {
+              if (err) rejectPromise(err);
+              else resolvePromise(stdout);
+            });
+          });
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            allPrs.push(...parsed);
+          }
+        } catch {}
+      }
+      if (allPrs.length > 0) {
+        prCache = { timestamp: Date.now(), prs: allPrs };
+      }
+    } catch {} finally {
+      prFetchInProgress = false;
+    }
+  })();
+}
 
 export function getPullRequests() {
   const now = Date.now();
-  if (now - prCache.timestamp < PR_CACHE_TTL_MS) {
-    return prCache.prs || [];
+  if (now - prCache.timestamp > PR_CACHE_TTL_MS) {
+    refreshPullRequestsAsync();
   }
-  const repos = ['sorensencc-dotcom/toolforge', 'sorensencc-dotcom/sigil'];
-  const allPrs = [];
-  try {
-    for (const repo of repos) {
-      try {
-        const raw = cp.execFileSync('gh', [
-          'pr', 'list',
-          '--repo', repo,
-          '--limit', '25',
-          '--state', 'all',
-          '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
-        ], {
-          cwd: resolve(TOOLFORGE_ROOT),
-          encoding: 'utf8',
-          timeout: 1500,
-          windowsHide: true,
-          stdio: ['ignore', 'pipe', 'ignore']
-        });
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          allPrs.push(...parsed);
-        }
-      } catch {}
-    }
-    prCache = { timestamp: now, prs: allPrs.length > 0 ? allPrs : (prCache.prs || []) };
-    return prCache.prs;
-  } catch {
-    prCache = { timestamp: now, prs: prCache.prs || [] };
-    return prCache.prs;
-  }
+  return prCache.prs || [];
 }
 
 export function parseJsonBody(req) {
@@ -94,7 +107,12 @@ export const trmInboxDir = () => (process.env.TRM_INBOX_DIR ? resolve(process.en
 // toolforge inbox. With TRM_INBOX_DIR overridden there is nothing for it to refresh, and importing it would stall on the G: mount.
 async function refreshTrmLedgerMarkdown() {
   if (process.env.TRM_INBOX_DIR) return;
-  await refreshTrmLedgerMarkdown();
+  try {
+    const { refreshLedgerMarkdown } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-ingress-watcher.mjs')).href);
+    refreshLedgerMarkdown();
+  } catch (err) {
+    console.warn('[refreshTrmLedgerMarkdown] Failed to refresh markdown:', err.message);
+  }
 }
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
 export const HOST = process.env.ICF_HOST || '127.0.0.1';
@@ -1018,9 +1036,11 @@ export function createGatewayServer(options = {}) {
         try {
           const outboxDirs = [
             resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/outbox'),
-            resolve(TOOLFORGE_ROOT, '.trm/inbox/outbox'),
-            process.env.TRM_GDRIVE_OUTBOX_DIR || 'G:/My Drive/TRM-Research/mobile-outbox'
+            resolve(TOOLFORGE_ROOT, '.trm/inbox/outbox')
           ];
+          if (process.env.TRM_GDRIVE_OUTBOX_DIR) {
+            outboxDirs.push(resolve(process.env.TRM_GDRIVE_OUTBOX_DIR));
+          }
           const rawReceipts = [];
           for (const dir of outboxDirs) {
             if (existsSync(dir)) {
