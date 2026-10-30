@@ -1533,8 +1533,7 @@ export function createGatewayServer(options = {}) {
           if (isDryRun) {
             issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
           } else {
-            const tmpDir = resolve(os.homedir(), '.tmp');
-            mkdirSync(tmpDir, { recursive: true });
+            const tmpDir = os.tmpdir();
             const tmpFile = resolve(tmpDir, `trm-promote-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
             writeFileSync(tmpFile, bodyText, 'utf8');
             try {
