@@ -1,5 +1,5 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildWeeklyRetroArtifact } from '../reporting/src/publication-artifact.mjs';
 import { CATEGORY_REGISTRY, normalizeCategoryMetrics } from '../reporting/src/category-contract.mjs';
