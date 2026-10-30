@@ -483,7 +483,8 @@ function actionVersionFromRow(row) {
 
 function actionVersionEqual(left, right) {
   const comparable = value => {
-    const { observedAt, ...withoutTimestamp } = value;
+    const withoutTimestamp = { ...value };
+    delete withoutTimestamp.observedAt;
     return withoutTimestamp;
   };
   return canonicalJson(comparable(left)) === canonicalJson(comparable(right));
