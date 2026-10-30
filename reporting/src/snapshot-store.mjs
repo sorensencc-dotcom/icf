@@ -11,7 +11,7 @@ import {
   normalizeActions,
   normalizeWeekKey
 } from './action-continuity.mjs';
-import { computeTrend, weekRange } from './trend-summary.mjs';
+import { weekRange } from './trend-summary.mjs';
 
 let DatabaseSync;
 try {
