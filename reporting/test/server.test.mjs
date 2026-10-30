@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { createReportingServer, DEFAULT_REPORT_PATH, CATEGORIES_API_ROUTE, ROUTING_API_ROUTE, ACTIONS_API_ROUTE } from '../src/server.mjs';
+import { createReportingServer, DEFAULT_REPORT_PATH, CATEGORIES_API_ROUTE, ROUTING_API_ROUTE, ACTIONS_API_ROUTE, readWeeklyRetro } from '../src/server.mjs';
 import { interpretReport, validateRoutingFacts } from '../src/routing-telemetry.mjs';
 
 const FIXTURES = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +33,38 @@ test('Task 6 read projections expose validated categories and bounded unavailabl
   const actions = await requestPath(server, `${ACTIONS_API_ROUTE}?fromWeek=2026-W37&toWeek=2026-W37`);
   assert.equal(actions.status, 503);
   assert.equal(actions.payload.status, 'UNAVAILABLE');
+});
+
+test('readWeeklyRetro parses and validates a well-formed report fixture', async () => {
+  const report = await readWeeklyRetro(DEFAULT_REPORT_PATH);
+  assert.equal(report.date, '2026-09-13');
+  assert.equal(report.window, '7d');
+  assert.equal(report.metrics.commits, 37);
+  assert.equal(report.test_health.total_test_files, 184);
+});
+
+test('readWeeklyRetro rejects on missing file with ENOENT', async () => {
+  const missingPath = join(FIXTURES, 'fixtures', 'does-not-exist.json');
+  await assert.rejects(
+    () => readWeeklyRetro(missingPath),
+    (error) => error.code === 'ENOENT'
+  );
+});
+
+test('readWeeklyRetro rejects malformed JSON with SyntaxError', async () => {
+  const malformedPath = join(FIXTURES, 'fixtures', 'malformed-report.json');
+  await assert.rejects(
+    () => readWeeklyRetro(malformedPath),
+    SyntaxError
+  );
+});
+
+test('readWeeklyRetro rejects invalid report schema', async () => {
+  const partialPath = join(FIXTURES, 'fixtures', 'partial-report.json');
+  await assert.rejects(
+    () => readWeeklyRetro(partialPath),
+    /schema validation failed/
+  );
 });
 
 test('Task 7 routing facts are bounded and invalid model output cannot replace report data', () => {
