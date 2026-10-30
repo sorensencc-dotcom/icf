@@ -6,7 +6,7 @@ import { getPullRequests } from '../src/server.mjs';
 // getPullRequests shells out to `gh pr list` once per configured repo.
 const REPO_COUNT = 2;
 
-test('getPullRequests fetches and caches PRs from GitHub', async (t) => {
+test('getPullRequests fetches and caches PRs from GitHub', async () => {
   const originalExecFileSync = cp.execFileSync;
   const originalDateNow = Date.now;
 
