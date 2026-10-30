@@ -243,3 +243,48 @@ test('ICF Gateway - backlog card reconciles pr_branch and preserves active statu
     assert.equal(card.pr_branch, 'trm/card-staged-active');
   });
 });
+
+test('ICF Gateway - backlog card prioritizes terminal completed receipt over earlier staging receipt', async () => {
+  const row = {
+    id: 'card-competing-receipts',
+    status: 'STAGED_FOR_RESEARCH',
+    target: 'toolforge',
+    intent: 'test_competing_receipts'
+  };
+  const inboxDir = mkdtempSync(join(tmpdir(), 'trm-inbox-'));
+  const outboxDir = join(inboxDir, 'outbox');
+  mkdirSync(outboxDir, { recursive: true });
+  writeFileSync(join(inboxDir, 'ledger.jsonl'), JSON.stringify(row) + '\n', 'utf8');
+  writeFileSync(join(outboxDir, 'receipt-100-card-competing-receipts.json'), JSON.stringify({
+    action_id: 'card-competing-receipts',
+    status: 'STAGED_FOR_RESEARCH',
+    dispatched_at: '2026-10-04T12:00:00.000Z'
+  }), 'utf8');
+  writeFileSync(join(outboxDir, 'receipt-card-competing-receipts-completed.json'), JSON.stringify({
+    action_id: 'card-competing-receipts',
+    status: 'COMPLETED',
+    completed_at: '2026-10-04T12:00:01.000Z',
+    pr_url: 'https://github.com/sorensencc-dotcom/toolforge/pull/77'
+  }), 'utf8');
+
+  const previous = process.env.TRM_INBOX_DIR;
+  process.env.TRM_INBOX_DIR = inboxDir;
+  const server = createGatewayServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const card = body.cards.find(c => c.id === 'card-competing-receipts');
+    assert.ok(card);
+    assert.equal(card.status, 'COMPLETED');
+    assert.equal(card.pr_url, 'https://github.com/sorensencc-dotcom/toolforge/pull/77');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (previous === undefined) delete process.env.TRM_INBOX_DIR; else process.env.TRM_INBOX_DIR = previous;
+    rmSync(inboxDir, { recursive: true, force: true });
+  }
+});
+

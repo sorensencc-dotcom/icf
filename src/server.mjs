@@ -1128,15 +1128,30 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
-          const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
+          const inboxBase = trmInboxDir();
+          const ledgerPath = resolve(inboxBase, 'ledger.jsonl');
           const pendingDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
           const inProgressDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/in-progress');
           const completedDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/completed');
           const archiveDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
-          const outboxDir = resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/outbox');
-          const completedOutboxDir = resolve(TOOLFORGE_ROOT, 'trm-drive/inbox/completed/outbox');
+          const outboxDir = resolve(inboxBase, 'outbox');
+          const completedOutboxDir = resolve(inboxBase, 'completed/outbox');
 
           // Collect latest receipt metadata for live card reconciliation
+          const parseReceiptTime = (d) => {
+            const raw = d.completed_at || d.dispatched_at || d.timestamp || d.processed_at;
+            if (!raw) return 0;
+            if (typeof raw === 'number') return raw;
+            const str = String(raw).trim();
+            const compact = str.replace(/^(\d{4}-\d{2}-\d{2}T\d{2})(\d{2})(\d{2})/, '$1:$2:$3');
+            const ms = new Date(compact).getTime();
+            return Number.isFinite(ms) ? ms : 0;
+          };
+          const isTerminalStatus = (s) => {
+            const norm = String(s || '').toUpperCase();
+            return norm === 'COMPLETED' || norm === 'DONE' || norm === 'ARCHIVED' || norm === 'REJECTED' || norm === 'FAILED';
+          };
+
           const receipts = new Map();
           for (const dir of [completedOutboxDir, outboxDir]) {
             if (existsSync(dir)) {
@@ -1145,7 +1160,33 @@ export function createGatewayServer(options = {}) {
                   try {
                     const data = JSON.parse(readFileSync(resolve(dir, f), 'utf8'));
                     const id = data.action_id || data.id;
-                    if (id && !receipts.has(id)) receipts.set(id, data);
+                    if (!id) continue;
+                    const existing = receipts.get(id);
+                    if (!existing) {
+                      receipts.set(id, data);
+                    } else {
+                      const newIsTerminal = isTerminalStatus(data.status);
+                      const oldIsTerminal = isTerminalStatus(existing.status);
+                      const newTime = parseReceiptTime(data);
+                      const oldTime = parseReceiptTime(existing);
+                      const shouldReplace = (newTime > oldTime + 60000)
+                        ? true
+                        : (oldTime > newTime + 60000)
+                          ? false
+                          : (newIsTerminal && !oldIsTerminal) || (newIsTerminal === oldIsTerminal && newTime >= oldTime);
+                      const base = shouldReplace ? existing : data;
+                      const top = shouldReplace ? data : existing;
+                      receipts.set(id, {
+                        ...base,
+                        ...top,
+                        issue_url: top.issue_url || base.issue_url || null,
+                        pr_url: top.pr_url || base.pr_url || null,
+                        pr_number: top.pr_number || base.pr_number || null,
+                        pr_state: top.pr_state || base.pr_state || null,
+                        summary: top.summary || base.summary || '',
+                        target_notebook: top.target_notebook || base.target_notebook || null
+                      });
+                    }
                   } catch {}
                 }
               }
@@ -1199,7 +1240,9 @@ export function createGatewayServer(options = {}) {
                       target: data.target || data.domain || rcpt?.target_notebook || 'unassigned',
                       intent: data.title || data.intent || rcpt?.intent || id,
                       summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
-                      status: rcpt?.status || data.status || defaultStatus,
+                      status: (data.status === 'COMPLETED' || data.status === 'DONE' || data.status === 'ARCHIVED')
+                        ? data.status
+                        : (rcpt?.status || data.status || defaultStatus),
                       priority: data.priority || 'P2',
                       created_at: data.created_at || data.created || data.timestamp || data.processed_at || rcpt?.timestamp || null,
                       timestamp: data.timestamp || rcpt?.timestamp || null,
@@ -1225,7 +1268,8 @@ export function createGatewayServer(options = {}) {
                     if (data.summary && (!existing.summary || existing.summary.startsWith('Mobile action item'))) {
                       existing.summary = data.summary;
                     }
-                    if (rcpt?.status && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
+                    const isProtected = existing.status === 'DEFERRED' || existing.status === 'DEFERRED_YAGNI' || existing.status === 'ARCHIVED' || existing.status === 'IN_PROGRESS';
+                    if (rcpt?.status && !isProtected && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
                       existing.status = rcpt.status;
                     }
                     if (rcpt?.issue_url && !existing.issue_url) {
@@ -1242,6 +1286,26 @@ export function createGatewayServer(options = {}) {
                     }
                   }
                 } catch {}
+              }
+            }
+          }
+
+          // 3. Reconcile all cards against latest receipts
+          for (const card of cardsMap.values()) {
+            const rcpt = receipts.get(card.id);
+            if (rcpt) {
+              if (rcpt.issue_url && !card.issue_url) card.issue_url = rcpt.issue_url;
+              if (rcpt.pr_url && !card.pr_url) card.pr_url = rcpt.pr_url;
+              if (rcpt.pr_number && !card.pr_number) card.pr_number = rcpt.pr_number;
+              if (rcpt.pr_branch && !card.pr_branch) card.pr_branch = rcpt.pr_branch;
+              if (rcpt.research_ref && !card.research_ref) card.research_ref = rcpt.research_ref;
+              const isProtected = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI' || card.status === 'ARCHIVED' || card.status === 'IN_PROGRESS';
+              if (!isProtected) {
+                if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE') {
+                  card.status = 'COMPLETED';
+                } else if (!card.status || card.status === 'STAGED' || card.status === 'PENDING' || card.status.startsWith('STAGED_')) {
+                  card.status = rcpt.status;
+                }
               }
             }
           }
@@ -1264,8 +1328,16 @@ export function createGatewayServer(options = {}) {
           }
           const prs = getPullRequests();
           for (const card of cards) {
-            if (!card.pr_url) {
-              const matchedPr = prs.find(p => {
+            let matchedPr = null;
+            if (card.pr_url) {
+              const urlTrimmed = card.pr_url.trim().toLowerCase();
+              matchedPr = prs.find(p => p.url && p.url.trim().toLowerCase() === urlTrimmed);
+              if (!matchedPr && card.pr_number) {
+                matchedPr = prs.find(p => p.number === Number(card.pr_number));
+              }
+            }
+            if (!matchedPr) {
+              matchedPr = prs.find(p => {
                 if (card.pr_branch && p.headRefName === card.pr_branch) {
                   return true;
                 }
@@ -1274,8 +1346,9 @@ export function createGatewayServer(options = {}) {
                 }
                 if (card.issue_url) {
                   const issueNum = card.issue_url.split('/').pop();
-                  if (issueNum && (p.title.includes(`#${issueNum}`) || p.title.toLowerCase().includes(`closes #${issueNum}`) || p.title.toLowerCase().includes(`fixes #${issueNum}`))) {
-                    return true;
+                  if (issueNum) {
+                    const issueRegex = new RegExp(`(?:closes|fixes|resolves)?\\s*#${issueNum}\\b`, 'i');
+                    if (issueRegex.test(p.title)) return true;
                   }
                 }
                 if (card.id) {
@@ -1288,11 +1361,16 @@ export function createGatewayServer(options = {}) {
                 }
                 return false;
               });
-              if (matchedPr) {
-                card.pr_url = matchedPr.url;
-                card.pr_number = matchedPr.number;
-                card.pr_title = matchedPr.title;
-                card.pr_state = matchedPr.state;
+            }
+            if (matchedPr) {
+              card.pr_url = matchedPr.url;
+              card.pr_number = matchedPr.number;
+              card.pr_title = matchedPr.title;
+              card.pr_state = String(matchedPr.state || '').toUpperCase();
+            }
+            if (String(card.pr_state || '').toUpperCase() === 'MERGED') {
+              if (card.status !== 'ARCHIVED' && card.status !== 'DEFERRED' && card.status !== 'DEFERRED_YAGNI') {
+                card.status = 'COMPLETED';
               }
             }
           }

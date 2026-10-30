@@ -5077,12 +5077,17 @@ flowchart TD
     if (currentTrmBacklogFilter === 'OPEN') {
       filtered = cachedTrmBacklogCards.filter(c => {
         if (c.status === 'ARCHIVED' || c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI') return false;
+        if (c.pr_state === 'MERGED' || (c.pr_url && (c.status === 'DONE' || c.status === 'COMPLETED'))) return false;
+        if (c.research_ref && !c.issue_url && !c.pr_url && c.status !== 'COMPLETED') return true;
         if (c.issue_url && (c.status === 'DONE' || c.status === 'COMPLETED')) return false;
-        if (c.research_ref && !c.issue_url) return true;
         return c.status !== 'DONE' && c.status !== 'COMPLETED';
       });
     } else if (currentTrmBacklogFilter === 'COMPLETED') {
-      filtered = cachedTrmBacklogCards.filter(c => (c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED') && !(c.research_ref && !c.issue_url));
+      filtered = cachedTrmBacklogCards.filter(c => {
+        const isTerminal = c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED' || c.pr_state === 'MERGED';
+        if (c.research_ref && !c.issue_url && !c.pr_url && c.status !== 'COMPLETED') return false;
+        return isTerminal;
+      });
     } else if (currentTrmBacklogFilter === 'STAGED') {
       filtered = cachedTrmBacklogCards.filter(c => c.status === 'STAGED' || c.status === 'PENDING' || c.status === 'STAGED_FOR_TRIAGE');
     } else if (currentTrmBacklogFilter === 'RESEARCH') {
