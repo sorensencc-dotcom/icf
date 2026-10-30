@@ -161,7 +161,7 @@ test('ICF Gateway - resolveTargetRepo and promote fallback deterministically map
   assert.equal(resolveTargetRepo('toolforge'), 'sorensencc-dotcom/toolforge');
 
   const row = { id: 'card-repo-route', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'icf', intent: 'test_routing' };
-  await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
+  await withPromoteInbox([row], [], async ({ baseUrl }) => {
     const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/promote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
