@@ -20,10 +20,6 @@ async function atomicWrite(path, value) {
   await rename(temp, path);
 }
 
-function getPath(source, path) {
-  return path.split('.').reduce((value, key) => value?.[key], source);
-}
-
 export function deriveProjections(report) {
   const normalized = normalizeCategoryMetrics(report, { registry: CATEGORY_REGISTRY, allowPartial: true });
   const definitions = new Map(CATEGORY_REGISTRY.categories.map(category => [category.id, category]));
