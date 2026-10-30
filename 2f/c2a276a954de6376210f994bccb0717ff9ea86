@@ -1,0 +1,18 @@
+dashboard/index.html
+  h_5c172e9b435f5a 5080-5081,5086-5090
+src/server.mjs
+  h_5c172e9b435f5a 1131-1132,1137-1138,1141-1154,1163-1189,1243-1245,1271-1272,1293-1312,1331-1340,1349-1351,1364-1373
+test/trm-backlog-api.test.mjs
+  h_5c172e9b435f5a 246-290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2fc2a276a954de6376210f994bccb0717ff9ea86",
+  "prompts": {},
+  "humans": {
+    "h_5c172e9b435f5a": {
+      "author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
