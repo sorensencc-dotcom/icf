@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
 import { join, resolve, extname, normalize, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import cp from 'node:child_process';
@@ -1533,8 +1533,7 @@ export function createGatewayServer(options = {}) {
           if (isDryRun) {
             issueUrl = `https://github.com/${repo}/issues/mock-${Date.now()}`;
           } else {
-            const tmpDir = resolve(os.homedir(), '.tmp');
-            mkdirSync(tmpDir, { recursive: true });
+            const tmpDir = os.tmpdir();
             const tmpFile = resolve(tmpDir, `trm-promote-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
             writeFileSync(tmpFile, bodyText, 'utf8');
             try {
