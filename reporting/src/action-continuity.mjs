@@ -286,7 +286,7 @@ export function normalizeActions(value, { identity = {}, requireStatus = false }
   }));
 }
 
-export function createActionContinuity({ store, sourceSystem, sourceId, categoryId } = {}) {
+export function createActionContinuity({ store, sourceSystem, categoryId } = {}) {
   if (!store || typeof store.upsertAction !== 'function' || typeof store.listActions !== 'function' ||
       typeof store.carryForwardActions !== 'function') {
     throw new TypeError('A snapshot store with action continuity support is required');
