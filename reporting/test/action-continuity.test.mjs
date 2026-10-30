@@ -166,7 +166,7 @@ test('action writes roll back atomically and schema survives reopening', async (
 
 test('action continuity facade delegates the three public interfaces', async () => {
   await withStore(store => {
-    const actions = createActionContinuity({ store, sourceSystem: 'github', sourceId: 'snapshot-id', categoryId: 'delivery' });
+    const actions = createActionContinuity({ store, sourceSystem: 'github', categoryId: 'delivery' });
     assert.throws(() => actions.upsertAction({ weekKey: '2026-W37', wording: 'Missing explicit ID', provenanceLinks: ['https://github.example/issues/missing'] }), /sourceId must be a non-empty string/);
     actions.upsertAction({ sourceId: 'issue-1', weekKey: '2026-W37', wording: 'Review owners', provenanceLinks: ['https://github.example/issues/1'] });
     assert.equal(actions.listActions({ weekKey: '2026-W37' }).length, 1);
