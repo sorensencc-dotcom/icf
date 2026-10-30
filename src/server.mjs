@@ -675,7 +675,7 @@ export function createGatewayServer(options = {}) {
       let payload = {};
       try {
         payload = JSON.parse(body || '{}');
-      } catch (err) {
+      } catch {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
         return;
