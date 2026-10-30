@@ -5,7 +5,6 @@ import { dirname, resolve } from 'node:path';
 import {
   CATEGORY_REGISTRY,
   CATEGORY_REGISTRY_VERSION,
-  LAUNCH_CATEGORY_IDS,
   API_ROUTE,
   serializeApiSuccess,
   serializeApiUnavailable,
