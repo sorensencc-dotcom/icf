@@ -11,7 +11,7 @@ import {
   normalizeActions,
   normalizeWeekKey
 } from './action-continuity.mjs';
-import { computeTrend, weekRange } from './trend-summary.mjs';
+import { weekRange } from './trend-summary.mjs';
 
 let DatabaseSync;
 try {
@@ -483,7 +483,8 @@ function actionVersionFromRow(row) {
 
 function actionVersionEqual(left, right) {
   const comparable = value => {
-    const { observedAt, ...withoutTimestamp } = value;
+    const withoutTimestamp = { ...value };
+    delete withoutTimestamp.observedAt;
     return withoutTimestamp;
   };
   return canonicalJson(comparable(left)) === canonicalJson(comparable(right));

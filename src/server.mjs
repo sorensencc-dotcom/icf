@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
-import { join, resolve, extname, normalize, sep } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
+import { join, resolve, extname, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import cp from 'node:child_process';
 import os from 'node:os';
@@ -675,7 +675,7 @@ export function createGatewayServer(options = {}) {
       let payload = {};
       try {
         payload = JSON.parse(body || '{}');
-      } catch (err) {
+      } catch {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
         return;

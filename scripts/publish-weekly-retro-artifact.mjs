@@ -1,5 +1,5 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildWeeklyRetroArtifact } from '../reporting/src/publication-artifact.mjs';
 import { CATEGORY_REGISTRY, normalizeCategoryMetrics } from '../reporting/src/category-contract.mjs';
@@ -18,10 +18,6 @@ async function atomicWrite(path, value) {
   const temp = `${path}.tmp-${process.pid}`;
   await writeFile(temp, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
   await rename(temp, path);
-}
-
-function getPath(source, path) {
-  return path.split('.').reduce((value, key) => value?.[key], source);
 }
 
 export function deriveProjections(report) {

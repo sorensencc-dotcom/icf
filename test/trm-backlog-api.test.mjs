@@ -128,7 +128,7 @@ test('ICF Gateway - promote allows promoting researched cards with an RFC refere
 
 test('ICF Gateway - promote hydrates card body and formats title with commit prefix from archived card', async () => {
   const row = { id: 'card-hydrate', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'toolforge', intent: 'test_hydration' };
-  await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
+  await withPromoteInbox([row], [], async ({ baseUrl }) => {
     const completedDir = join(process.env.TRM_INBOX_DIR, 'completed');
     mkdirSync(completedDir, { recursive: true });
     writeFileSync(join(completedDir, 'card-hydrate.json'), JSON.stringify({
@@ -161,7 +161,7 @@ test('ICF Gateway - resolveTargetRepo and promote fallback deterministically map
   assert.equal(resolveTargetRepo('toolforge'), 'sorensencc-dotcom/toolforge');
 
   const row = { id: 'card-repo-route', status: 'STAGED_FOR_TRIAGE', issue_url: null, target: 'icf', intent: 'test_routing' };
-  await withPromoteInbox([row], [], async ({ baseUrl, readRows }) => {
+  await withPromoteInbox([row], [], async ({ baseUrl }) => {
     const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/promote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

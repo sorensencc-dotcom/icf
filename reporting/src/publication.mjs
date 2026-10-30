@@ -3,7 +3,7 @@ import { buildWeeklyRetroArtifact } from './publication-artifact.mjs';
 
 export const WEEKLY_RETRO_WRITER_FLAG = 'ICF_WEEKLY_RETRO_WRITER_ENABLED';
 
-function flagEnabled(value) {
+export function flagEnabled(value) {
   return value === true || value === '1' || value === 'true' || value === 'TRUE';
 }
 

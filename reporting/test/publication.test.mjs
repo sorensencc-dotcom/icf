@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { createSnapshotStore } from '../src/snapshot-store.mjs';
-import { publishWeeklyRetro, writerEnabledFromEnvironment } from '../src/publication.mjs';
+import { publishWeeklyRetro, writerEnabledFromEnvironment, flagEnabled } from '../src/publication.mjs';
 
 const identity = { sourceSystem: 'icf', sourceId: 'weekly-retro', weekKey: '2026-W37', categoryId: 'delivery' };
 
@@ -54,4 +54,20 @@ test('enabled publisher persists supplied projections without changing legacy me
     assert.deepEqual(result.record.envelope.report.categories, [{ id: 'delivery', name: 'Delivery' }]);
     assert.deepEqual(result.record.envelope.report.evidence, [{ label: 'commit abc' }]);
   });
+});
+
+test('flagEnabled evaluates truthy and falsy string/boolean flag values correctly', () => {
+  assert.equal(flagEnabled(true), true);
+  assert.equal(flagEnabled('1'), true);
+  assert.equal(flagEnabled('true'), true);
+  assert.equal(flagEnabled('TRUE'), true);
+
+  assert.equal(flagEnabled(false), false);
+  assert.equal(flagEnabled('0'), false);
+  assert.equal(flagEnabled('false'), false);
+  assert.equal(flagEnabled('FALSE'), false);
+  assert.equal(flagEnabled(undefined), false);
+  assert.equal(flagEnabled(null), false);
+  assert.equal(flagEnabled(1), false); // Strict equality means numeric 1 is false
+  assert.equal(flagEnabled(''), false);
 });
