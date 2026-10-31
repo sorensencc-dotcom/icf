@@ -1,0 +1,18 @@
+dashboard/index.html
+  h_5c172e9b435f5a 824,2775-2777,2779-2808,2816-2817,2819,2823-2824,2826,2830-2831,2837-2838,4877-4921,4946-4947,5534,5546
+src/server.mjs
+  h_5c172e9b435f5a 202-283,649-658,695,698
+test/trail-telemetry.test.mjs
+  h_5c172e9b435f5a 1-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7351bb23690a68399d0aca23a6c5ae3cc28a313f",
+  "prompts": {},
+  "humans": {
+    "h_5c172e9b435f5a": {
+      "author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
