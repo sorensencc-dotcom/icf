@@ -821,7 +821,7 @@
       08. COST ROUTING <span class="tab-badge" id="tabCostRoutingBadge">Active</span>
     </div>
     <div class="tab-item" id="btn-tab-graft" onclick="switchTab('tab-graft')">
-      09. GRAFT &amp; DRIFT
+      09. TRAIL CODE &amp; ROI
     </div>
     <div class="tab-item" id="btn-tab-skills" onclick="switchTab('tab-skills')">
       10. TOOLFORGE SKILLS
@@ -2772,13 +2772,40 @@ flowchart TD
       <div class="section-label">Context Graph &amp; Upstream Ingestion</div>
       <div class="panel-header">
         <div class="panel-title" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-          <span>Graft Context Pruning &amp; Competitor Drift</span>
-          <span class="status-badge live" id="graftTabStatus">● VFS GRAPH ACTIVE</span>
-          <span class="tag date" id="graftCommitBadge">65c2966 Adapted</span>
+          <span>Trail Code Context Graph &amp; ROI</span>
+          <span class="status-badge live" id="graftTabStatus">● TRAIL CODE ACTIVE</span>
+          <span class="tag date" id="graftCommitBadge">7,173 AST Nodes</span>
         </div>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="panel-action" data-copy-command="node C:\dev\benchmarks\viking-benchmark.mjs" onclick="copyCommand(this.dataset.copyCommand)">Run VFS Benchmark 📋</button>
-          <button type="button" class="panel-action" data-copy-command="graft --help" onclick="copyCommand(this.dataset.copyCommand)">graft --help 📋</button>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <select id="skeletonHubSelect" class="panel-action" style="background: var(--bg-surface); color: var(--fg-primary); border: 1px solid var(--border-subtle); padding: 0.35rem 0.5rem; font-size: 0.8rem; cursor: pointer;" onchange="if(this.value){ copyCommand(this.value); this.selectedIndex = 0; }">
+            <option value="">📋 Skeleton Hubs Selector...</option>
+            <optgroup label="Pass 1: Primary Architectural Hubs">
+              <option value="trail skeleton sigil/relay/v1/room-routes.mjs">sigil-repo: room-routes.mjs</option>
+              <option value="trail skeleton icf/src/server.mjs">icf: server.mjs</option>
+              <option value="trail skeleton src/ironledger/compile/journal.py">IronLedger: journal.py</option>
+              <option value="trail skeleton watch-competitors-v2.mjs">kb-sync: watch-competitors-v2.mjs</option>
+              <option value="trail skeleton src/notebooklm/chatArchiver.ts">trm: chatArchiver.ts</option>
+              <option value="trail skeleton openrouter-transport.ts">toolforge: openrouter-transport.ts</option>
+              <option value="trail skeleton src/api/server.js">marketplace: server.js</option>
+            </optgroup>
+            <optgroup label="Pass 2: Contract &amp; Engine Hubs">
+              <option value="trail skeleton sigil/relay/v1/accept-federated-envelope.mjs">sigil-repo: accept-federated-envelope.mjs</option>
+              <option value="trail skeleton sigil/relay/v1/room-dispatch.mjs">sigil-repo: room-dispatch.mjs</option>
+              <option value="trail skeleton icf/reporting/src/snapshot-store.mjs">icf: snapshot-store.mjs</option>
+              <option value="trail skeleton icf/reporting/src/category-contract.mjs">icf: category-contract.mjs</option>
+              <option value="trail skeleton src/ironledger/connectors/registry.py">IronLedger: registry.py</option>
+              <option value="trail skeleton src/ironledger/governance/migrations.py">IronLedger: migrations.py</option>
+              <option value="trail skeleton modules/wiki/validate-staging-docs.mjs">kb-sync: validate-staging-docs.mjs</option>
+              <option value="trail skeleton modules/wiki/pipeline-runner.ts">kb-sync: pipeline-runner.ts</option>
+              <option value="trail skeleton src/notebooklm/nlmResearch.ts">trm: nlmResearch.ts</option>
+              <option value="trail skeleton src/notebooklm/registry.ts">trm: registry.ts</option>
+              <option value="trail skeleton skills/toolforge-submission-validator/src/validate.ts">toolforge: validate.ts</option>
+              <option value="trail skeleton src/services/recommendation.js">marketplace: recommendation.js</option>
+            </optgroup>
+          </select>
+          <button type="button" class="panel-action" data-copy-command="trail status" onclick="copyCommand(this.dataset.copyCommand)">trail status 📋</button>
+          <button type="button" class="panel-action" data-copy-command="trail skeleton --help" onclick="copyCommand(this.dataset.copyCommand)">trail skeleton &lt;file&gt; 📋</button>
+          <button type="button" class="panel-action" onclick="loadTrailTelemetry()">Refresh ⟳</button>
         </div>
       </div>
 
@@ -2786,29 +2813,29 @@ flowchart TD
       <div class="grid-metrics" style="margin-top: 1.25rem;">
         <div>
           <div class="stat-block">
-            <div class="stat-number" id="graftDetailReduction" style="color: #5eead4;">94.79%</div>
-            <div class="stat-label">Prompt Token Reduction</div>
+            <div class="stat-number" id="graftDetailReduction" style="color: #5eead4;">4.15M</div>
+            <div class="stat-label">Lifetime Tokens Saved</div>
           </div>
-          <div class="stat-sub">L0 Summary vs L2 Raw Snapshot</div>
+          <div class="stat-sub" id="graftDetailReductionSub">4,152,151 tokens across 405 sessions</div>
         </div>
         <div>
           <div class="stat-block">
-            <div class="stat-number" id="graftDetailSavedPerCall" style="color: #67e8f9;">91 <span style="font-size: 0.85rem; color: var(--ash);">tok</span></div>
-            <div class="stat-label">Tokens Avoided / Call</div>
+            <div class="stat-number" id="graftDetailSavedPerCall" style="color: #67e8f9;">275K <span style="font-size: 0.85rem; color: var(--ash);">tok</span></div>
+            <div class="stat-label">Weekly Tokens Saved</div>
           </div>
-          <div class="stat-sub">5 tok (L0) vs 96 tok (L2)</div>
+          <div class="stat-sub" id="graftDetailSavedPerCallSub">7,173 AST nodes · 83 learnings</div>
         </div>
         <div>
           <div class="stat-block">
-            <div class="stat-number" id="graftDetailClaudeAvoided" style="color: #d8b4fe;">$2.7300</div>
-            <div class="stat-label">Claude 3.5 Sonnet / 10k</div>
+            <div class="stat-number" id="graftDetailClaudeAvoided" style="color: #d8b4fe;">$12.45</div>
+            <div class="stat-label">Claude Avoided Cost</div>
           </div>
           <div class="stat-sub">$3.00 / 1M input pricing</div>
         </div>
         <div>
           <div class="stat-block">
-            <div class="stat-number" id="graftDetailGeminiAvoided" style="color: #fcd34d;">$1.1375</div>
-            <div class="stat-label">Gemini 1.5 Pro / 10k</div>
+            <div class="stat-number" id="graftDetailGeminiAvoided" style="color: #fcd34d;">$5.19</div>
+            <div class="stat-label">Gemini Avoided Cost</div>
           </div>
           <div class="stat-sub">$1.25 / 1M input pricing</div>
         </div>
@@ -4847,6 +4874,51 @@ flowchart TD
     } catch {}
   }
 
+  async function loadTrailTelemetry() {
+    try {
+      const res = await fetch('/api/telemetry/trail', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      const reductionEl = document.getElementById('graftDetailReduction');
+      const reductionSubEl = document.getElementById('graftDetailReductionSub');
+      const savedPerCallEl = document.getElementById('graftDetailSavedPerCall');
+      const savedPerCallSubEl = document.getElementById('graftDetailSavedPerCallSub');
+      const claudeEl = document.getElementById('graftDetailClaudeAvoided');
+      const geminiEl = document.getElementById('graftDetailGeminiAvoided');
+      const commitBadgeEl = document.getElementById('graftCommitBadge');
+      const statusBadge = document.getElementById('graftTabStatus');
+
+      if (reductionEl && data.lifetimeSavedTokens !== undefined) {
+        const millions = (data.lifetimeSavedTokens / 1_000_000).toFixed(2);
+        reductionEl.textContent = `${millions}M`;
+      }
+      if (reductionSubEl && data.lifetimeSavedTokens !== undefined) {
+        reductionSubEl.textContent = `${data.lifetimeSavedTokens.toLocaleString()} tokens lifetime`;
+      }
+      if (savedPerCallEl && data.weeklySavedTokens !== undefined) {
+        const k = Math.round(data.weeklySavedTokens / 1000);
+        savedPerCallEl.innerHTML = `${k}K <span style="font-size: 0.85rem; color: var(--ash);">tok</span>`;
+      }
+      if (savedPerCallSubEl && data.totalNodes !== undefined) {
+        savedPerCallSubEl.textContent = `${data.totalNodes.toLocaleString()} AST nodes · ${data.activeLearnings || 0} learnings`;
+      }
+      if (claudeEl && data.costAvoidedClaudeUsd !== undefined) {
+        claudeEl.textContent = `$${data.costAvoidedClaudeUsd.toFixed(2)}`;
+      }
+      if (geminiEl && data.costAvoidedGeminiUsd !== undefined) {
+        geminiEl.textContent = `$${data.costAvoidedGeminiUsd.toFixed(2)}`;
+      }
+      if (commitBadgeEl && data.totalNodes !== undefined) {
+        commitBadgeEl.textContent = `${data.totalNodes.toLocaleString()} AST Nodes`;
+      }
+      if (statusBadge) {
+        statusBadge.textContent = '● TRAIL CODE ACTIVE';
+        statusBadge.className = 'status-badge live';
+      }
+    } catch {}
+  }
+
   function initRealtimeEventStream() {
     if (!window.EventSource) return;
     try {
@@ -4871,6 +4943,8 @@ flowchart TD
             loadStorageAnalytics();
           } else if (payload.feed === 'cost_routing_status.json') {
             fetchCostRoutingMetrics();
+          } else if (payload.feed === 'trail' || payload.feed === 'trail_telemetry') {
+            loadTrailTelemetry();
           }
         } catch {}
       });
@@ -5457,6 +5531,7 @@ flowchart TD
   loadPullRequests();
   loadStorageAnalytics();
   loadTrmBacklog();
+  loadTrailTelemetry();
   handleHashRoute();
   initRealtimeEventStream();
 
@@ -5468,6 +5543,7 @@ flowchart TD
   setInterval(loadPullRequests, 60000);
   setInterval(loadStorageAnalytics, 60000);
   setInterval(loadTrmBacklog, 60000);
+  setInterval(loadTrailTelemetry, 60000);
 </script>
 
 <!-- PROMOTE MODAL OVERLAY -->
