@@ -5414,6 +5414,14 @@ flowchart TD
     }
 
     const labels = labelsStr.split(',').map(s => s.trim()).filter(Boolean);
+    const submitBtn = document.getElementById('promoteSubmitBtn') || document.querySelector('#promoteModal .panel-action');
+    const originalText = submitBtn ? submitBtn.textContent : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating Issue...';
+      submitBtn.style.opacity = '0.7';
+      submitBtn.style.cursor = 'wait';
+    }
 
     try {
       const res = await fetch('/api/reporting/trm-backlog/promote', {
@@ -5434,6 +5442,13 @@ flowchart TD
     } catch (e) {
       console.error('Promotion error', e);
       alert('Promotion request error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.cursor = '';
+      }
     }
   }
 
@@ -5579,7 +5594,7 @@ flowchart TD
 
       <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
         <button type="button" class="btn-secondary" onclick="closePromoteModal()">Cancel</button>
-        <button type="button" class="panel-action" onclick="submitPromoteModal()">Create GitHub Issue ↗</button>
+        <button type="button" class="panel-action" id="promoteSubmitBtn" onclick="submitPromoteModal()">Create GitHub Issue ↗</button>
       </div>
     </div>
   </div>

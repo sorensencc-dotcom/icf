@@ -1691,6 +1691,24 @@ export function createGatewayServer(options = {}) {
             const tmpDir = os.tmpdir();
             const tmpFile = resolve(tmpDir, `trm-promote-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
             writeFileSync(tmpFile, bodyText, 'utf8');
+            const runGhAsync = (args, timeout = 60000) => {
+              return new Promise((resolvePromise, rejectPromise) => {
+                cp.execFile('gh', args, {
+                  encoding: 'utf8',
+                  timeout,
+                  windowsHide: true,
+                  env: { ...process.env, GH_NO_UPDATE_NOTIFIER: '1', GH_PROMPT_DISABLED: '1' }
+                }, (err, stdout, stderr) => {
+                  if (err) {
+                    err.stderr = stderr;
+                    rejectPromise(err);
+                  } else {
+                    resolvePromise(stdout);
+                  }
+                });
+              });
+            };
+
             try {
               // First attempt: with requested labels
               if (labelList.length > 0) {
@@ -1699,9 +1717,12 @@ export function createGatewayServer(options = {}) {
                   for (const lbl of labelList) {
                     args.push('--label', lbl);
                   }
-                  const out = cp.execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                  const out = await runGhAsync(args, 60000);
                   issueUrl = out.trim().split(/\r?\n/).pop();
                 } catch (err) {
+                  if (err.code === 'ETIMEDOUT' || err.killed) {
+                    throw err;
+                  }
                   // If failed (e.g. label does not exist on target repo), retry without labels
                   console.warn(`[promote] gh issue create with labels failed on ${repo}: ${err.message}. Retrying without labels.`);
                 }
@@ -1711,7 +1732,7 @@ export function createGatewayServer(options = {}) {
               if (!issueUrl) {
                 try {
                   const args = ['issue', 'create', '--repo', repo, '--title', title, '--body-file', tmpFile];
-                  const out = cp.execFileSync('gh', args, { encoding: 'utf8', timeout: 15000 });
+                  const out = await runGhAsync(args, 60000);
                   issueUrl = out.trim().split(/\r?\n/).pop();
                 } catch (err) {
                   console.error(`[promote] gh issue create failed on ${repo}: ${err.message}`);
@@ -1720,6 +1741,11 @@ export function createGatewayServer(options = {}) {
                   return;
                 }
               }
+            } catch (fatalErr) {
+              console.error(`[promote] gh issue create timed out or failed on ${repo}: ${fatalErr.message}`);
+              res.writeHead(504, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'ERROR', error: `gh issue create failed: ${fatalErr.message}` }));
+              return;
             } finally {
               try { unlinkSync(tmpFile); } catch {}
             }
