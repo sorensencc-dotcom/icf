@@ -5263,6 +5263,7 @@ flowchart TD
           <td>
             <strong style="color:var(--fg-primary); font-family:monospace; font-size:0.8rem;">${escapeHtml(card.id)}</strong>
             <br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Target: ${escapeHtml(card.target || 'toolforge')}</span>
+            <br><span style="font-size:0.72rem; color:var(--accent-brass); font-family:monospace;">Repo: ${escapeHtml(resolveRepoForCard(card) || 'unassigned')}</span>
             ${cardDate ? `<br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Created: ${escapeHtml(cardDate)}</span>` : ''}
           </td>
           <td>
@@ -5334,13 +5335,43 @@ flowchart TD
     'kb-sync': 'sorensencc-dotcom/kb-sync',
     'personal-os': 'sorensencc-dotcom/personal-os',
     'icf': 'sorensencc-dotcom/icf',
-    'ironledger': 'sorensencc-dotcom/IronLedger'
+    'ironledger': 'sorensencc-dotcom/IronLedger',
+    'research': 'sorensencc-dotcom/kb-sync',
+    'cic': 'sorensencc-dotcom/kb-sync',
+    'cic-kb': 'sorensencc-dotcom/kb-sync',
+    'whichllm': 'sorensencc-dotcom/kb-sync',
+    'sandboxes': 'sorensencc-dotcom/kb-sync',
+    'strategic-intelligence': 'sorensencc-dotcom/kb-sync',
+    'cross-fleet': 'sorensencc-dotcom/toolforge',
+    'agent-harness': 'sorensencc-dotcom/toolforge',
+    'trm': 'sorensencc-dotcom/toolforge',
+    'rewritelabs.io': 'sorensencc-dotcom/rewrite-docs'
   };
 
   function resolveRepoForCard(card) {
-    if (card.repo && card.repo !== 'IronLedger') return card.repo;
+    if (card.repo && card.repo !== 'IronLedger' && card.repo.includes('/')) return card.repo;
     const domainKey = (card.domain || card.target || '').toLowerCase().trim();
-    return BACKLOG_DOMAIN_TO_REPO[domainKey] || '';
+    if (BACKLOG_DOMAIN_TO_REPO[domainKey]) return BACKLOG_DOMAIN_TO_REPO[domainKey];
+
+    const textToScan = `${card.id || ''} ${card.intent || ''} ${card.title || ''} ${card.target_notebook_name || ''} ${card.summary || ''}`.toLowerCase();
+    if (textToScan.includes('kbsync') || textToScan.includes('kb-sync') || textToScan.includes('williamson') || textToScan.includes('bombard') || textToScan.includes('redaction') || textToScan.includes('research') || textToScan.includes('wiki') || textToScan.includes('gap-')) {
+      return 'sorensencc-dotcom/kb-sync';
+    }
+    if (textToScan.includes('sigil') || textToScan.includes('relay')) return 'sorensencc-dotcom/sigil';
+    if (textToScan.includes('ironledger') || textToScan.includes('ledger') || textToScan.includes('finances') || textToScan.includes('tax lot')) return 'sorensencc-dotcom/IronLedger';
+    if (textToScan.includes('icf') || textToScan.includes('forge') || textToScan.includes('dashboard')) return 'sorensencc-dotcom/icf';
+    if (textToScan.includes('rewrite-docs') || textToScan.includes('rewritelabs')) return 'sorensencc-dotcom/rewrite-docs';
+    if (textToScan.includes('rewrite')) return 'sorensencc-dotcom/rewrite-mcp';
+
+    if (card.research_ref || card.category === 'RESEARCH' || card.status === 'STAGED_FOR_RESEARCH' || (card.action_type === 'antigravity_triage' && domainKey.includes('research'))) {
+      return 'sorensencc-dotcom/kb-sync';
+    }
+    return 'sorensencc-dotcom/toolforge';
+  }
+
+  function setPromoteRepo(repo) {
+    const repoInput = document.getElementById('promoteRepoInput');
+    if (repoInput) repoInput.value = repo;
   }
 
   function buildCardDetailSections(card) {
@@ -5574,7 +5605,27 @@ flowchart TD
     <div style="display: flex; flex-direction: column; gap: 0.8rem;">
       <div>
         <label style="display: block; font-size: 0.75rem; color: var(--fg-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Target Repository</label>
-        <input type="text" id="promoteRepoInput" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 0.4rem; font-family: monospace; font-size: 0.85rem;" />
+        <input type="text" id="promoteRepoInput" list="promoteRepoSuggestions" placeholder="e.g. sorensencc-dotcom/kb-sync" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-subtle); color: var(--fg-primary); padding: 0.4rem; font-family: monospace; font-size: 0.85rem;" />
+        <datalist id="promoteRepoSuggestions">
+          <option value="sorensencc-dotcom/kb-sync">kb-sync (Research, Wiki, TRM RFCs)</option>
+          <option value="sorensencc-dotcom/toolforge">toolforge (Skills, Engine, Harness)</option>
+          <option value="sorensencc-dotcom/sigil">sigil (Relay, Messaging)</option>
+          <option value="sorensencc-dotcom/icf">icf (Operations Dashboard)</option>
+          <option value="sorensencc-dotcom/IronLedger">IronLedger (Finance & Portfolio)</option>
+          <option value="sorensencc-dotcom/rewrite-mcp">rewrite-mcp (Rewrite MCP Server)</option>
+          <option value="sorensencc-dotcom/rewrite-docs">rewrite-docs (Docs & rewritelabs.io)</option>
+          <option value="sorensencc-dotcom/personal-os">personal-os</option>
+        </datalist>
+        <div style="display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.35rem; align-items: center;">
+          <span style="font-size: 0.68rem; color: var(--fg-muted);">Quick Select:</span>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/kb-sync')">kb-sync</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/toolforge')">toolforge</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/sigil')">sigil</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/icf')">icf</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/IronLedger')">IronLedger</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/rewrite-mcp')">rewrite-mcp</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-family: monospace;" onclick="setPromoteRepo('sorensencc-dotcom/rewrite-docs')">rewrite-docs</button>
+        </div>
       </div>
 
       <div>

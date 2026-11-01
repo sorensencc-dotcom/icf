@@ -252,6 +252,9 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
         cardsMap.set(id, {
           id,
           target: data.target || data.domain || rcpt?.target_notebook || 'unassigned',
+          domain: data.domain || rcpt?.domain || null,
+          repo: data.repo || rcpt?.repo || null,
+          target_notebook_name: data.target_notebook_name || rcpt?.target_notebook_name || null,
           intent: data.title || data.intent || rcpt?.intent || id,
           summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
           status: (data.status === 'COMPLETED' || data.status === 'DONE' || data.status === 'ARCHIVED')
@@ -272,7 +275,7 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
         });
       } else {
         const existing = cardsMap.get(id);
-        for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path', 'title', 'raw_preview']) {
+        for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path', 'title', 'raw_preview', 'domain', 'repo', 'target_notebook_name']) {
           if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
         }
         if (data.title && (!existing.title || existing.intent === existing.id || existing.intent.startsWith('act_'))) {
@@ -309,6 +312,7 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
       if (rcpt.pr_number && !card.pr_number) card.pr_number = rcpt.pr_number;
       if (rcpt.pr_branch && !card.pr_branch) card.pr_branch = rcpt.pr_branch;
       if (rcpt.research_ref && !card.research_ref) card.research_ref = rcpt.research_ref;
+      if (rcpt.repo && !card.repo) card.repo = rcpt.repo;
       const isProtected = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI' || card.status === 'ARCHIVED' || card.status === 'IN_PROGRESS';
       if (!isProtected) {
         if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE') {
@@ -334,6 +338,10 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
     if (!card.created_date && card.archived_path) {
       const m = card.archived_path.match(/(\d{4}-\d{2}-\d{2})/);
       if (m) card.created_date = m[1];
+    }
+    if (!card.repo) {
+      const dKey = (card.domain || card.target || '').toLowerCase().trim();
+      if (DEFAULT_REPO_MAP[dKey]) card.repo = DEFAULT_REPO_MAP[dKey];
     }
   }
   const prs = getPullRequests();
@@ -422,7 +430,17 @@ export const DEFAULT_REPO_MAP = {
   'rewrite-mcp': 'sorensencc-dotcom/rewrite-mcp',
   'rewrite-docs': 'sorensencc-dotcom/rewrite-docs',
   'ironledger': 'sorensencc-dotcom/IronLedger',
-  'IronLedger': 'sorensencc-dotcom/IronLedger'
+  'IronLedger': 'sorensencc-dotcom/IronLedger',
+  'research': 'sorensencc-dotcom/kb-sync',
+  'cic': 'sorensencc-dotcom/kb-sync',
+  'cic-kb': 'sorensencc-dotcom/kb-sync',
+  'whichllm': 'sorensencc-dotcom/kb-sync',
+  'sandboxes': 'sorensencc-dotcom/kb-sync',
+  'strategic-intelligence': 'sorensencc-dotcom/kb-sync',
+  'cross-fleet': 'sorensencc-dotcom/toolforge',
+  'agent-harness': 'sorensencc-dotcom/toolforge',
+  'trm': 'sorensencc-dotcom/toolforge',
+  'rewritelabs.io': 'sorensencc-dotcom/rewrite-docs'
 };
 
 export const NON_CODE_TARGETS = new Set([
