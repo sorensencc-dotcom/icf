@@ -5064,7 +5064,7 @@ flowchart TD
     trmBacklogInFlight = (async () => {
       try {
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timerId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+        const timerId = controller ? setTimeout(() => controller.abort(), 15000) : null;
         const res = await fetch('/api/reporting/trm-backlog', {
           cache: 'no-store',
           signal: controller ? controller.signal : undefined

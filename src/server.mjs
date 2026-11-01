@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch, promises as fsPromises } from 'node:fs';
 import { join, resolve, extname, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import cp from 'node:child_process';
@@ -19,6 +19,20 @@ import { skillId } from './toolforge-skill-command.mjs';
 let prCache = { timestamp: 0, prs: [] };
 let prFetchInProgress = false;
 const PR_CACHE_TTL_MS = 60_000;
+
+let trmBacklogCache = new Map();
+let trmBacklogPendingPromises = new Map();
+const TRM_BACKLOG_CACHE_TTL_MS = 30_000;
+
+export function invalidateTrmBacklogCache(inboxBase = null) {
+  if (inboxBase) {
+    trmBacklogCache.delete(inboxBase);
+    trmBacklogPendingPromises.delete(inboxBase);
+  } else {
+    trmBacklogCache.clear();
+    trmBacklogPendingPromises.clear();
+  }
+}
 
 function refreshPullRequestsAsync() {
   if (prFetchInProgress) return;
@@ -113,6 +127,273 @@ async function refreshTrmLedgerMarkdown() {
   } catch (err) {
     console.warn('[refreshTrmLedgerMarkdown] Failed to refresh markdown:', err.message);
   }
+}
+
+export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
+  const ledgerPath = resolve(inboxBase, 'ledger.jsonl');
+  const pendingDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
+  const inProgressDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/in-progress');
+  const completedDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/completed');
+  const archiveDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
+  const outboxDir = resolve(inboxBase, 'outbox');
+  const completedOutboxDir = resolve(inboxBase, 'completed/outbox');
+
+  const parseReceiptTime = (d) => {
+    const raw = d.completed_at || d.dispatched_at || d.timestamp || d.processed_at;
+    if (!raw) return 0;
+    if (typeof raw === 'number') return raw;
+    const str = String(raw).trim();
+    const compact = str.replace(/^(\d{4}-\d{2}-\d{2}T\d{2})(\d{2})(\d{2})/, '$1:$2:$3');
+    const ms = new Date(compact).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const isTerminalStatus = (s) => {
+    const norm = String(s || '').toUpperCase();
+    return norm === 'COMPLETED' || norm === 'DONE' || norm === 'ARCHIVED' || norm === 'REJECTED' || norm === 'FAILED';
+  };
+
+  const receiptPromises = [];
+  for (const dir of [completedOutboxDir, outboxDir]) {
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        if (f.endsWith('.json')) {
+          receiptPromises.push(fsPromises.readFile(resolve(dir, f), 'utf8').then(content => {
+            try {
+              return JSON.parse(content);
+            } catch {
+              return null;
+            }
+          }).catch(() => null));
+        }
+      }
+    }
+  }
+  const rawReceipts = (await Promise.all(receiptPromises)).filter(Boolean);
+
+  const receipts = new Map();
+  for (const data of rawReceipts) {
+    const id = data.action_id || data.id;
+    if (!id) continue;
+    const existing = receipts.get(id);
+    if (!existing) {
+      receipts.set(id, data);
+    } else {
+      const newIsTerminal = isTerminalStatus(data.status);
+      const oldIsTerminal = isTerminalStatus(existing.status);
+      const newTime = parseReceiptTime(data);
+      const oldTime = parseReceiptTime(existing);
+      const shouldReplace = (newTime > oldTime + 60000)
+        ? true
+        : (oldTime > newTime + 60000)
+          ? false
+          : (newIsTerminal && !oldIsTerminal) || (newIsTerminal === oldIsTerminal && newTime >= oldTime);
+      const base = shouldReplace ? existing : data;
+      const top = shouldReplace ? data : existing;
+      receipts.set(id, {
+        ...base,
+        ...top,
+        issue_url: top.issue_url || base.issue_url || null,
+        pr_url: top.pr_url || base.pr_url || null,
+        pr_number: top.pr_number || base.pr_number || null,
+        pr_state: top.pr_state || base.pr_state || null,
+        summary: top.summary || base.summary || '',
+        target_notebook: top.target_notebook || base.target_notebook || null
+      });
+    }
+  }
+
+  const cardsMap = new Map();
+
+  if (existsSync(ledgerPath)) {
+    const raw = await fsPromises.readFile(ledgerPath, 'utf8');
+    let start = 0;
+    let end = 0;
+    while ((end = raw.indexOf('\n', start)) !== -1) {
+      if (end > start) {
+        try {
+          const item = JSON.parse(raw.substring(start, end));
+          if (item.id) cardsMap.set(item.id, item);
+        } catch {}
+      }
+      start = end + 1;
+    }
+    if (start < raw.length) {
+      try {
+        const item = JSON.parse(raw.substring(start));
+        if (item.id) cardsMap.set(item.id, item);
+      } catch {}
+    }
+  }
+
+  const harnessPromises = [];
+  for (const [dir, defaultStatus] of [
+    [pendingDir, 'STAGED'],
+    [inProgressDir, 'IN_PROGRESS'],
+    [completedDir, 'COMPLETED'],
+    [archiveDir, 'ARCHIVED']
+  ]) {
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        harnessPromises.push(fsPromises.readFile(resolve(dir, f), 'utf8').then(content => {
+          let data = {};
+          try { data = JSON.parse(content); } catch {}
+          return { f, defaultStatus, data };
+        }).catch(() => null));
+      }
+    }
+  }
+  const harnessFiles = (await Promise.all(harnessPromises)).filter(Boolean);
+  for (const { f, defaultStatus, data } of harnessFiles) {
+    try {
+      const id = data.id || f.replace(/\.(md|gdoc|json)$/, '');
+      const rcpt = receipts.get(id);
+
+      if (!cardsMap.has(id)) {
+        cardsMap.set(id, {
+          id,
+          target: data.target || data.domain || rcpt?.target_notebook || 'unassigned',
+          intent: data.title || data.intent || rcpt?.intent || id,
+          summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
+          status: (data.status === 'COMPLETED' || data.status === 'DONE' || data.status === 'ARCHIVED')
+            ? data.status
+            : (rcpt?.status || data.status || defaultStatus),
+          priority: data.priority || 'P2',
+          created_at: data.created_at || data.created || data.timestamp || data.processed_at || rcpt?.timestamp || null,
+          timestamp: data.timestamp || rcpt?.timestamp || null,
+          issue_url: rcpt?.issue_url || data.issue_url || null,
+          pr_url: rcpt?.pr_url || data.pr_url || null,
+          pr_branch: rcpt?.pr_branch || data.pr_branch || null,
+          research_ref: rcpt?.research_ref || data.research_ref || null,
+          action_type: data.action_type,
+          category: data.category,
+          context: data.context,
+          execution_plan: data.execution_plan,
+          deliverables: data.deliverables
+        });
+      } else {
+        const existing = cardsMap.get(id);
+        for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path', 'title', 'raw_preview']) {
+          if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
+        }
+        if (data.title && (!existing.title || existing.intent === existing.id || existing.intent.startsWith('act_'))) {
+          existing.intent = data.title;
+        }
+        if (data.summary && (!existing.summary || existing.summary.startsWith('Mobile action item'))) {
+          existing.summary = data.summary;
+        }
+        const isProtected = existing.status === 'DEFERRED' || existing.status === 'DEFERRED_YAGNI' || existing.status === 'ARCHIVED' || existing.status === 'IN_PROGRESS';
+        if (rcpt?.status && !isProtected && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
+          existing.status = rcpt.status;
+        }
+        if (rcpt?.issue_url && !existing.issue_url) {
+          existing.issue_url = rcpt.issue_url;
+        }
+        if (data?.issue_url && !existing.issue_url) {
+          existing.issue_url = data.issue_url;
+        }
+        if (data?.pr_url && !existing.pr_url) {
+          existing.pr_url = data.pr_url;
+        }
+        if (data?.pr_branch && !existing.pr_branch) {
+          existing.pr_branch = data.pr_branch;
+        }
+      }
+    } catch {}
+  }
+
+  for (const card of cardsMap.values()) {
+    const rcpt = receipts.get(card.id);
+    if (rcpt) {
+      if (rcpt.issue_url && !card.issue_url) card.issue_url = rcpt.issue_url;
+      if (rcpt.pr_url && !card.pr_url) card.pr_url = rcpt.pr_url;
+      if (rcpt.pr_number && !card.pr_number) card.pr_number = rcpt.pr_number;
+      if (rcpt.pr_branch && !card.pr_branch) card.pr_branch = rcpt.pr_branch;
+      if (rcpt.research_ref && !card.research_ref) card.research_ref = rcpt.research_ref;
+      const isProtected = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI' || card.status === 'ARCHIVED' || card.status === 'IN_PROGRESS';
+      if (!isProtected) {
+        if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE') {
+          card.status = 'COMPLETED';
+        } else if (!card.status || card.status === 'STAGED' || card.status === 'PENDING' || card.status.startsWith('STAGED_')) {
+          card.status = rcpt.status;
+        }
+      }
+    }
+  }
+
+  const cards = Array.from(cardsMap.values());
+  for (const card of cards) {
+    const raw = card.created_date || card.created_at || card.created || card.timestamp || card.processed_at;
+    if (raw) {
+      const m = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) card.created_date = m[1];
+    }
+    if (!card.created_date && card.id) {
+      const m = card.id.match(/^act-(\d{4})(\d{2})(\d{2})/);
+      if (m) card.created_date = `${m[1]}-${m[2]}-${m[3]}`;
+    }
+    if (!card.created_date && card.archived_path) {
+      const m = card.archived_path.match(/(\d{4}-\d{2}-\d{2})/);
+      if (m) card.created_date = m[1];
+    }
+  }
+  const prs = getPullRequests();
+  for (const card of cards) {
+    let matchedPr = null;
+    if (card.pr_url) {
+      const urlTrimmed = card.pr_url.trim().toLowerCase();
+      matchedPr = prs.find(p => p.url && p.url.trim().toLowerCase() === urlTrimmed);
+      if (!matchedPr && card.pr_number) {
+        matchedPr = prs.find(p => p.number === Number(card.pr_number));
+      }
+    }
+    if (!matchedPr) {
+      matchedPr = prs.find(p => {
+        if (card.pr_branch && p.headRefName === card.pr_branch) return true;
+        if (card.id && p.headRefName && p.headRefName.includes(card.id)) return true;
+        if (card.issue_url) {
+          const issueNum = card.issue_url.split('/').pop();
+          if (issueNum) {
+            const issueRegex = new RegExp(`(?:closes|fixes|resolves)?\\s*#${issueNum}\\b`, 'i');
+            if (issueRegex.test(p.title)) return true;
+          }
+        }
+        if (card.id) {
+          const slug = card.id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
+          if (slug.length > 5 && p.title.toLowerCase().includes(slug)) return true;
+        }
+        if (card.intent) {
+          const intentSlug = card.intent.replace(/_/g, ' ').toLowerCase();
+          if (intentSlug.length > 5 && p.title.toLowerCase().includes(intentSlug)) return true;
+        }
+        return false;
+      });
+    }
+    if (matchedPr) {
+      card.pr_url = matchedPr.url;
+      card.pr_number = matchedPr.number;
+      card.pr_title = matchedPr.title;
+      card.pr_state = String(matchedPr.state || '').toUpperCase();
+    }
+    if (String(card.pr_state || '').toUpperCase() === 'MERGED') {
+      if (card.status !== 'ARCHIVED' && card.status !== 'DEFERRED' && card.status !== 'DEFERRED_YAGNI') {
+        card.status = 'COMPLETED';
+      }
+    }
+  }
+
+  cards.reverse();
+  trmBacklogCache.set(inboxBase, { timestamp: Date.now(), count: cards.length, cards });
+  return cards;
+}
+
+export function refreshTrmBacklogAsync(inboxBase = trmInboxDir()) {
+  const pending = trmBacklogPendingPromises.get(inboxBase);
+  if (pending) return pending;
+  const p = buildTrmBacklogCards(inboxBase).finally(() => {
+    trmBacklogPendingPromises.delete(inboxBase);
+  });
+  trmBacklogPendingPromises.set(inboxBase, p);
+  return p;
 }
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
 export const HOST = process.env.ICF_HOST || '127.0.0.1';
@@ -470,6 +751,12 @@ export function loadArchivedCard(cardId, lockRow = null, inboxDir = null) {
 }
 
 export function createGatewayServer(options = {}) {
+  // Pre-warm TRM backlog and PR caches in the background on startup
+  try {
+    refreshTrmBacklogAsync().catch(() => {});
+    refreshPullRequestsAsync();
+  } catch {}
+
   const toolforgeRoot = resolve(options.toolforgeRoot || TOOLFORGE_ROOT);
   const toolforgeManifestPath = options.toolforgeManifestPath || join(toolforgeRoot, 'manifest.json');
   const toolforgeInvocation = createToolforgeInvocationConsumer({ toolforgeRoot, manifestPath: toolforgeManifestPath,
@@ -1241,254 +1528,28 @@ export function createGatewayServer(options = {}) {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
         try {
+          const now = Date.now();
+          const forceRefresh = reqUrl.searchParams?.get('refresh') === '1' || reqUrl.searchParams?.get('nocache') === '1';
           const inboxBase = trmInboxDir();
-          const ledgerPath = resolve(inboxBase, 'ledger.jsonl');
-          const pendingDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/pending');
-          const inProgressDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/in-progress');
-          const completedDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/completed');
-          const archiveDir = resolve(TOOLFORGE_ROOT, '.harness/tasks/archive');
-          const outboxDir = resolve(inboxBase, 'outbox');
-          const completedOutboxDir = resolve(inboxBase, 'completed/outbox');
 
-          // Collect latest receipt metadata for live card reconciliation
-          const parseReceiptTime = (d) => {
-            const raw = d.completed_at || d.dispatched_at || d.timestamp || d.processed_at;
-            if (!raw) return 0;
-            if (typeof raw === 'number') return raw;
-            const str = String(raw).trim();
-            const compact = str.replace(/^(\d{4}-\d{2}-\d{2}T\d{2})(\d{2})(\d{2})/, '$1:$2:$3');
-            const ms = new Date(compact).getTime();
-            return Number.isFinite(ms) ? ms : 0;
-          };
-          const isTerminalStatus = (s) => {
-            const norm = String(s || '').toUpperCase();
-            return norm === 'COMPLETED' || norm === 'DONE' || norm === 'ARCHIVED' || norm === 'REJECTED' || norm === 'FAILED';
-          };
-
-          const receipts = new Map();
-          for (const dir of [completedOutboxDir, outboxDir]) {
-            if (existsSync(dir)) {
-              for (const f of readdirSync(dir)) {
-                if (f.endsWith('.json')) {
-                  try {
-                    const data = JSON.parse(readFileSync(resolve(dir, f), 'utf8'));
-                    const id = data.action_id || data.id;
-                    if (!id) continue;
-                    const existing = receipts.get(id);
-                    if (!existing) {
-                      receipts.set(id, data);
-                    } else {
-                      const newIsTerminal = isTerminalStatus(data.status);
-                      const oldIsTerminal = isTerminalStatus(existing.status);
-                      const newTime = parseReceiptTime(data);
-                      const oldTime = parseReceiptTime(existing);
-                      const shouldReplace = (newTime > oldTime + 60000)
-                        ? true
-                        : (oldTime > newTime + 60000)
-                          ? false
-                          : (newIsTerminal && !oldIsTerminal) || (newIsTerminal === oldIsTerminal && newTime >= oldTime);
-                      const base = shouldReplace ? existing : data;
-                      const top = shouldReplace ? data : existing;
-                      receipts.set(id, {
-                        ...base,
-                        ...top,
-                        issue_url: top.issue_url || base.issue_url || null,
-                        pr_url: top.pr_url || base.pr_url || null,
-                        pr_number: top.pr_number || base.pr_number || null,
-                        pr_state: top.pr_state || base.pr_state || null,
-                        summary: top.summary || base.summary || '',
-                        target_notebook: top.target_notebook || base.target_notebook || null
-                      });
-                    }
-                  } catch {}
-                }
-              }
-            }
+          if (forceRefresh) {
+            const cards = await buildTrmBacklogCards(inboxBase);
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
+            return;
           }
 
-          const cardsMap = new Map();
-
-          // 1. Ingest historical and active items from ledger.jsonl
-          if (existsSync(ledgerPath)) {
-            const raw = readFileSync(ledgerPath, 'utf8');
-            let start = 0;
-            let end = 0;
-            while ((end = raw.indexOf('\n', start)) !== -1) {
-              if (end > start) {
-                try {
-                  const item = JSON.parse(raw.substring(start, end));
-                  if (item.id) cardsMap.set(item.id, item);
-                } catch {}
-              }
-              start = end + 1;
+          const cached = trmBacklogCache.get(inboxBase);
+          if (cached && cached.cards && cached.cards.length > 0) {
+            if (now - cached.timestamp >= TRM_BACKLOG_CACHE_TTL_MS) {
+              refreshTrmBacklogAsync(inboxBase);
             }
-            if (start < raw.length) {
-              try {
-                const item = JSON.parse(raw.substring(start));
-                if (item.id) cardsMap.set(item.id, item);
-              } catch {}
-            }
+            res.writeHead(200);
+            res.end(JSON.stringify({ status: 'SUCCESS', count: cached.count, cards: cached.cards }));
+            return;
           }
 
-          // 2. Discover live cards from .harness/tasks/pending, in-progress, completed, and archive
-          for (const [dir, defaultStatus] of [
-            [pendingDir, 'STAGED'],
-            [inProgressDir, 'IN_PROGRESS'],
-            [completedDir, 'COMPLETED'],
-            [archiveDir, 'ARCHIVED']
-          ]) {
-            if (existsSync(dir)) {
-              for (const f of readdirSync(dir)) {
-                try {
-                  const fullPath = resolve(dir, f);
-                  const content = readFileSync(fullPath, 'utf8');
-                  let data = {};
-                  try { data = JSON.parse(content); } catch {}
-                  const id = data.id || f.replace(/\.(md|gdoc|json)$/, '');
-                  const rcpt = receipts.get(id);
-
-                  if (!cardsMap.has(id)) {
-                    cardsMap.set(id, {
-                      id,
-                      target: data.target || data.domain || rcpt?.target_notebook || 'unassigned',
-                      intent: data.title || data.intent || rcpt?.intent || id,
-                      summary: data.summary || data.raw_preview || rcpt?.summary || data.intent || '',
-                      status: (data.status === 'COMPLETED' || data.status === 'DONE' || data.status === 'ARCHIVED')
-                        ? data.status
-                        : (rcpt?.status || data.status || defaultStatus),
-                      priority: data.priority || 'P2',
-                      created_at: data.created_at || data.created || data.timestamp || data.processed_at || rcpt?.timestamp || null,
-                      timestamp: data.timestamp || rcpt?.timestamp || null,
-                      issue_url: rcpt?.issue_url || data.issue_url || null,
-                      pr_url: rcpt?.pr_url || data.pr_url || null,
-                      pr_branch: rcpt?.pr_branch || data.pr_branch || null,
-                      research_ref: rcpt?.research_ref || data.research_ref || null,
-                      action_type: data.action_type,
-                      category: data.category,
-                      context: data.context,
-                      execution_plan: data.execution_plan,
-                      deliverables: data.deliverables
-                    });
-                  } else {
-                    const existing = cardsMap.get(id);
-                    // Ledger rows are flat; fill in the structured card sections from the archived card.
-                    for (const key of ['context', 'execution_plan', 'deliverables', 'direction', 'archived_path', 'title', 'raw_preview']) {
-                      if (existing[key] === undefined && data[key] !== undefined) existing[key] = data[key];
-                    }
-                    if (data.title && (!existing.title || existing.intent === existing.id || existing.intent.startsWith('act_'))) {
-                      existing.intent = data.title;
-                    }
-                    if (data.summary && (!existing.summary || existing.summary.startsWith('Mobile action item'))) {
-                      existing.summary = data.summary;
-                    }
-                    const isProtected = existing.status === 'DEFERRED' || existing.status === 'DEFERRED_YAGNI' || existing.status === 'ARCHIVED' || existing.status === 'IN_PROGRESS';
-                    if (rcpt?.status && !isProtected && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
-                      existing.status = rcpt.status;
-                    }
-                    if (rcpt?.issue_url && !existing.issue_url) {
-                      existing.issue_url = rcpt.issue_url;
-                    }
-                    if (data?.issue_url && !existing.issue_url) {
-                      existing.issue_url = data.issue_url;
-                    }
-                    if (data?.pr_url && !existing.pr_url) {
-                      existing.pr_url = data.pr_url;
-                    }
-                    if (data?.pr_branch && !existing.pr_branch) {
-                      existing.pr_branch = data.pr_branch;
-                    }
-                  }
-                } catch {}
-              }
-            }
-          }
-
-          // 3. Reconcile all cards against latest receipts
-          for (const card of cardsMap.values()) {
-            const rcpt = receipts.get(card.id);
-            if (rcpt) {
-              if (rcpt.issue_url && !card.issue_url) card.issue_url = rcpt.issue_url;
-              if (rcpt.pr_url && !card.pr_url) card.pr_url = rcpt.pr_url;
-              if (rcpt.pr_number && !card.pr_number) card.pr_number = rcpt.pr_number;
-              if (rcpt.pr_branch && !card.pr_branch) card.pr_branch = rcpt.pr_branch;
-              if (rcpt.research_ref && !card.research_ref) card.research_ref = rcpt.research_ref;
-              const isProtected = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI' || card.status === 'ARCHIVED' || card.status === 'IN_PROGRESS';
-              if (!isProtected) {
-                if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE') {
-                  card.status = 'COMPLETED';
-                } else if (!card.status || card.status === 'STAGED' || card.status === 'PENDING' || card.status.startsWith('STAGED_')) {
-                  card.status = rcpt.status;
-                }
-              }
-            }
-          }
-
-          const cards = Array.from(cardsMap.values());
-          for (const card of cards) {
-            const raw = card.created_date || card.created_at || card.created || card.timestamp || card.processed_at;
-            if (raw) {
-              const m = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
-              if (m) card.created_date = m[1];
-            }
-            if (!card.created_date && card.id) {
-              const m = card.id.match(/^act-(\d{4})(\d{2})(\d{2})/);
-              if (m) card.created_date = `${m[1]}-${m[2]}-${m[3]}`;
-            }
-            if (!card.created_date && card.archived_path) {
-              const m = card.archived_path.match(/(\d{4}-\d{2}-\d{2})/);
-              if (m) card.created_date = m[1];
-            }
-          }
-          const prs = getPullRequests();
-          for (const card of cards) {
-            let matchedPr = null;
-            if (card.pr_url) {
-              const urlTrimmed = card.pr_url.trim().toLowerCase();
-              matchedPr = prs.find(p => p.url && p.url.trim().toLowerCase() === urlTrimmed);
-              if (!matchedPr && card.pr_number) {
-                matchedPr = prs.find(p => p.number === Number(card.pr_number));
-              }
-            }
-            if (!matchedPr) {
-              matchedPr = prs.find(p => {
-                if (card.pr_branch && p.headRefName === card.pr_branch) {
-                  return true;
-                }
-                if (card.id && p.headRefName && p.headRefName.includes(card.id)) {
-                  return true;
-                }
-                if (card.issue_url) {
-                  const issueNum = card.issue_url.split('/').pop();
-                  if (issueNum) {
-                    const issueRegex = new RegExp(`(?:closes|fixes|resolves)?\\s*#${issueNum}\\b`, 'i');
-                    if (issueRegex.test(p.title)) return true;
-                  }
-                }
-                if (card.id) {
-                  const slug = card.id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
-                  if (slug.length > 5 && p.title.toLowerCase().includes(slug)) return true;
-                }
-                if (card.intent) {
-                  const intentSlug = card.intent.replace(/_/g, ' ').toLowerCase();
-                  if (intentSlug.length > 5 && p.title.toLowerCase().includes(intentSlug)) return true;
-                }
-                return false;
-              });
-            }
-            if (matchedPr) {
-              card.pr_url = matchedPr.url;
-              card.pr_number = matchedPr.number;
-              card.pr_title = matchedPr.title;
-              card.pr_state = String(matchedPr.state || '').toUpperCase();
-            }
-            if (String(card.pr_state || '').toUpperCase() === 'MERGED') {
-              if (card.status !== 'ARCHIVED' && card.status !== 'DEFERRED' && card.status !== 'DEFERRED_YAGNI') {
-                card.status = 'COMPLETED';
-              }
-            }
-          }
-
-          cards.reverse();
+          const cards = await refreshTrmBacklogAsync(inboxBase);
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
         } catch (err) {
@@ -1522,6 +1583,7 @@ export function createGatewayServer(options = {}) {
               }
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            invalidateTrmBacklogCache();
             await refreshTrmLedgerMarkdown();
           }
           if (!updatedCard) {
@@ -1682,6 +1744,7 @@ export function createGatewayServer(options = {}) {
               }
             }
             writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            invalidateTrmBacklogCache();
             await refreshTrmLedgerMarkdown();
           }
 
@@ -1704,6 +1767,7 @@ export function createGatewayServer(options = {}) {
             }
           }
 
+          invalidateTrmBacklogCache();
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', issue_url: issueUrl, card: updatedCard }));
         } catch (err) {
@@ -1783,6 +1847,7 @@ export function createGatewayServer(options = {}) {
             }
             writeFileSync(lockLedgerPath, updatedLines.join('\n') + '\n', 'utf8');
             await refreshTrmLedgerMarkdown();
+            invalidateTrmBacklogCache();
           }
 
           res.writeHead(200);
@@ -1814,6 +1879,7 @@ export function createGatewayServer(options = {}) {
             stagePr
           });
           await refreshTrmLedgerMarkdown();
+          invalidateTrmBacklogCache();
 
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', results }));
@@ -1843,6 +1909,7 @@ export function createGatewayServer(options = {}) {
             ledgerPath: lockLedgerPath
           });
           await refreshTrmLedgerMarkdown();
+          invalidateTrmBacklogCache();
 
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', results }));
