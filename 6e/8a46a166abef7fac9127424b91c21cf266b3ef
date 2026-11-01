@@ -1,0 +1,19 @@
+dashboard/index.html
+  s_c18290ef58a40c::t_80da5fc899d405 5266,5338-5348,5352,5354-5374,5608-5628
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6e8a46a166abef7fac9127424b91c21cf266b3ef",
+  "prompts": {},
+  "sessions": {
+    "s_c18290ef58a40c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce39e3dd-db5c-44d9-bd2f-236703b13d05",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
