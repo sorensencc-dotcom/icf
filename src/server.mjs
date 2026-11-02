@@ -1482,25 +1482,70 @@ export function createGatewayServer(options = {}) {
 
           const receipts = Array.from(receiptMap.values());
           const prs = getPullRequests();
+
+          // PRECOMPUTATION: Build an index for fast lookups
+          const issuePrMap = new Map();
+          const prsLen = prs.length;
+          const prTitlesLower = new Array(prsLen);
+
+          for (let i = 0; i < prsLen; i++) {
+            const p = prs[i];
+            const title = p.title;
+            prTitlesLower[i] = title.toLowerCase();
+
+            // Extract potential issue numbers from PR title
+            const issueMatch = title.match(/(?:#|fixes #|closes #)(\d+)/ig);
+            if (issueMatch) {
+              for (const m of issueMatch) {
+                const num = m.replace(/[^0-9]/g, '');
+                if (num && !issuePrMap.has(num)) {
+                  issuePrMap.set(num, p);
+                }
+              }
+            }
+          }
+
           for (const r of receipts) {
             if (!r.pr_url) {
-              const matchedPr = prs.find(p => {
-                if (r.issue_url) {
-                  const issueNum = r.issue_url.split('/').pop();
-                  if (issueNum && (p.title.includes(`#${issueNum}`) || p.title.includes(`fixes #${issueNum}`) || p.title.includes(`closes #${issueNum}`))) {
-                    return true;
-                  }
+              let matchedPr = undefined;
+
+              // 1. O(1) Issue Match
+              if (r.issue_url) {
+                const issueNum = r.issue_url.split('/').pop();
+                if (issueNum) {
+                  matchedPr = issuePrMap.get(issueNum);
                 }
+              }
+
+              // 2. Fallback to linear search with pre-computed properties
+              if (!matchedPr && (r.action_id || r.intent)) {
+                let slug = null;
+                let intentSlug = null;
+
                 if (r.action_id) {
-                  const slug = r.action_id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
-                  if (slug.length > 5 && p.title.toLowerCase().includes(slug)) return true;
+                  slug = r.action_id.replace(/^act-\d*-?/, '').replace(/[-_]/g, ' ').toLowerCase();
+                  if (slug.length <= 5) slug = null;
                 }
                 if (r.intent) {
-                  const intentSlug = r.intent.replace(/_/g, ' ').toLowerCase();
-                  if (intentSlug.length > 5 && p.title.toLowerCase().includes(intentSlug)) return true;
+                  intentSlug = r.intent.replace(/_/g, ' ').toLowerCase();
+                  if (intentSlug.length <= 5) intentSlug = null;
                 }
-                return false;
-              });
+
+                if (slug || intentSlug) {
+                  for (let i = 0; i < prsLen; i++) {
+                    const titleLower = prTitlesLower[i];
+                    if (slug && titleLower.includes(slug)) {
+                      matchedPr = prs[i];
+                      break;
+                    }
+                    if (intentSlug && titleLower.includes(intentSlug)) {
+                      matchedPr = prs[i];
+                      break;
+                    }
+                  }
+                }
+              }
+
               if (matchedPr) {
                 r.pr_url = matchedPr.url;
                 r.pr_number = matchedPr.number;
