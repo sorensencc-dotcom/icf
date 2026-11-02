@@ -1441,20 +1441,23 @@ export function createGatewayServer(options = {}) {
           }
           const rawReceipts = [];
           for (const dir of outboxDirs) {
-            if (existsSync(dir)) {
-              try {
-                const files = readdirSync(dir).filter(f => f.endsWith('.json'));
-                for (const file of files) {
-                  try {
-                    const content = JSON.parse(readFileSync(join(dir, file), 'utf8'));
-                    rawReceipts.push({
-                      file,
-                      ...content
-                    });
-                  } catch {}
+            try {
+              const files = (await fsPromises.readdir(dir)).filter(f => f.endsWith('.json'));
+              const fileReads = await Promise.all(files.map(async (file) => {
+                try {
+                  const content = JSON.parse(await fsPromises.readFile(join(dir, file), 'utf8'));
+                  return {
+                    file,
+                    ...content
+                  };
+                } catch {
+                  return null;
                 }
-              } catch {}
-            }
+              }));
+              for (const read of fileReads) {
+                if (read) rawReceipts.push(read);
+              }
+            } catch {}
           }
 
           // Deduplicate by normalized action_id or intent
