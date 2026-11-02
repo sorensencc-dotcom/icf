@@ -39,40 +39,34 @@ function refreshPullRequestsAsync() {
   prFetchInProgress = true;
   const repos = ['sorensencc-dotcom/toolforge', 'sorensencc-dotcom/sigil'];
   const allPrs = [];
-  (async () => {
-    try {
-      for (const repo of repos) {
-        try {
-          const raw = await new Promise((resolvePromise, rejectPromise) => {
-            cp.execFile('gh', [
-              'pr', 'list',
-              '--repo', repo,
-              '--limit', '25',
-              '--state', 'all',
-              '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
-            ], {
-              cwd: resolve(TOOLFORGE_ROOT),
-              encoding: 'utf8',
-              timeout: 3000,
-              windowsHide: true
-            }, (err, stdout) => {
-              if (err) rejectPromise(err);
-              else resolvePromise(stdout);
-            });
-          });
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            allPrs.push(...parsed);
-          }
-        } catch {}
-      }
-      if (allPrs.length > 0) {
-        prCache = { timestamp: Date.now(), prs: allPrs };
-      }
-    } catch {} finally {
-      prFetchInProgress = false;
+  try {
+    for (const repo of repos) {
+      if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) continue;
+      try {
+        const raw = cp.execFileSync('gh', [
+          'pr', 'list',
+          '--repo', repo,
+          '--limit', '25',
+          '--state', 'all',
+          '--json', 'number,title,state,url,createdAt,mergedAt,headRefName'
+        ], {
+          cwd: resolve(TOOLFORGE_ROOT),
+          encoding: 'utf8',
+          timeout: 3000,
+          windowsHide: true
+        });
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          allPrs.push(...parsed);
+        }
+      } catch {}
     }
-  })();
+    if (allPrs.length > 0) {
+      prCache = { timestamp: Date.now(), prs: allPrs };
+    }
+  } catch {} finally {
+    prFetchInProgress = false;
+  }
 }
 
 export function getPullRequests() {
@@ -1706,9 +1700,9 @@ export function createGatewayServer(options = {}) {
             return;
           }
 
-          if (!repo) {
+          if (!repo || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ status: 'ERROR', error: `UNROUTABLE_TARGET: Target '${target}' has no mapped repository. Explicitly specify a repository before promotion.` }));
+            res.end(JSON.stringify({ status: 'ERROR', error: `UNROUTABLE_TARGET: Target '${target}' has no mapped repository or repository format is invalid. Explicitly specify a valid repository before promotion.` }));
             return;
           }
 
