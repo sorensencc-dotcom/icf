@@ -865,8 +865,25 @@ export function createGatewayServer(options = {}) {
   const server = createServer(async (req, res) => {
     let pilotRequest = false;
     try { pilotRequest = new URL(req.url, 'http://127.0.0.1').pathname === '/api/toolforge/invoke'; } catch {}
-    // Check raw requested URL for directory traversal patterns
-    if (req.url && (req.url.includes('/..') || req.url.includes('\\..') || req.url.includes('%2e%2e') || req.url.includes('%2E%2E'))) {
+    // Check requested URL for directory traversal patterns (isolating pathname to prevent query string false positives)
+    let hasTraversal = false;
+    if (req.url) {
+      const rawPathname = req.url.split('?')[0];
+      const lowerUrl = rawPathname.toLowerCase();
+      if (lowerUrl.includes('/..') || lowerUrl.includes('\\..') || lowerUrl.includes('..\\') || lowerUrl.includes('../') || lowerUrl === '..' || lowerUrl.includes('%2e%2e') || lowerUrl.includes('%c0%ae') || lowerUrl.includes('%e0%40%ae') || lowerUrl.includes('%c0%af') || /%(?:2e|c0%ae|e0%40%ae)\./.test(lowerUrl) || /\.\%(?:2e|c0%ae|e0%40%ae)/.test(lowerUrl)) {
+        hasTraversal = true;
+      } else {
+        try {
+          let decoded = rawPathname;
+          let prev;
+          do { prev = decoded; decoded = decodeURIComponent(decoded); } while (prev !== decoded);
+          if (decoded.includes('/..') || decoded.includes('\\..') || decoded.includes('..\\') || decoded.includes('../') || decoded === '..') hasTraversal = true;
+        } catch (e) {
+          hasTraversal = true;
+        }
+      }
+    }
+    if (hasTraversal) {
       if (pilotRequest) {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify(toolforgeHttpFailure(null, 'FORBIDDEN')));
