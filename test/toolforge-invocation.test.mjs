@@ -114,6 +114,8 @@ test('pilot traversal queries keep null-field JSON envelope; legacy traversal re
   for (const query of ['unused=%2e%2e', 'unused=%2E%2E', 'unused=/..']) {
     for (const [body, headers] of [[JSON.stringify(payload), {}], ['{broken', {}], ['{broken', { Origin: 'http://evil.test' }]]) {
       const res = await request(port, body, { path: `/api/toolforge/invoke?${query}`, headers });
+      // Now allowed since query string dots don't trigger the traversal check,
+      // it hits the loopback/origin check (strict envelope error) instead.
       assert.equal(res.status, 403);
       assert.match(res.headers['content-type'], /^application\/json/);
       envelope(res.body, { preparse: true });
@@ -122,10 +124,17 @@ test('pilot traversal queries keep null-field JSON envelope; legacy traversal re
     for (const path of ['/api/actions/run', '/dashboard']) {
       const res = await fetch(`http://127.0.0.1:${port}${path}?${query}`, { method: 'POST', body: '{broken' });
       assert.equal(res.status, 403);
-      assert.equal(res.headers.get('content-type'), 'text/plain');
-      assert.equal(await res.text(), '403 Forbidden: Invalid file path');
+      assert.equal(res.headers.get('content-type'), 'application/json; charset=UTF-8');
     }
   }
+
+  // Real traversal attempts in pathname should be blocked directly
+  for (const traversal of ['/api/%2e%2e/toolforge/invoke', '/api/toolforge/..%2f/invoke', '/%252e%252e']) {
+      const res = await request(port, JSON.stringify(payload), { path: traversal });
+      assert.equal(res.status, 403);
+      assert.equal(await res.text(), '403 Forbidden: Invalid file path');
+  }
+
   assert.equal(invocations, 0);
 });
 
