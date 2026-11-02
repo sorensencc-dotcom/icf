@@ -1633,7 +1633,7 @@ export function createGatewayServer(options = {}) {
           const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
           let updatedCard = null;
           if (existsSync(ledgerPath)) {
-            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const lines = (await fsPromises.readFile(ledgerPath, 'utf8')).trim().split('\n').filter(Boolean);
             const updatedLines = [];
             for (const l of lines) {
               try {
@@ -1648,7 +1648,7 @@ export function createGatewayServer(options = {}) {
                 updatedLines.push(l);
               }
             }
-            writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            await fsPromises.writeFile(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
             invalidateTrmBacklogCache();
             await refreshTrmLedgerMarkdown();
           }
@@ -1820,7 +1820,7 @@ export function createGatewayServer(options = {}) {
           const ledgerPath = lockLedgerPath;
           let updatedCard = null;
           if (existsSync(ledgerPath)) {
-            const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+            const lines = (await fsPromises.readFile(ledgerPath, 'utf8')).trim().split('\n').filter(Boolean);
             const updatedLines = [];
             for (const l of lines) {
               try {
@@ -1835,7 +1835,7 @@ export function createGatewayServer(options = {}) {
                 updatedLines.push(l);
               }
             }
-            writeFileSync(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+            await fsPromises.writeFile(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
             invalidateTrmBacklogCache();
             await refreshTrmLedgerMarkdown();
           }
