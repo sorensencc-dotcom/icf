@@ -773,12 +773,12 @@ export function createSnapshotStore({
         if (existing && existing.redaction_reason !== null && existing.redaction_reason !== undefined) {
           throw new SnapshotRedactedError(identity);
         }
-        const ingestedActions = normalizeActions(normalizedEnvelope.parsed, { identity, requireStatus: true });
         if (existing && existing.envelope_json === normalizedEnvelope.serialized &&
             existing.schema_version === normalizedEnvelope.schemaVersion) {
-          for (const action of ingestedActions) persistAction(db, action, timestamp);
           return toRecord(existing);
         }
+
+        const ingestedActions = normalizeActions(normalizedEnvelope.parsed, { identity, requireStatus: true });
 
         if (existing) {
           db.prepare(`
