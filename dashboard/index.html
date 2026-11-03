@@ -1505,7 +1505,7 @@
       <table class="table-clean">
         <thead>
           <tr>
-            <th style="width: 90px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('priority')" title="Sort by Priority">Priority <span id="sortIconPriority" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
+            <th style="width: 118px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('priority')" title="Sort by priority index">Priority <span id="sortIconPriority" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
             <th style="width: 220px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('id')" title="Sort by Card ID &amp; Target">Card ID &amp; Target <span id="sortIconId" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
             <th style="cursor: pointer; user-select: none;" onclick="sortTrmBacklog('intent')" title="Sort by Intent / Summary">Intent / Summary <span id="sortIconIntent" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
             <th style="width: 140px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('status')" title="Sort by Status">Status <span id="sortIconStatus" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
@@ -5207,12 +5207,18 @@ flowchart TD
       return;
     }
 
-    if (trmBacklogSortColumn) {
+    const priorityIndexOf = (card) => {
+      const n = Number(card.priority_index);
+      return Number.isFinite(n) ? n : -Infinity;
+    };
+
+    if (!trmBacklogSortColumn && currentTrmBacklogFilter === 'OPEN') {
+      filtered = [...filtered].sort((a, b) => priorityIndexOf(b) - priorityIndexOf(a) || String(a.id || '').localeCompare(String(b.id || '')));
+    } else if (trmBacklogSortColumn) {
       filtered = [...filtered].sort((a, b) => {
         let cmp = 0;
         if (trmBacklogSortColumn === 'priority') {
-          const rank = { 'P1': 1, 'P2': 2, 'P3': 3 };
-          cmp = (rank[a.priority] || 9) - (rank[b.priority] || 9);
+          cmp = priorityIndexOf(a) - priorityIndexOf(b);
         } else if (trmBacklogSortColumn === 'id') {
           cmp = String(a.id || '').localeCompare(String(b.id || ''));
         } else if (trmBacklogSortColumn === 'intent') {
@@ -5251,14 +5257,21 @@ flowchart TD
         return '';
       })(card);
 
+      const detail = card.priority_index_detail || {};
+      const indexLabel = Number.isFinite(Number(card.priority_index)) ? Number(card.priority_index).toFixed(1) : '—';
+      const indexTitle = `directive ${detail.directive || '?'} ×${detail.directive_weight ?? '?'} · ROI ${detail.roi_known ? detail.roi : 'none'} · velocity ${detail.velocity_known ? (detail.velocity > 0 ? '+' : '') + detail.velocity : 'flat'} · age ${detail.age_days ?? '?'}d ×${detail.aging ?? '?'} · ${detail.manual_priority || card.priority || 'P2'} ${Number(detail.nudge) > 0 ? '+' : ''}${detail.nudge ?? 0}`;
+
       return `
         <tr>
           <td>
-            <select class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.35rem;" onchange="updateCardPriority('${escapeHtml(card.id)}', this.value)">
+            <div style="display:flex; align-items:center; gap:0.35rem;">
+            <select class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.35rem;" onchange="updateCardPriority('${escapeHtml(card.id)}', this.value)" title="Manual priority. This nudges the index. It does not replace it.">
               <option value="P1" ${card.priority === 'P1' ? 'selected' : ''}>P1</option>
               <option value="P2" ${card.priority === 'P2' ? 'selected' : ''}>P2</option>
               <option value="P3" ${card.priority === 'P3' ? 'selected' : ''}>P3</option>
             </select>
+            <span title="${escapeHtml(indexTitle)}" style="font-family:monospace; font-size:0.72rem; font-weight:600; color:var(--accent-terracotta);">${escapeHtml(indexLabel)}</span>
+            </div>
           </td>
           <td>
             <strong style="color:var(--fg-primary); font-family:monospace; font-size:0.8rem;">${escapeHtml(card.id)}</strong>

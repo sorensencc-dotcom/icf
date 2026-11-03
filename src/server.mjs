@@ -15,6 +15,7 @@ import { weekRange, SUPPORTED_TREND_WINDOWS } from '../reporting/src/trend-summa
 import { createMobileSnapshotService } from './mobile-snapshot.mjs';
 import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 import { skillId } from './toolforge-skill-command.mjs';
+import { scorePriorityIndex } from './priority-index.mjs';
 
 let prCache = { timestamp: 0, prs: [] };
 let prFetchInProgress = false;
@@ -381,6 +382,12 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
         card.status = 'COMPLETED';
       }
     }
+  }
+
+  for (const card of cards) {
+    const score = scorePriorityIndex(card);
+    card.priority_index = score.index;
+    card.priority_index_detail = score;
   }
 
   cards.reverse();
