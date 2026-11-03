@@ -568,6 +568,18 @@
       background: var(--bg-card-hover);
     }
 
+    #trmActionBacklogPanel tbody tr.backlog-card td {
+      background: color-mix(in srgb, var(--accent-terracotta) calc(var(--heat) * 24%), var(--bg-surface));
+    }
+
+    #trmActionBacklogPanel tbody tr.backlog-card td:first-child {
+      box-shadow: inset 4px 0 0 color-mix(in srgb, var(--accent-terracotta) calc(var(--heat) * 100%), transparent);
+    }
+
+    #trmActionBacklogPanel tbody tr.backlog-card:hover td {
+      background: color-mix(in srgb, var(--accent-terracotta) calc(var(--heat) * 24% + 7%), var(--bg-card-hover));
+    }
+
     /* Tab Panes */
     .tab-pane {
       display: none;
@@ -1487,7 +1499,7 @@
         <div>
           <div class="panel-title">TRM Action Backlog &amp; Lifecycle Triage</div>
           <div style="font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem;">
-            Open queue sorts by priority index: directive, harvest ROI, 7-day velocity, and aging. P1–P3 stays a manual nudge.
+            Open queue sorts by priority index: directive, harvest ROI, 7-day velocity, and aging. Row color is that same heat. P1–P3 stays a manual nudge.
           </div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -5321,10 +5333,11 @@ flowchart TD
       const detail = clientPriorityIndex(card);
       const indexLabel = detail.index.toFixed(1);
       const barWidth = Math.max(8, Math.min(100, detail.index / 1.6));
+      const heat = Math.max(0, Math.min(1, (detail.index - 48) / 72));
       const indexTitle = `directive ${detail.directive} ×${detail.directive_weight} · ROI ${detail.roi_known ? detail.roi : 'none'} · velocity ${detail.velocity_known ? (detail.velocity > 0 ? '+' : '') + detail.velocity : 'flat'} · age ${detail.age_days}d ×${detail.aging} · ${detail.manual_priority} ${detail.nudge > 0 ? '+' : ''}${detail.nudge}`;
 
       return `
-        <tr>
+        <tr class="backlog-card" style="--heat:${heat.toFixed(3)}">
           <td>
             <div title="${escapeHtml(indexTitle)}" style="min-width:7.5rem;">
               <div style="display:flex; align-items:baseline; justify-content:space-between; gap:0.4rem;">

@@ -10,6 +10,8 @@ test('dashboard shows an index column and can score cards without a gateway rest
   assert.match(html, /id="sortIconIndex"/);
   assert.match(html, /function clientPriorityIndex/);
   assert.match(html, /Open queue sorts by priority index/);
+  assert.match(html, /tr class="backlog-card"/);
+  assert.match(html, /--heat:/);
   assert.equal(html.includes('Sort by priority index">Priority'), false);
 });
 
