@@ -30,6 +30,27 @@ test('ICF Gateway - GET /api/reporting/trm-backlog returns structured backlog ca
   }
 });
 
+test('ICF Gateway - backlog stamps a priority index and leaves the ledger priority untouched', async () => {
+  await withPromoteInbox([
+    { id: 'act-aged-impl', status: 'STAGED', priority: 'P2', category: 'IMPLEMENT', created_at: '2026-10-01T00:00:00.000Z', roi_score: 80, velocity_delta: 10 },
+    { id: 'act-fresh-research', status: 'RESEARCH', priority: 'P1', category: 'RESEARCH', created_at: new Date().toISOString() }
+  ], [], async ({ baseUrl, readRows }) => {
+    const res = await fetch(`${baseUrl}/api/reporting/trm-backlog?refresh=1`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const aged = body.cards.find((card) => card.id === 'act-aged-impl');
+    const fresh = body.cards.find((card) => card.id === 'act-fresh-research');
+    assert.equal(aged.priority, 'P2');
+    assert.equal(fresh.priority, 'P1');
+    assert.equal(aged.priority_index_detail.directive, 'IMPLEMENT');
+    assert.equal(fresh.priority_index_detail.directive, 'RESEARCH');
+    assert.equal(aged.priority_index_detail.roi_known, true);
+    assert.equal(fresh.priority_index_detail.roi_known, false);
+    assert.ok(aged.priority_index > fresh.priority_index);
+    assert.equal(readRows().some((row) => Object.hasOwn(row, 'priority_index')), false);
+  });
+});
+
 test('ICF Gateway - POST /api/reporting/trm-backlog/triage-card updates card priority and status', async () => {
   await withPromoteInbox([{ id: 'card-triage', status: 'COMPLETED', priority: 'P3' }], [], async ({ baseUrl, readRows }) => {
     const res = await fetch(`${baseUrl}/api/reporting/trm-backlog/triage-card`, {
