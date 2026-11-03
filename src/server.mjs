@@ -16,6 +16,7 @@ import { createMobileSnapshotService } from './mobile-snapshot.mjs';
 import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 import { skillId } from './toolforge-skill-command.mjs';
 import { scorePriorityIndex } from './priority-index.mjs';
+import { approvalPatch, decideApproval, displaySeats, readWriterSeats, writeWriterSeat, writerBlock } from './approval.mjs';
 
 let prCache = { timestamp: 0, prs: [] };
 let prFetchInProgress = false;
@@ -1615,11 +1616,18 @@ export function createGatewayServer(options = {}) {
           const now = Date.now();
           const forceRefresh = reqUrl.searchParams?.get('refresh') === '1' || reqUrl.searchParams?.get('nocache') === '1';
           const inboxBase = trmInboxDir();
+          const sendBacklog = (cards) => {
+            res.writeHead(200);
+            res.end(JSON.stringify({
+              status: 'SUCCESS',
+              count: cards.length,
+              cards,
+              writer_seats: displaySeats(readWriterSeats(inboxBase))
+            }));
+          };
 
           if (forceRefresh) {
-            const cards = await buildTrmBacklogCards(inboxBase);
-            res.writeHead(200);
-            res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
+            sendBacklog(await buildTrmBacklogCards(inboxBase));
             return;
           }
 
@@ -1628,14 +1636,11 @@ export function createGatewayServer(options = {}) {
             if (now - cached.timestamp >= TRM_BACKLOG_CACHE_TTL_MS) {
               refreshTrmBacklogAsync(inboxBase);
             }
-            res.writeHead(200);
-            res.end(JSON.stringify({ status: 'SUCCESS', count: cached.count, cards: cached.cards }));
+            sendBacklog(cached.cards);
             return;
           }
 
-          const cards = await refreshTrmBacklogAsync(inboxBase);
-          res.writeHead(200);
-          res.end(JSON.stringify({ status: 'SUCCESS', count: cards.length, cards }));
+          sendBacklog(await refreshTrmBacklogAsync(inboxBase));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
@@ -1675,6 +1680,118 @@ export function createGatewayServer(options = {}) {
           }
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'SUCCESS', card: updatedCard }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/writer-seat') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method !== 'POST') {
+          res.writeHead(405);
+          res.end(JSON.stringify({ status: 'ERROR', error: 'Method Not Allowed' }));
+          return;
+        }
+        try {
+          const body = await parseJsonBody(req);
+          const seats = writeWriterSeat(trmInboxDir(), body.repo, body.holder ?? null);
+          broadcastSseEvent('writer.seat', { repo: body.repo, holder: body.holder || null, seats });
+          res.writeHead(200);
+          res.end(JSON.stringify({ status: 'SUCCESS', writer_seats: seats }));
+        } catch (err) {
+          res.writeHead(err.statusCode || 500);
+          res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/reporting/trm-backlog/approve') {
+        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method !== 'POST') {
+          res.writeHead(405);
+          res.end(JSON.stringify({ status: 'ERROR', error: 'Method Not Allowed' }));
+          return;
+        }
+        try {
+          const body = await parseJsonBody(req);
+          const cardId = body.cardId;
+          const inboxDir = trmInboxDir();
+          const ledgerPath = resolve(inboxDir, 'ledger.jsonl');
+          let card = null;
+          if (cardId && existsSync(ledgerPath)) {
+            for (const line of readFileSync(ledgerPath, 'utf8').split('\n')) {
+              if (!line || !line.includes(String(cardId))) continue;
+              try {
+                const item = JSON.parse(line);
+                if (item.id === cardId) card = item;
+              } catch {}
+            }
+          }
+          const decision = decideApproval(card, readWriterSeats(inboxDir), { nonCodeTargets: NON_CODE_TARGETS });
+          if (!decision.ok) {
+            res.writeHead(decision.status);
+            res.end(JSON.stringify({ status: decision.status === 409 ? 'CONFLICT' : 'ERROR', error: decision.error, card_id: cardId }));
+            return;
+          }
+
+          const patch = approvalPatch();
+          const lines = readFileSync(ledgerPath, 'utf8').split('\n').filter(Boolean);
+          let updatedCard = null;
+          const updatedLines = lines.map((line) => {
+            try {
+              const item = JSON.parse(line);
+              if (item.id !== cardId) return line;
+              updatedCard = { ...item, ...patch };
+              return JSON.stringify(updatedCard);
+            } catch {
+              return line;
+            }
+          });
+          await fsPromises.writeFile(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+          invalidateTrmBacklogCache();
+
+          let staged = false;
+          let stageError = null;
+          let stageResult = null;
+          if (!decision.blockedBy) {
+            const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.TAP);
+            try {
+              const { stagePr } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-stage-pr.mjs')).href);
+              stageResult = stagePr(cardId, {
+                dryRun: isDryRun,
+                createBranch: !isDryRun,
+                inboxDir,
+                ledgerPath
+              });
+              staged = true;
+            } catch (err) {
+              stageError = err.message;
+            }
+          }
+
+          const payload = {
+            cardId,
+            target: updatedCard?.target || card.target || null,
+            blocked_by: decision.blockedBy,
+            staged,
+            stage_error: stageError,
+            approved_at: patch.approved_at
+          };
+          broadcastSseEvent('action.promoted', payload);
+          res.writeHead(200);
+          res.end(JSON.stringify({
+            status: 'SUCCESS',
+            event: 'action.promoted',
+            card: updatedCard,
+            staged,
+            blocked_by: decision.blockedBy,
+            stage_error: stageError,
+            results: stageResult
+          }));
         } catch (err) {
           res.writeHead(500);
           res.end(JSON.stringify({ status: 'ERROR', error: err.message }));
@@ -1746,7 +1863,8 @@ export function createGatewayServer(options = {}) {
             const isResearchCard = Boolean(lockRow.research_ref || cardData.research_ref);
             const rowCompleted = (lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at)) && !isResearchCard;
             let reason = null;
-            if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
+            if (lockRow.promotion_locked || lockRow.approved) reason = 'card is approval-locked';
+            else if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
             else if (rowCompleted) reason = 'card already completed';
             else if (hasReceipt && !isResearchCard) reason = 'completion receipt exists';
             if (reason) {
@@ -2011,6 +2129,27 @@ export function createGatewayServer(options = {}) {
 
           const promoteInboxDir = trmInboxDir();
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
+          let stageCard = null;
+          if (cardId && existsSync(lockLedgerPath)) {
+            for (const line of readFileSync(lockLedgerPath, 'utf8').split('\n')) {
+              if (!line || !line.includes(String(cardId))) continue;
+              try {
+                const item = JSON.parse(line);
+                if (item.id === cardId) stageCard = item;
+              } catch {}
+            }
+          }
+          const blockedBy = writerBlock(readWriterSeats(promoteInboxDir), stageCard?.target || stageCard?.domain || body.target);
+          if (blockedBy) {
+            res.writeHead(409);
+            res.end(JSON.stringify({
+              status: 'CONFLICT',
+              error: `Dispatch blocked. ${blockedBy} is the writer on ${stageCard?.target || body.target || 'that repo'}.`,
+              blocked_by: blockedBy,
+              card_id: cardId
+            }));
+            return;
+          }
           const { stagePr } = await import(pathToFileURL(resolve(TOOLFORGE_ROOT, 'scripts/trm-stage-pr.mjs')).href);
           const results = stagePr(cardId, {
             dryRun: isDryRun,
