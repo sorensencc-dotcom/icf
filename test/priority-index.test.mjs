@@ -1,8 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { agingFactor, directiveOf, scorePriorityIndex } from '../src/priority-index.mjs';
 
 const NOW = Date.parse('2026-11-03T12:00:00Z');
+
+test('dashboard shows an index column and can score cards without a gateway restart', () => {
+  const html = readFileSync(new URL('../dashboard/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="sortIconIndex"/);
+  assert.match(html, /function clientPriorityIndex/);
+  assert.match(html, /Open queue sorts by priority index/);
+  assert.equal(html.includes('Sort by priority index">Priority'), false);
+});
 
 test('priority index keeps manual priority as a nudge and does not invent a harvest ROI', () => {
   const aged = scorePriorityIndex({
