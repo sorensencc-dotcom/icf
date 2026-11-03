@@ -1487,7 +1487,7 @@
         <div>
           <div class="panel-title">TRM Action Backlog &amp; Lifecycle Triage</div>
           <div style="font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem;">
-            Autonomous Ollama intent triage with 1-click promotion to GitHub Issues and lifecycle tracking.
+            Open queue sorts by priority index: directive, harvest ROI, 7-day velocity, and aging. P1–P3 stays a manual nudge.
           </div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -1505,7 +1505,8 @@
       <table class="table-clean">
         <thead>
           <tr>
-            <th style="width: 118px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('priority')" title="Sort by priority index">Priority <span id="sortIconPriority" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
+            <th style="width: 148px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('index')" title="Sort by priority index">Index <span id="sortIconIndex" style="font-size: 0.65rem; color: var(--accent-terracotta);">▼</span></th>
+            <th style="width: 90px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('priority')" title="Sort by manual P1–P3">Priority <span id="sortIconPriority" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
             <th style="width: 220px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('id')" title="Sort by Card ID &amp; Target">Card ID &amp; Target <span id="sortIconId" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
             <th style="cursor: pointer; user-select: none;" onclick="sortTrmBacklog('intent')" title="Sort by Intent / Summary">Intent / Summary <span id="sortIconIntent" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
             <th style="width: 140px; cursor: pointer; user-select: none;" onclick="sortTrmBacklog('status')" title="Sort by Status">Status <span id="sortIconStatus" style="font-size: 0.65rem; color: var(--fg-muted);">↕</span></th>
@@ -5147,19 +5148,79 @@ flowchart TD
   }
   window.sortTrmBacklog = sortTrmBacklog;
 
+  function clientPriorityIndex(card) {
+    const serverDetail = card && card.priority_index_detail;
+    if (serverDetail && Number.isFinite(Number(card.priority_index))) {
+      return Object.assign({ index: Number(card.priority_index) }, serverDetail);
+    }
+    const fields = [card && card.directive, card && card.category, card && card.action_type, card && card.direction]
+      .map((value) => String(value || '').toUpperCase());
+    const hit = (name) => fields.some((value) => value === name || value.includes(name));
+    const status = String((card && card.status) || '').toUpperCase();
+    let directive = 'IMPLEMENT';
+    if (hit('RESEARCH') || status === 'RESEARCH' || status === 'STAGED_FOR_RESEARCH') directive = 'RESEARCH';
+    else if (hit('EVALUATE') || hit('FEASIBILITY')) directive = 'EVALUATE';
+    else if (card && card.research_ref && !hit('IMPLEMENT')) directive = 'RESEARCH';
+    const directiveWeight = directive === 'IMPLEMENT' ? 1 : (directive === 'EVALUATE' ? 0.62 : 0.38);
+    const roiRaw = card ? Number(card.roi_score ?? card.harvest_roi ?? card.roi) : NaN;
+    const roiKnown = Number.isFinite(roiRaw) && String(card.roi_score ?? card.harvest_roi ?? card.roi ?? '') !== '';
+    const roi = roiKnown ? Math.min(100, Math.max(0, roiRaw)) : 0;
+    const velocityRaw = card ? Number(card.velocity_delta ?? card.velocityDelta) : NaN;
+    const velocityKnown = Number.isFinite(velocityRaw);
+    const velocity = velocityKnown ? velocityRaw : 0;
+    const velocityNorm = Math.min(1, Math.max(0, (velocity + 20) / 40));
+    let ms = NaN;
+    const raw = card && (card.created_date || card.created_at || card.created || card.timestamp || card.processed_at);
+    if (typeof raw === 'number') ms = raw;
+    else if (raw) {
+      const day = String(raw).trim().match(/^(\d{4}-\d{2}-\d{2})/);
+      ms = Date.parse(day ? day[1] + 'T00:00:00Z' : String(raw));
+    }
+    if (!Number.isFinite(ms) && card && card.id) {
+      const id = String(card.id);
+      const epoch = id.match(/^act-(\d{13})(?:\D|$)/);
+      const ymd = id.match(/^act-(\d{4})(\d{2})(\d{2})(?:\D|$)/);
+      if (epoch) ms = Number(epoch[1]);
+      else if (ymd) ms = Date.parse(ymd[1] + '-' + ymd[2] + '-' + ymd[3] + 'T00:00:00Z');
+    }
+    const ageDays = Number.isFinite(ms) ? Math.max(0, (Date.now() - ms) / 86400000) : 0;
+    const aging = ageDays >= 7 ? 1.55 : (ageDays >= 6 ? 1.35 : (ageDays >= 4 ? 1.15 : (ageDays >= 2 ? 1.05 : 1)));
+    const manual = String((card && card.priority) || 'P2').toUpperCase();
+    const manualPriority = manual === 'P0' || manual === 'P1' ? manual : (manual === 'P3' ? 'P3' : 'P2');
+    const nudge = manualPriority === 'P0' || manualPriority === 'P1' ? 6 : (manualPriority === 'P3' ? -6 : 0);
+    const score = (0.46 * directiveWeight + 0.34 * (roi / 100) + 0.2 * velocityNorm) * aging * 100;
+    return {
+      index: Math.round((score + nudge) * 10) / 10,
+      directive,
+      directive_weight: directiveWeight,
+      roi,
+      roi_known: roiKnown,
+      velocity,
+      velocity_known: velocityKnown,
+      age_days: Math.round(ageDays * 10) / 10,
+      aging,
+      nudge,
+      manual_priority: manualPriority
+    };
+  }
+
   function renderTrmBacklogTable() {
     const tableBody = document.getElementById('trmBacklogTableBody');
     if (!tableBody) return;
 
     const sortIcons = {
+      index: document.getElementById('sortIconIndex'),
       priority: document.getElementById('sortIconPriority'),
       id: document.getElementById('sortIconId'),
       intent: document.getElementById('sortIconIntent'),
       status: document.getElementById('sortIconStatus'),
       actions: document.getElementById('sortIconActions')
     };
+    const defaultIndexSort = !trmBacklogSortColumn && currentTrmBacklogFilter === 'OPEN';
     for (const [k, el] of Object.entries(sortIcons)) {
-      if (el) el.textContent = (trmBacklogSortColumn === k) ? (trmBacklogSortAsc ? '▲' : '▼') : '↕';
+      if (!el) continue;
+      if (k === 'index' && defaultIndexSort) el.textContent = '▼';
+      else el.textContent = (trmBacklogSortColumn === k) ? (trmBacklogSortAsc ? '▲' : '▼') : '↕';
     }
 
     let filtered = cachedTrmBacklogCards;
@@ -5188,37 +5249,37 @@ flowchart TD
     }
 
     if (!trmBacklogLoaded && cachedTrmBacklogCards.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">Loading action cards...</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">Loading action cards...</td></tr>`;
       return;
     }
 
     if (trmBacklogError && cachedTrmBacklogCards.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--accent-terracotta); text-align: center; padding: 1.5rem; font-weight: 500;">⚠️ ${escapeHtml(trmBacklogError)}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--accent-terracotta); text-align: center; padding: 1.5rem; font-weight: 500;">⚠️ ${escapeHtml(trmBacklogError)}</td></tr>`;
       return;
     }
 
     if (cachedTrmBacklogCards.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No action cards in backlog.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No action cards in backlog.</td></tr>`;
       return;
     }
 
     if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No cards match the active filter (${escapeHtml(currentTrmBacklogFilter)}).</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--fg-muted); font-style: italic; text-align: center; padding: 1.5rem;">No cards match the active filter (${escapeHtml(currentTrmBacklogFilter)}).</td></tr>`;
       return;
     }
 
-    const priorityIndexOf = (card) => {
-      const n = Number(card.priority_index);
-      return Number.isFinite(n) ? n : -Infinity;
-    };
+    const priorityIndexOf = (card) => clientPriorityIndex(card).index;
 
     if (!trmBacklogSortColumn && currentTrmBacklogFilter === 'OPEN') {
       filtered = [...filtered].sort((a, b) => priorityIndexOf(b) - priorityIndexOf(a) || String(a.id || '').localeCompare(String(b.id || '')));
     } else if (trmBacklogSortColumn) {
       filtered = [...filtered].sort((a, b) => {
         let cmp = 0;
-        if (trmBacklogSortColumn === 'priority') {
+        if (trmBacklogSortColumn === 'index') {
           cmp = priorityIndexOf(a) - priorityIndexOf(b);
+        } else if (trmBacklogSortColumn === 'priority') {
+          const rank = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+          cmp = (rank[a.priority] || 9) - (rank[b.priority] || 9);
         } else if (trmBacklogSortColumn === 'id') {
           cmp = String(a.id || '').localeCompare(String(b.id || ''));
         } else if (trmBacklogSortColumn === 'intent') {
@@ -5257,21 +5318,31 @@ flowchart TD
         return '';
       })(card);
 
-      const detail = card.priority_index_detail || {};
-      const indexLabel = Number.isFinite(Number(card.priority_index)) ? Number(card.priority_index).toFixed(1) : '—';
-      const indexTitle = `directive ${detail.directive || '?'} ×${detail.directive_weight ?? '?'} · ROI ${detail.roi_known ? detail.roi : 'none'} · velocity ${detail.velocity_known ? (detail.velocity > 0 ? '+' : '') + detail.velocity : 'flat'} · age ${detail.age_days ?? '?'}d ×${detail.aging ?? '?'} · ${detail.manual_priority || card.priority || 'P2'} ${Number(detail.nudge) > 0 ? '+' : ''}${detail.nudge ?? 0}`;
+      const detail = clientPriorityIndex(card);
+      const indexLabel = detail.index.toFixed(1);
+      const barWidth = Math.max(8, Math.min(100, detail.index / 1.6));
+      const indexTitle = `directive ${detail.directive} ×${detail.directive_weight} · ROI ${detail.roi_known ? detail.roi : 'none'} · velocity ${detail.velocity_known ? (detail.velocity > 0 ? '+' : '') + detail.velocity : 'flat'} · age ${detail.age_days}d ×${detail.aging} · ${detail.manual_priority} ${detail.nudge > 0 ? '+' : ''}${detail.nudge}`;
 
       return `
         <tr>
           <td>
-            <div style="display:flex; align-items:center; gap:0.35rem;">
+            <div title="${escapeHtml(indexTitle)}" style="min-width:7.5rem;">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:0.4rem;">
+                <span style="font-family:monospace; font-size:1rem; font-weight:700; color:var(--accent-terracotta); line-height:1;">${escapeHtml(indexLabel)}</span>
+                <span style="font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--fg-muted);">${escapeHtml(detail.directive)}</span>
+              </div>
+              <div style="margin-top:0.28rem; height:4px; background:var(--bg-subtle);">
+                <div style="height:4px; width:${barWidth}%; background:var(--accent-terracotta);"></div>
+              </div>
+              <div style="margin-top:0.2rem; font-family:monospace; font-size:0.65rem; color:${detail.aging >= 1.55 ? 'var(--accent-brass)' : 'var(--fg-muted)'};">${detail.age_days.toFixed(1)}d${detail.aging >= 1.55 ? ' · 7d gate' : ''}</div>
+            </div>
+          </td>
+          <td>
             <select class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.35rem;" onchange="updateCardPriority('${escapeHtml(card.id)}', this.value)" title="Manual priority. This nudges the index. It does not replace it.">
               <option value="P1" ${card.priority === 'P1' ? 'selected' : ''}>P1</option>
               <option value="P2" ${card.priority === 'P2' ? 'selected' : ''}>P2</option>
               <option value="P3" ${card.priority === 'P3' ? 'selected' : ''}>P3</option>
             </select>
-            <span title="${escapeHtml(indexTitle)}" style="font-family:monospace; font-size:0.72rem; font-weight:600; color:var(--accent-terracotta);">${escapeHtml(indexLabel)}</span>
-            </div>
           </td>
           <td>
             <strong style="color:var(--fg-primary); font-family:monospace; font-size:0.8rem;">${escapeHtml(card.id)}</strong>

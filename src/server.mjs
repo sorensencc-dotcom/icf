@@ -2116,7 +2116,9 @@ export function createGatewayServer(options = {}) {
           const ext = extname(targetPath).toLowerCase();
           const contentType = MIME_TYPES[ext] || 'application/octet-stream';
           const fileContent = readFileSync(targetPath);
-          res.writeHead(200, { 'Content-Type': contentType });
+          const headers = { 'Content-Type': contentType };
+          if (ext === '.html' || ext === '.js' || ext === '.mjs') headers['Cache-Control'] = 'no-store';
+          res.writeHead(200, headers);
           res.end(fileContent);
           return;
         } catch (err) {
