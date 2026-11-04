@@ -1514,6 +1514,7 @@
           <button type="button" class="btn-secondary" style="color: var(--accent-terracotta); border-color: var(--accent-terracotta); font-weight: 600;" onclick="runBatchTriage()">⚡ Batch Triage (25+ Cards)</button>
         </div>
       </div>
+      <div id="writerSeatBar" style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.85rem;"></div>
       <table class="table-clean">
         <thead>
           <tr>
@@ -4943,6 +4944,16 @@ flowchart TD
           badge.style.opacity = '1';
         }
       });
+      sse.addEventListener('action.promoted', () => {
+        loadTrmBacklog();
+      });
+      sse.addEventListener('writer.seat', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (Array.isArray(payload.seats)) cachedWriterSeats = payload.seats;
+        } catch {}
+        renderWriterSeats();
+      });
       sse.addEventListener('telemetry', (e) => {
         try {
           const payload = JSON.parse(e.data);
@@ -5060,6 +5071,7 @@ flowchart TD
   applyTheme(savedTheme);
 
   let cachedTrmBacklogCards = [];
+  let cachedWriterSeats = [];
   let currentTrmBacklogFilter = 'OPEN';
   let trmBacklogLoaded = false;
   let trmBacklogError = null;
@@ -5093,6 +5105,7 @@ flowchart TD
         }
         const data = await res.json();
         cachedTrmBacklogCards = data.cards || [];
+        cachedWriterSeats = Array.isArray(data.writer_seats) ? data.writer_seats : cachedWriterSeats;
         trmBacklogLoaded = true;
         trmBacklogError = null;
 
@@ -5219,6 +5232,7 @@ flowchart TD
   function renderTrmBacklogTable() {
     const tableBody = document.getElementById('trmBacklogTableBody');
     if (!tableBody) return;
+    renderWriterSeats();
 
     const sortIcons = {
       index: document.getElementById('sortIconIndex'),
@@ -5307,6 +5321,7 @@ flowchart TD
       });
     }
 
+    renderWriterSeats();
     tableBody.innerHTML = filtered.map(card => {
       const isStaged = card.status === 'STAGED' || card.status === 'PENDING' || card.status === 'STAGED_FOR_TRIAGE';
       const isResearch = card.status === 'RESEARCH' || card.status === 'STAGED_FOR_RESEARCH';
@@ -5335,6 +5350,9 @@ flowchart TD
       const barWidth = Math.max(8, Math.min(100, detail.index / 1.6));
       const heat = Math.max(0, Math.min(1, (detail.index - 48) / 72));
       const indexTitle = `directive ${detail.directive} ×${detail.directive_weight} · ROI ${detail.roi_known ? detail.roi : 'none'} · velocity ${detail.velocity_known ? (detail.velocity > 0 ? '+' : '') + detail.velocity : 'flat'} · age ${detail.age_days}d ×${detail.aging} · ${detail.manual_priority} ${detail.nudge > 0 ? '+' : ''}${detail.nudge}`;
+      const researchOnly = detail.directive === 'RESEARCH' || ['cic', 'cic-kb', 'research', 'whichllm', 'sandboxes', 'cross-fleet', 'strategic-intelligence'].includes(String(card.target || card.domain || '').toLowerCase());
+      const locked = Boolean(card.approved || card.promotion_locked);
+      const seatHolder = (cachedWriterSeats || []).find(seat => String(seat.repo).toLowerCase() === String(card.target || '').toLowerCase())?.holder;
 
       return `
         <tr class="backlog-card" style="--heat:${heat.toFixed(3)}">
@@ -5386,9 +5404,11 @@ flowchart TD
           </td>
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-              ${card.issue_url ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">${card.research_ref ? 'Promote RFC →' : 'Promote →'}</button>`}
+              ${(!researchOnly && !locked && !isDone && !isDeferred) ? `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="approveCard('${escapeHtml(card.id)}')">Approve</button>` : ''}
+              ${locked ? `<span style="font-family:monospace; font-size:0.68rem; font-weight:700; color:var(--accent-terracotta);">Locked${seatHolder ? ` · ${escapeHtml(seatHolder)}` : ''}</span>` : ''}
+              ${(card.issue_url || locked) ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">${card.research_ref ? 'Promote RFC →' : 'Promote →'}</button>`}
               ${(!isDone && !card.completed_at && (isResearch || card.category === 'RESEARCH' || card.category === 'EVALUATE' || card.direction === 'FEASIBILITY_SPIKE')) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="runResearchSpike('${escapeHtml(card.id)}')">🔬 Run Spike</button>` : ''}
-              ${(!card.pr_branch && (card.issue_url || isInProgress)) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="stagePrForCard('${escapeHtml(card.id)}')">🌿 Stage PR</button>` : ''}
+              ${(!card.pr_branch && (card.issue_url || isInProgress || locked)) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="stagePrForCard('${escapeHtml(card.id)}')">🌿 Stage PR</button>` : ''}
               ${(card.pr_branch && !card.pr_url) ? `<span style="display:inline-flex; align-items:center; color:var(--fg-muted); font-size:0.68rem; font-family:monospace; font-style:italic;">🌿 Branch staged · Awaiting PR</span>` : ''}
             </div>
           </td>
@@ -5632,6 +5652,70 @@ flowchart TD
     } catch (e) {
       console.error('Batch triage error', e);
       alert('Batch triage request error: ' + e.message);
+    }
+  }
+
+  function renderWriterSeats() {
+    const bar = document.getElementById('writerSeatBar');
+    if (!bar) return;
+    const fallback = [
+      { repo: 'toolforge', holder: null },
+      { repo: 'sigil', holder: null },
+      { repo: 'rewrite-mcp', holder: null },
+      { repo: 'icf', holder: null }
+    ];
+    const seats = cachedWriterSeats.length ? cachedWriterSeats : fallback;
+    bar.innerHTML = seats.map(seat => {
+      const held = Boolean(seat.holder);
+      const tone = held ? 'color:var(--accent-terracotta);border-color:var(--accent-terracotta);font-weight:700;' : '';
+      return `<button type="button" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem; ${tone}" onclick="cycleWriterSeat('${escapeHtml(seat.repo)}')">${escapeHtml(seat.repo)} · ${escapeHtml(seat.holder || 'free')}</button>`;
+    }).join('');
+  }
+
+  async function cycleWriterSeat(repo) {
+    const order = [null, 'Claude Code', 'Muse', 'Helix'];
+    const current = (cachedWriterSeats.find(seat => seat.repo === repo) || {}).holder || null;
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    try {
+      const res = await fetch('/api/reporting/trm-backlog/writer-seat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo, holder: next })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Could not update the writer seat');
+        return;
+      }
+      cachedWriterSeats = data.writer_seats || [];
+      renderTrmBacklogTable();
+    } catch (e) {
+      alert('Writer seat error: ' + e.message);
+    }
+  }
+
+  async function approveCard(cardId) {
+    if (!confirm(`Approve ${cardId}? This locks promotion and stages a PR only if the writer seat is free.`)) return;
+    try {
+      if (typeof showToast === 'function') showToast(`Approving ${cardId}...`);
+      const res = await fetch('/api/reporting/trm-backlog/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId })
+      });
+      const data = await res.json();
+      if (!res.ok || data.status !== 'SUCCESS') {
+        alert(data.error || 'Approval refused');
+        return;
+      }
+      if (typeof showToast === 'function') {
+        if (data.blocked_by) showToast(`Locked. ${data.blocked_by} holds the repo, so stage-pr did not run.`);
+        else if (data.staged) showToast(`Approved. Staged ${data.results?.branchName || cardId}.`);
+        else showToast(`Approved and locked. Stage-pr did not finish${data.stage_error ? ': ' + data.stage_error : '.'}`);
+      }
+      loadTrmBacklog();
+    } catch (e) {
+      alert('Approval error: ' + e.message);
     }
   }
 

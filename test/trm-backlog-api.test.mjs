@@ -309,3 +309,73 @@ test('ICF Gateway - backlog card prioritizes terminal completed receipt over ear
   }
 });
 
+test('ICF Gateway - approve locks a card, emits action.promoted, and does not stage while a writer holds the repo', async () => {
+  await withPromoteInbox([
+    { id: 'card-research', status: 'STAGED', category: 'RESEARCH', target: 'toolforge' },
+    { id: 'card-approve', status: 'STAGED', category: 'IMPLEMENT', target: 'sigil', intent: 'countersign' },
+    { id: 'card-held', status: 'STAGED', category: 'IMPLEMENT', target: 'rewrite-mcp', intent: 'held repo' }
+  ], [], async ({ baseUrl, readRows }) => {
+    const research = await fetch(`${baseUrl}/api/reporting/trm-backlog/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-research', dryRun: true })
+    });
+    assert.equal(research.status, 409);
+    assert.equal(readRows().find((row) => row.id === 'card-research').promotion_locked, undefined);
+
+    const seat = await fetch(`${baseUrl}/api/reporting/trm-backlog/writer-seat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo: 'rewrite-mcp', holder: 'Claude Code' })
+    });
+    assert.equal(seat.status, 200);
+
+    const held = await fetch(`${baseUrl}/api/reporting/trm-backlog/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-held', dryRun: true })
+    });
+    assert.equal(held.status, 200);
+    const heldBody = await held.json();
+    assert.equal(heldBody.event, 'action.promoted');
+    assert.equal(heldBody.blocked_by, 'Claude Code');
+    assert.equal(heldBody.staged, false);
+    assert.equal(readRows().find((row) => row.id === 'card-held').promotion_locked, true);
+
+    const blockedStage = await fetch(`${baseUrl}/api/reporting/trm-backlog/stage-pr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-held', dryRun: true, createBranch: true })
+    });
+    assert.equal(blockedStage.status, 409);
+
+    const approved = await fetch(`${baseUrl}/api/reporting/trm-backlog/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-approve', dryRun: true })
+    });
+    assert.equal(approved.status, 200);
+    const approvedBody = await approved.json();
+    assert.equal(approvedBody.event, 'action.promoted');
+    assert.equal(approvedBody.blocked_by, null);
+    const row = readRows().find((item) => item.id === 'card-approve');
+    assert.equal(row.approved, true);
+    assert.equal(row.promotion_locked, true);
+    assert.equal(row.pr_branch, undefined);
+
+    const again = await fetch(`${baseUrl}/api/reporting/trm-backlog/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-approve', dryRun: true })
+    });
+    assert.equal(again.status, 409);
+
+    const promote = await fetch(`${baseUrl}/api/reporting/trm-backlog/promote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: 'card-approve', dryRun: true, repo: 'sorensencc-dotcom/sigil' })
+    });
+    assert.equal(promote.status, 409);
+  });
+});
+
