@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { request } from 'node:http';
 import { createGatewayServer, resolveTargetRepo } from '../src/server.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,6 +21,7 @@ test('ICF Gateway - GET /api/reporting/trm-backlog returns structured backlog ca
     const res = await fetch(`${baseUrl}/api/reporting/trm-backlog`);
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /application\/json/);
+    assert.equal(res.headers.get('access-control-allow-origin'), '*');
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
     assert.ok(Array.isArray(body.cards));
@@ -64,6 +66,57 @@ test('ICF Gateway - POST /api/reporting/trm-backlog/triage-card updates card pri
     assert.equal(body.card.priority, 'P1');
     assert.equal(readRows()[0].priority, 'P1');
     assert.equal(readRows()[0].status, 'STAGED_FOR_TRIAGE');
+  });
+});
+
+test('ICF Gateway - TRM backlog writes reject unsafe origins, hosts, and content types', async () => {
+  await withPromoteInbox([{ id: 'card-csrf', status: 'STAGED_FOR_TRIAGE', issue_url: null }], [], async ({ baseUrl }) => {
+    const url = `${baseUrl}/api/reporting/trm-backlog/promote`;
+    const payload = JSON.stringify({ cardId: 'card-csrf', repo: 'sorensencc-dotcom/toolforge', dryRun: true });
+
+    const crossOrigin = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' },
+      body: payload
+    });
+    assert.equal(crossOrigin.status, 403);
+    assert.match((await crossOrigin.json()).error, /valid loopback Host and Origin required/);
+
+    const badHost = await new Promise((resolve, reject) => {
+      const req = request(url, {
+        method: 'POST',
+        headers: { Host: 'evil-rebind.attacker.test:8080', 'Content-Type': 'application/json' }
+      }, (res) => {
+        let raw = '';
+        res.on('data', (chunk) => { raw += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(raw) }));
+      });
+      req.on('error', reject);
+      req.end(payload);
+    });
+    assert.equal(badHost.status, 403);
+    assert.match(badHost.body.error, /valid loopback Host and Origin required/);
+
+    const plainText = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: payload
+    });
+    assert.equal(plainText.status, 400);
+    assert.match((await plainText.json()).error, /application\/json required/);
+
+    const getWrite = await fetch(url);
+    assert.equal(getWrite.status, 405);
+    assert.equal(getWrite.headers.get('access-control-allow-origin'), null);
+
+    const allowed = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get('access-control-allow-origin'), null);
+    assert.equal((await allowed.json()).status, 'SUCCESS');
   });
 });
 
@@ -378,4 +431,3 @@ test('ICF Gateway - approve locks a card, emits action.promoted, and does not st
     assert.equal(promote.status, 409);
   });
 });
-

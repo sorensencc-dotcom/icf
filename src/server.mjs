@@ -25,6 +25,31 @@ const PR_CACHE_TTL_MS = 60_000;
 let trmBacklogCache = new Map();
 let trmBacklogPendingPromises = new Map();
 const TRM_BACKLOG_CACHE_TTL_MS = 30_000;
+const TRM_BACKLOG_WRITE_PATHS = new Set([
+  '/api/reporting/trm-backlog/triage-card',
+  '/api/reporting/trm-backlog/writer-seat',
+  '/api/reporting/trm-backlog/approve',
+  '/api/reporting/trm-backlog/promote',
+  '/api/reporting/trm-backlog/run-spike',
+  '/api/reporting/trm-backlog/batch-triage',
+  '/api/reporting/trm-backlog/stage-pr'
+]);
+
+function hasValidLoopbackHostOrigin(req, toolforgeDashboardOrigin) {
+  const hostHeader = String(req.headers.host || '').trim().toLowerCase();
+  const validHost = /^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(hostHeader);
+  const allowedOrigins = new Set([
+    toolforgeDashboardOrigin.toLowerCase(),
+    ...(hostHeader && validHost ? [`http://${hostHeader}`, `https://${hostHeader}`] : [])
+  ]);
+  const originHeader = req.headers.origin;
+  const validOrigin = originHeader === undefined || allowedOrigins.has(String(originHeader).trim().toLowerCase());
+  return validHost && validOrigin;
+}
+
+function hasJsonContentType(req) {
+  return /^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(req.headers['content-type'] || '');
+}
 
 export function invalidateTrmBacklogCache(inboxBase = null) {
   if (inboxBase) {
@@ -1054,15 +1079,7 @@ export function createGatewayServer(options = {}) {
         return;
       }
       if (!bearerValid) {
-        const hostHeader = String(req.headers.host || '').trim().toLowerCase();
-        const validHost = /^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(hostHeader);
-        const originHeader = req.headers.origin;
-        const allowedOrigins = new Set([
-          toolforgeDashboardOrigin.toLowerCase(),
-          ...(hostHeader && validHost ? [`http://${hostHeader}`, `https://${hostHeader}`] : [])
-        ]);
-        const validOrigin = originHeader === undefined || allowedOrigins.has(String(originHeader).trim().toLowerCase());
-        if (!validHost || !validOrigin) {
+        if (!hasValidLoopbackHostOrigin(req, toolforgeDashboardOrigin)) {
           res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
           res.end(JSON.stringify({ ok: false, error: 'Forbidden: valid loopback Host and Origin required' }));
           return;
@@ -1073,7 +1090,7 @@ export function createGatewayServer(options = {}) {
         res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
         return;
       }
-      if (!/^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(req.headers['content-type'] || '')) {
+      if (!hasJsonContentType(req)) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ ok: false, error: 'Unsupported Content-Type: application/json required' }));
         return;
@@ -1230,6 +1247,24 @@ export function createGatewayServer(options = {}) {
 
     // 1. API Projections & Reporting Routes
     if (pathname.startsWith('/api/reporting/')) {
+      if (req.method !== 'GET') {
+        if (!hasValidLoopbackHostOrigin(req, toolforgeDashboardOrigin)) {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: valid loopback Host and Origin required' }));
+          return;
+        }
+        if (!hasJsonContentType(req)) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Unsupported Content-Type: application/json required' }));
+          return;
+        }
+      }
+      if (TRM_BACKLOG_WRITE_PATHS.has(pathname) && req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ status: 'ERROR', error: 'Method Not Allowed' }));
+        return;
+      }
+
       if (pathname === '/api/reporting/ironbots' || pathname === '/api/reporting/ironbots/daily') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1650,7 +1685,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/triage-card') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
           const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
@@ -1689,7 +1723,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/writer-seat') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         if (req.method !== 'POST') {
           res.writeHead(405);
           res.end(JSON.stringify({ status: 'ERROR', error: 'Method Not Allowed' }));
@@ -1710,7 +1743,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/approve') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         if (req.method !== 'POST') {
           res.writeHead(405);
           res.end(JSON.stringify({ status: 'ERROR', error: 'Method Not Allowed' }));
@@ -1801,7 +1833,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/promote') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
           const cardId = body.cardId;
@@ -2007,7 +2038,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/run-spike') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
           const cardId = body.cardId;
@@ -2089,7 +2119,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/batch-triage') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
           const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test');
@@ -2120,7 +2149,6 @@ export function createGatewayServer(options = {}) {
 
       if (pathname === '/api/reporting/trm-backlog/stage-pr') {
         res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         try {
           const body = await parseJsonBody(req);
           const cardId = body.cardId;
