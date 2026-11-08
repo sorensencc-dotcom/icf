@@ -1,0 +1,19 @@
+.trail/learnings/2026-11-08-promote-refuses-filename-only-cards-rejected-chris.md
+  s_dd3ec75cc7fb2f::t_ee62ff5c5771f1 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "374233e6567142b80001ddc4b4b5603a6f022532",
+  "prompts": {},
+  "sessions": {
+    "s_dd3ec75cc7fb2f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1bb79-02b8-7be2-ab09-a26f0ab7bcfd",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
