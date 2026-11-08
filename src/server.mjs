@@ -731,6 +731,69 @@ export function buildCardDetailSections(card = {}) {
   return out;
 }
 
+export function cardMentionsId(text, cardId) {
+  const id = String(cardId || '').toLowerCase();
+  if (!id || text == null || text === '') return false;
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(String(text).toLowerCase());
+}
+
+export function cardBodyFetchFailed(card = {}) {
+  const ctx = card.context && typeof card.context === 'object' ? card.context : {};
+  if (ctx.body_fetch_failed === true) return true;
+  if (typeof ctx.note === 'string' && /fetch failed/i.test(ctx.note)) return true;
+  if (typeof card.error === 'string' && /body extraction failed|filename metadata/i.test(card.error)) return true;
+  return false;
+}
+
+function promoteReceiptExists(inboxDir, cardId, kind) {
+  if (!inboxDir || !cardId) return false;
+  const name = `receipt-${cardId}-${kind}.json`;
+  return ['completed/outbox', 'outbox'].some((d) => existsSync(resolve(inboxDir, d, name)));
+}
+
+export function findCompletedAliasId(cardId, ledgerRows = []) {
+  for (const row of ledgerRows) {
+    if (!row || row.id === cardId) continue;
+    if (row.research_ref) continue;
+    const terminal = String(row.status || '').toUpperCase() === 'COMPLETED' || Boolean(row.completed_at);
+    if (!terminal) continue;
+    if (row.parent_action_id === cardId) return row.id;
+    // Sibling remediations keep a different action id; archived_path still names the stub.
+    if (cardMentionsId(row.archived_path, cardId)) return row.id;
+  }
+  return null;
+}
+
+const INSUFFICIENT_PROMOTE_STATUS = /^(REJECTED|FAILED|QUARANTINED)/i;
+
+export function promoteRefusalReason({
+  cardId,
+  lockRow = null,
+  cardData = {},
+  inboxDir = null,
+  ledgerRows = []
+} = {}) {
+  if (lockRow?.promotion_locked || lockRow?.approved || cardData.promotion_locked || cardData.approved) {
+    return 'card is approval-locked';
+  }
+  if (lockRow?.issue_url) return `card already promoted: ${lockRow.issue_url}`;
+  if (cardBodyFetchFailed(cardData) || cardBodyFetchFailed(lockRow || {})) {
+    return 'source document body was not fetched';
+  }
+  const status = String(lockRow?.status || cardData.status || '');
+  if (status && INSUFFICIENT_PROMOTE_STATUS.test(status)) return `card status is ${status}`;
+  const id = lockRow?.id || cardId;
+  if (id && promoteReceiptExists(inboxDir, id, 'rejected')) return 'rejection receipt exists';
+  const isResearchCard = Boolean(lockRow?.research_ref || cardData.research_ref);
+  const rowCompleted = Boolean(lockRow) && (lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at)) && !isResearchCard;
+  if (rowCompleted) return 'card already completed';
+  if (id && !isResearchCard && promoteReceiptExists(inboxDir, id, 'completed')) return 'completion receipt exists';
+  const aliasId = findCompletedAliasId(cardId, ledgerRows);
+  if (aliasId) return `completed alias exists: ${aliasId}`;
+  return null;
+}
+
 export function loadArchivedCard(cardId, lockRow = null, inboxDir = null) {
   const candidatePaths = [];
   if (lockRow?.archived_path) candidatePaths.push(lockRow.archived_path);
@@ -1842,16 +1905,15 @@ export function createGatewayServer(options = {}) {
           const lockLedgerPath = resolve(promoteInboxDir, 'ledger.jsonl');
 
           let lockRow = null;
+          const ledgerRows = [];
           if (existsSync(lockLedgerPath)) {
             const lines = readFileSync(lockLedgerPath, 'utf8').split('\n');
             for (const line of lines) {
-              if (!line || !line.includes(String(cardId))) continue;
+              if (!line) continue;
               try {
                 const item = JSON.parse(line);
-                if (item.id === cardId) {
-                  lockRow = item;
-                  break;
-                }
+                ledgerRows.push(item);
+                if (item.id === cardId) lockRow = item;
               } catch {}
             }
           }
@@ -1861,6 +1923,29 @@ export function createGatewayServer(options = {}) {
             ...(lockRow || {}),
             ...(archivedCard || {})
           };
+
+          const reason = promoteRefusalReason({
+            cardId,
+            lockRow,
+            cardData,
+            inboxDir: promoteInboxDir,
+            ledgerRows
+          });
+          if (reason) {
+            if (lockRow && promoteReceiptExists(promoteInboxDir, lockRow.id, 'completed') && lockRow.status !== 'COMPLETED') {
+              const reconciled = readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => {
+                try {
+                  const item = JSON.parse(l);
+                  if (item.id === lockRow.id) item.status = 'COMPLETED';
+                  return JSON.stringify(item);
+                } catch { return l; }
+              });
+              writeFileSync(lockLedgerPath, reconciled.join('\n') + '\n', 'utf8');
+            }
+            res.writeHead(409);
+            res.end(JSON.stringify({ status: 'CONFLICT', error: `Promote refused: ${reason}`, card_id: lockRow?.id || cardId }));
+            return;
+          }
 
           const commitType = commitTypeForCard(cardData);
           const target = cardData.target || cardData.domain || 'core';
@@ -1886,34 +1971,6 @@ export function createGatewayServer(options = {}) {
             bodyText = `### Overview\n${cardData.summary || cardData.intent || ''}\n\n### Card Context\n- Card ID: \`${cardId}\`\n- Target: \`${target}\`\n- Priority: \`${cardData.priority || 'P2'}\`\n\n### PR & Issue Traceability\n- When opening a Pull Request for this issue, include \`Closes #<issue_number>\` in the PR description.\n- Use conventional commit title: \`${commitType}(${target}): ${intent} (closes #<issue_number>)\`\n\n### Requirements\n- [ ] Review implementation requirements\n- [ ] Implement and verify via TDD\n` + buildCardDetailSections(cardData);
           }
           const labelList = Array.isArray(body.labels) ? body.labels.filter(Boolean) : (body.labels ? String(body.labels).split(',').map(s => s.trim()).filter(Boolean) : ['enhancement']);
-
-          if (lockRow) {
-            const receiptName = `receipt-${lockRow.id}-completed.json`;
-            const hasReceipt = ['completed/outbox', 'outbox']
-              .some(d => existsSync(resolve(promoteInboxDir, d, receiptName)));
-            const isResearchCard = Boolean(lockRow.research_ref || cardData.research_ref);
-            const rowCompleted = (lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at)) && !isResearchCard;
-            let reason = null;
-            if (lockRow.promotion_locked || lockRow.approved) reason = 'card is approval-locked';
-            else if (lockRow.issue_url) reason = `card already promoted: ${lockRow.issue_url}`;
-            else if (rowCompleted) reason = 'card already completed';
-            else if (hasReceipt && !isResearchCard) reason = 'completion receipt exists';
-            if (reason) {
-              if (hasReceipt && lockRow.status !== 'COMPLETED') {
-                const reconciled = readFileSync(lockLedgerPath, 'utf8').split('\n').filter(Boolean).map(l => {
-                  try {
-                    const item = JSON.parse(l);
-                    if (item.id === lockRow.id) item.status = 'COMPLETED';
-                    return JSON.stringify(item);
-                  } catch { return l; }
-                });
-                writeFileSync(lockLedgerPath, reconciled.join('\n') + '\n', 'utf8');
-              }
-              res.writeHead(409);
-              res.end(JSON.stringify({ status: 'CONFLICT', error: `Promote refused: ${reason}`, card_id: lockRow.id }));
-              return;
-            }
-          }
 
           const isDryRun = Boolean(body.dryRun || options.dryRun || process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.TAP);
           let issueUrl = null;

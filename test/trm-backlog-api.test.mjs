@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
-import { createGatewayServer, resolveTargetRepo } from '../src/server.mjs';
+import { createGatewayServer, resolveTargetRepo, promoteRefusalReason, cardBodyFetchFailed, findCompletedAliasId } from '../src/server.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -175,6 +175,87 @@ test('ICF Gateway - promote refuses completed, already-promoted, and receipt-bac
     assert.equal(byId['card-completed'].status, 'COMPLETED');
     assert.equal(byId['card-promoted'].status, 'IN_PROGRESS');
     assert.equal(byId['card-receipt'].status, 'COMPLETED', 'receipt-backed row is reconciled to COMPLETED');
+  });
+});
+
+test('promoteRefusalReason blocks filename-only cards, rejected status, and completed aliases', () => {
+  assert.equal(cardBodyFetchFailed({ context: { body_fetch_failed: true } }), true);
+  assert.equal(cardBodyFetchFailed({ context: { note: 'body text fetch failed: 401 Unauthorized' } }), true);
+  assert.equal(cardBodyFetchFailed({ error: 'Document body extraction failed; only filename metadata is present.' }), true);
+  assert.equal(cardBodyFetchFailed({ context: { raw_input: 'ok' } }), false);
+
+  assert.equal(promoteRefusalReason({
+    cardId: 'card-approve',
+    lockRow: { id: 'card-approve', status: 'STAGED', issue_url: null, promotion_locked: true, approved: true },
+    cardData: { promotion_locked: true, approved: true },
+    ledgerRows: []
+  }), 'card is approval-locked');
+
+  assert.equal(promoteRefusalReason({
+    cardId: 'act-01-stub',
+    lockRow: { id: 'act-01-stub', status: 'STAGED_FOR_TRIAGE', issue_url: null, context: { body_fetch_failed: true } },
+    cardData: { context: { body_fetch_failed: true } },
+    ledgerRows: []
+  }), 'source document body was not fetched');
+
+  assert.equal(promoteRefusalReason({
+    cardId: 'act-01-stub',
+    lockRow: { id: 'act-01-stub', status: 'REJECTED', issue_url: null },
+    cardData: { status: 'REJECTED' },
+    ledgerRows: []
+  }), 'card status is REJECTED');
+
+  assert.equal(promoteRefusalReason({
+    cardId: 'act-01-jittest',
+    lockRow: { id: 'act-01-jittest', status: 'QUARANTINED_INSUFFICIENT_DATA', issue_url: null },
+    cardData: { status: 'QUARANTINED_INSUFFICIENT_DATA' },
+    ledgerRows: []
+  }), 'card status is QUARANTINED_INSUFFICIENT_DATA');
+
+  const aliasRows = [{
+    id: 'ACT-TOOLFORGE-POST-TURN-SELF-ASSESSMENT-AUDITOR',
+    status: 'COMPLETED',
+    archived_path: 'G:\\My Drive\\archive\\2026-10-30T174503Z__action__toolforge__act-01-post-turn-self-assessment-auditor.md'
+  }];
+  assert.equal(findCompletedAliasId('act-01-post-turn-self-assessment-auditor', aliasRows), 'ACT-TOOLFORGE-POST-TURN-SELF-ASSESSMENT-AUDITOR');
+  assert.match(promoteRefusalReason({
+    cardId: 'act-01-post-turn-self-assessment-auditor',
+    lockRow: { id: 'act-01-post-turn-self-assessment-auditor', status: 'STAGED_FOR_TRIAGE', issue_url: null },
+    cardData: {},
+    ledgerRows: aliasRows
+  }), /completed alias exists: ACT-TOOLFORGE-POST-TURN-SELF-ASSESSMENT-AUDITOR/);
+});
+
+test('ICF Gateway - promote refuses filename-only, rejected-receipt, and completed-alias cards with 409', async () => {
+  const rows = [
+    { id: 'act-01-stub-fetch', status: 'STAGED_FOR_TRIAGE', issue_url: null, context: { body_fetch_failed: true } },
+    { id: 'act-01-stub-rejected', status: 'STAGED_FOR_TRIAGE', issue_url: null },
+    { id: 'act-01-stub-alias', status: 'STAGED_FOR_TRIAGE', issue_url: null },
+    {
+      id: 'ACT-REAL-ALIAS',
+      status: 'COMPLETED',
+      completed_at: '2026-11-05T00:00:00.000Z',
+      archived_path: 'archive/2026-10-30T174503Z__action__toolforge__act-01-stub-alias.md',
+      issue_url: 'https://github.com/sorensencc-dotcom/toolforge/issues/256'
+    }
+  ];
+  await withPromoteInbox(rows, [], async ({ promote, readRows }) => {
+    writeFileSync(
+      join(process.env.TRM_INBOX_DIR, 'outbox', 'receipt-act-01-stub-rejected-rejected.json'),
+      JSON.stringify({ action_id: 'act-01-stub-rejected', status: 'REJECTED' }),
+      'utf8'
+    );
+    for (const id of ['act-01-stub-fetch', 'act-01-stub-rejected', 'act-01-stub-alias']) {
+      const res = await promote(id);
+      assert.equal(res.status, 409, `${id} must be refused`);
+      const body = await res.json();
+      assert.equal(body.status, 'CONFLICT');
+      assert.match(body.error, /Promote refused:/);
+    }
+    const byId = Object.fromEntries(readRows().map((r) => [r.id, r]));
+    assert.equal(byId['act-01-stub-fetch'].status, 'STAGED_FOR_TRIAGE');
+    assert.equal(byId['act-01-stub-rejected'].status, 'STAGED_FOR_TRIAGE');
+    assert.equal(byId['act-01-stub-alias'].status, 'STAGED_FOR_TRIAGE');
   });
 });
 
