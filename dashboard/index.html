@@ -5252,15 +5252,15 @@ flowchart TD
     let filtered = cachedTrmBacklogCards;
     if (currentTrmBacklogFilter === 'OPEN') {
       filtered = cachedTrmBacklogCards.filter(c => {
-        if (c.status === 'ARCHIVED' || c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI') return false;
+        if (c.status === 'ARCHIVED' || c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI' || c.status === 'CLOSED_NOT_PLANNED' || c.status === 'CLOSED' || c.status === 'SUPPRESSED_CLOSED_ISSUE') return false;
         if (c.pr_state === 'MERGED' || (c.pr_url && (c.status === 'DONE' || c.status === 'COMPLETED'))) return false;
         if (c.research_ref && !c.issue_url && !c.pr_url && c.status !== 'COMPLETED') return true;
-        if (c.issue_url && (c.status === 'DONE' || c.status === 'COMPLETED')) return false;
-        return c.status !== 'DONE' && c.status !== 'COMPLETED';
+        if (c.issue_url && (c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'CLOSED_NOT_PLANNED' || c.status === 'CLOSED')) return false;
+        return c.status !== 'DONE' && c.status !== 'COMPLETED' && c.status !== 'CLOSED_NOT_PLANNED' && c.status !== 'CLOSED';
       });
     } else if (currentTrmBacklogFilter === 'COMPLETED') {
       filtered = cachedTrmBacklogCards.filter(c => {
-        const isTerminal = c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED' || c.pr_state === 'MERGED';
+        const isTerminal = c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED' || c.status === 'CLOSED_NOT_PLANNED' || c.status === 'CLOSED' || c.pr_state === 'MERGED';
         if (c.research_ref && !c.issue_url && !c.pr_url && c.status !== 'COMPLETED') return false;
         return isTerminal;
       });

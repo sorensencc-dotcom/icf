@@ -90,10 +90,23 @@ function refreshPullRequestsAsync() {
     }
     if (allPrs.length > 0) {
       prCache = { timestamp: Date.now(), prs: allPrs };
+    } else {
+      prCache.timestamp = Date.now();
     }
   } catch {} finally {
     prFetchInProgress = false;
   }
+}
+
+export function canonicalCardSlug(id) {
+  if (!id) return '';
+  return String(id)
+    .toLowerCase()
+    .trim()
+    .replace(/^act-(?:0?\d+|toolforge|sigil|trm|kb-?sync|rewrite-?mcp|icf|personal-?os|cic)-/i, '')
+    .replace(/^act[-_]/i, '')
+    .replace(/[-_]+/g, '-')
+    .trim();
 }
 
 export function getPullRequests() {
@@ -170,7 +183,7 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
   };
   const isTerminalStatus = (s) => {
     const norm = String(s || '').toUpperCase();
-    return norm === 'COMPLETED' || norm === 'DONE' || norm === 'ARCHIVED' || norm === 'REJECTED' || norm === 'FAILED';
+    return norm === 'COMPLETED' || norm === 'DONE' || norm === 'ARCHIVED' || norm === 'REJECTED' || norm === 'FAILED' || norm === 'CLOSED_NOT_PLANNED' || norm === 'CLOSED' || norm === 'SUPPRESSED_CLOSED_ISSUE';
   };
 
   const receiptPromises = [];
@@ -305,7 +318,7 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
         if (data.summary && (!existing.summary || existing.summary.startsWith('Mobile action item'))) {
           existing.summary = data.summary;
         }
-        const isProtected = existing.status === 'DEFERRED' || existing.status === 'DEFERRED_YAGNI' || existing.status === 'ARCHIVED' || existing.status === 'IN_PROGRESS';
+        const isProtected = existing.status === 'DEFERRED' || existing.status === 'DEFERRED_YAGNI' || existing.status === 'ARCHIVED' || existing.status === 'IN_PROGRESS' || existing.status === 'CLOSED_NOT_PLANNED' || existing.status === 'CLOSED';
         if (rcpt?.status && !isProtected && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
           existing.status = rcpt.status;
         }
@@ -334,10 +347,10 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
       if (rcpt.pr_branch && !card.pr_branch) card.pr_branch = rcpt.pr_branch;
       if (rcpt.research_ref && !card.research_ref) card.research_ref = rcpt.research_ref;
       if (rcpt.repo && !card.repo) card.repo = rcpt.repo;
-      const isProtected = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI' || card.status === 'ARCHIVED' || card.status === 'IN_PROGRESS';
+      const isProtected = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI' || card.status === 'ARCHIVED' || card.status === 'IN_PROGRESS' || card.status === 'CLOSED_NOT_PLANNED' || card.status === 'CLOSED';
       if (!isProtected) {
-        if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE') {
-          card.status = 'COMPLETED';
+        if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE' || rcpt.status === 'CLOSED_NOT_PLANNED' || rcpt.status === 'CLOSED') {
+          card.status = rcpt.status === 'CLOSED_NOT_PLANNED' ? 'CLOSED_NOT_PLANNED' : 'COMPLETED';
         } else if (!card.status || card.status === 'STAGED' || card.status === 'PENDING' || card.status.startsWith('STAGED_')) {
           card.status = rcpt.status;
         }
@@ -410,15 +423,67 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
     }
   }
 
+  // Deduplicate twin cards across batch naming variants (e.g. act-01-* vs act-trm-*)
+  const statusRank = (s) => {
+    const norm = String(s || '').toUpperCase();
+    if (norm === 'COMPLETED' || norm === 'DONE' || norm === 'CLOSED' || norm === 'CLOSED_NOT_PLANNED' || norm === 'SUPPRESSED_CLOSED_ISSUE') return 5;
+    if (norm === 'IN_PROGRESS') return 4;
+    if (norm === 'APPROVED' || norm === 'PROMOTION_LOCKED') return 3;
+    if (norm === 'RESEARCH' || norm === 'STAGED_FOR_RESEARCH') return 2;
+    if (norm === 'STAGED' || norm === 'PENDING' || norm === 'HEALED_AND_STAGED') return 1;
+    return 0;
+  };
+
+  const slugCardMap = new Map();
   for (const card of cards) {
+    const slug = canonicalCardSlug(card.id);
+    if (!slug) {
+      slugCardMap.set(card.id, card);
+      continue;
+    }
+    const existing = slugCardMap.get(slug);
+    if (!existing) {
+      slugCardMap.set(slug, card);
+    } else {
+      const primary = statusRank(card.status) >= statusRank(existing.status) ? card : existing;
+      const secondary = primary === card ? existing : card;
+
+      primary.issue_url = primary.issue_url || secondary.issue_url || null;
+      primary.pr_url = primary.pr_url || secondary.pr_url || null;
+      primary.pr_number = primary.pr_number || secondary.pr_number || null;
+      primary.pr_branch = primary.pr_branch || secondary.pr_branch || null;
+      primary.pr_state = primary.pr_state || secondary.pr_state || null;
+      primary.pr_title = primary.pr_title || secondary.pr_title || null;
+      primary.research_ref = primary.research_ref || secondary.research_ref || null;
+      if (!primary.repo) primary.repo = secondary.repo || null;
+      if (!primary.target || primary.target === 'unassigned') primary.target = secondary.target || primary.target;
+      if (primary.summary && primary.summary.startsWith('Mobile action item') && secondary.summary && !secondary.summary.startsWith('Mobile action item')) {
+        primary.summary = secondary.summary;
+      }
+      if (!primary.created_at && secondary.created_at) primary.created_at = secondary.created_at;
+      if (!primary.created_date && secondary.created_date) primary.created_date = secondary.created_date;
+
+      // Retain the promoted ID if secondary already has issue/PR tracking
+      if (secondary.issue_url && !primary.issue_url) primary.id = secondary.id;
+
+      primary.alias_ids = Array.from(new Set([
+        ...(primary.alias_ids || [primary.id]),
+        ...(secondary.alias_ids || [secondary.id])
+      ]));
+      slugCardMap.set(slug, primary);
+    }
+  }
+  const dedupedCards = Array.from(slugCardMap.values());
+
+  for (const card of dedupedCards) {
     const score = scorePriorityIndex(card);
     card.priority_index = score.index;
     card.priority_index_detail = score;
   }
 
-  cards.reverse();
-  trmBacklogCache.set(inboxBase, { timestamp: Date.now(), count: cards.length, cards });
-  return cards;
+  dedupedCards.reverse();
+  trmBacklogCache.set(inboxBase, { timestamp: Date.now(), count: dedupedCards.length, cards: dedupedCards });
+  return dedupedCards;
 }
 
 export function refreshTrmBacklogAsync(inboxBase = trmInboxDir()) {
@@ -753,12 +818,14 @@ function promoteReceiptExists(inboxDir, cardId, kind) {
 }
 
 export function findCompletedAliasId(cardId, ledgerRows = []) {
+  const cardSlug = canonicalCardSlug(cardId);
   for (const row of ledgerRows) {
     if (!row || row.id === cardId) continue;
     if (row.research_ref) continue;
     const terminal = String(row.status || '').toUpperCase() === 'COMPLETED' || Boolean(row.completed_at);
     if (!terminal) continue;
     if (row.parent_action_id === cardId) return row.id;
+    if (cardSlug && canonicalCardSlug(row.id) === cardSlug) return row.id;
     // Sibling remediations keep a different action id; archived_path still names the stub.
     if (cardMentionsId(row.archived_path, cardId)) return row.id;
   }
@@ -778,6 +845,13 @@ export function promoteRefusalReason({
     return 'card is approval-locked';
   }
   if (lockRow?.issue_url) return `card already promoted: ${lockRow.issue_url}`;
+  const cardSlug = canonicalCardSlug(cardId);
+  if (cardSlug && Array.isArray(ledgerRows)) {
+    const activeAlias = ledgerRows.find((r) => r && r.id !== cardId && canonicalCardSlug(r.id) === cardSlug && (r.issue_url || r.pr_url || String(r.status || '').toUpperCase() === 'IN_PROGRESS'));
+    if (activeAlias) {
+      return `card already promoted via alias ${activeAlias.id}: ${activeAlias.issue_url || activeAlias.pr_url || 'in progress'}`;
+    }
+  }
   if (cardBodyFetchFailed(cardData) || cardBodyFetchFailed(lockRow || {})) {
     return 'source document body was not fetched';
   }
