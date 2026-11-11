@@ -97,6 +97,29 @@ test('promoteRefusalReason rejects cards when an active twin alias already exist
   assert.match(refusal, /already promoted via alias act-trm-provable-inference-zksnark-verifier/);
 });
 
+test('promoteRefusalReason permits promotion with user-provided body even if ingestion body fetch failed', () => {
+  const quarantinedCard = {
+    id: 'act-kbsync-ingress-gdoc-export-fallback',
+    status: 'QUARANTINED_INSUFFICIENT_DATA',
+    context: { body_fetch_failed: true }
+  };
+
+  const defaultRefusal = promoteRefusalReason({
+    cardId: quarantinedCard.id,
+    cardData: quarantinedCard,
+    hasUserProvidedBody: false
+  });
+  assert.ok(defaultRefusal, 'Should refuse promotion when automated/headless with body_fetch_failed');
+  assert.equal(defaultRefusal, 'source document body was not fetched');
+
+  const overrideRefusal = promoteRefusalReason({
+    cardId: quarantinedCard.id,
+    cardData: quarantinedCard,
+    hasUserProvidedBody: true
+  });
+  assert.equal(overrideRefusal, null, 'Should permit promotion when operator provides issue body');
+});
+
 test('archiveOlderPendingVersions archives older pending cards matching the canonical slug', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'ingress-watcher-dedup-test-'));
   const pendingDir = join(tempDir, 'pending');

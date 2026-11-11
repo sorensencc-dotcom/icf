@@ -5253,6 +5253,7 @@ flowchart TD
     if (currentTrmBacklogFilter === 'OPEN') {
       filtered = cachedTrmBacklogCards.filter(c => {
         if (c.status === 'ARCHIVED' || c.status === 'DEFERRED' || c.status === 'DEFERRED_YAGNI' || c.status === 'CLOSED_NOT_PLANNED' || c.status === 'CLOSED' || c.status === 'SUPPRESSED_CLOSED_ISSUE') return false;
+        if (c.status === 'REJECTED' || c.status === 'REJECTED_STUB' || String(c.status || '').startsWith('QUARANTINED')) return false;
         if (c.pr_state === 'MERGED' || (c.pr_url && (c.status === 'DONE' || c.status === 'COMPLETED'))) return false;
         if (c.research_ref && !c.issue_url && !c.pr_url && c.status !== 'COMPLETED') return true;
         if (c.issue_url && (c.status === 'DONE' || c.status === 'COMPLETED' || c.status === 'CLOSED_NOT_PLANNED' || c.status === 'CLOSED')) return false;
@@ -5323,11 +5324,13 @@ flowchart TD
 
     renderWriterSeats();
     tableBody.innerHTML = filtered.map(card => {
-      const isStaged = card.status === 'STAGED' || card.status === 'PENDING' || card.status === 'STAGED_FOR_TRIAGE';
+      const isQuarantined = String(card.status || '').startsWith('QUARANTINED');
+      const isRejected = card.status === 'REJECTED' || card.status === 'REJECTED_STUB';
+      const isStaged = (card.status === 'STAGED' || card.status === 'PENDING' || card.status === 'STAGED_FOR_TRIAGE') && !isQuarantined && !isRejected;
       const isResearch = card.status === 'RESEARCH' || card.status === 'STAGED_FOR_RESEARCH';
       const isInProgress = card.status === 'IN_PROGRESS';
       const isDeferred = card.status === 'DEFERRED' || card.status === 'DEFERRED_YAGNI';
-      const isDone = card.status === 'DONE' || card.status === 'COMPLETED';
+      const isDone = card.status === 'DONE' || card.status === 'COMPLETED' || card.status === 'CLOSED';
       const cardDate = (function(c) {
         const raw = c.created_date || c.created_at || c.created || c.timestamp || c.processed_at;
         if (raw) {
@@ -5400,14 +5403,16 @@ flowchart TD
               <option value="IN_PROGRESS" ${isInProgress ? 'selected' : ''}>🛠️ In Progress</option>
               <option value="DEFERRED" ${isDeferred ? 'selected' : ''}>🚫 Deferred</option>
               <option value="DONE" ${isDone ? 'selected' : ''}>✅ Done</option>
+              ${isQuarantined ? `<option value="${escapeHtml(card.status)}" selected>⚠️ Quarantined</option>` : ''}
+              ${isRejected ? `<option value="REJECTED" selected>❌ Rejected</option>` : ''}
             </select>
           </td>
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-              ${(!researchOnly && !locked && !isDone && !isDeferred) ? `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="approveCard('${escapeHtml(card.id)}')">Approve</button>` : ''}
+              ${(!researchOnly && !locked && !isDone && !isDeferred && !isRejected && !isQuarantined) ? `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="approveCard('${escapeHtml(card.id)}')">Approve</button>` : ''}
               ${locked ? `<span style="font-family:monospace; font-size:0.68rem; font-weight:700; color:var(--accent-terracotta);">Locked${seatHolder ? ` · ${escapeHtml(seatHolder)}` : ''}</span>` : ''}
-              ${(card.issue_url || locked) ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">${card.research_ref ? 'Promote RFC →' : 'Promote →'}</button>`}
-              ${(!isDone && !card.completed_at && (isResearch || card.category === 'RESEARCH' || card.category === 'EVALUATE' || card.direction === 'FEASIBILITY_SPIKE')) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="runResearchSpike('${escapeHtml(card.id)}')">🔬 Run Spike</button>` : ''}
+              ${(card.issue_url || locked || isDone || isRejected) ? '' : `<button type="button" class="panel-action" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="openPromoteModal('${escapeHtml(card.id)}')">${card.research_ref ? 'Promote RFC →' : 'Promote →'}</button>`}
+              ${(!isDone && !card.completed_at && !isRejected && (isResearch || card.category === 'RESEARCH' || card.category === 'EVALUATE' || card.direction === 'FEASIBILITY_SPIKE')) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="runResearchSpike('${escapeHtml(card.id)}')">🔬 Run Spike</button>` : ''}
               ${(!card.pr_branch && (card.issue_url || isInProgress || locked)) ? `<button type="button" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="stagePrForCard('${escapeHtml(card.id)}')">🌿 Stage PR</button>` : ''}
               ${(card.pr_branch && !card.pr_url) ? `<span style="display:inline-flex; align-items:center; color:var(--fg-muted); font-size:0.68rem; font-family:monospace; font-style:italic;">🌿 Branch staged · Awaiting PR</span>` : ''}
             </div>

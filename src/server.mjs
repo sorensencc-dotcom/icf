@@ -319,7 +319,7 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
           existing.summary = data.summary;
         }
         const isProtected = existing.status === 'DEFERRED' || existing.status === 'DEFERRED_YAGNI' || existing.status === 'ARCHIVED' || existing.status === 'IN_PROGRESS' || existing.status === 'CLOSED_NOT_PLANNED' || existing.status === 'CLOSED';
-        if (rcpt?.status && !isProtected && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING')) {
+        if (rcpt?.status && !isProtected && (!existing.status || existing.status === 'STAGED' || existing.status === 'PENDING' || existing.status.startsWith('QUARANTINED'))) {
           existing.status = rcpt.status;
         }
         if (rcpt?.issue_url && !existing.issue_url) {
@@ -351,7 +351,7 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
       if (!isProtected) {
         if (rcpt.status === 'COMPLETED' || rcpt.status === 'DONE' || rcpt.status === 'CLOSED_NOT_PLANNED' || rcpt.status === 'CLOSED') {
           card.status = rcpt.status === 'CLOSED_NOT_PLANNED' ? 'CLOSED_NOT_PLANNED' : 'COMPLETED';
-        } else if (!card.status || card.status === 'STAGED' || card.status === 'PENDING' || card.status.startsWith('STAGED_')) {
+        } else if (!card.status || card.status === 'STAGED' || card.status === 'PENDING' || card.status.startsWith('STAGED_') || card.status.startsWith('QUARANTINED')) {
           card.status = rcpt.status;
         }
       }
@@ -839,11 +839,9 @@ export function promoteRefusalReason({
   lockRow = null,
   cardData = {},
   inboxDir = null,
-  ledgerRows = []
+  ledgerRows = [],
+  hasUserProvidedBody = false
 } = {}) {
-  if (lockRow?.promotion_locked || lockRow?.approved || cardData.promotion_locked || cardData.approved) {
-    return 'card is approval-locked';
-  }
   if (lockRow?.issue_url) return `card already promoted: ${lockRow.issue_url}`;
   const cardSlug = canonicalCardSlug(cardId);
   if (cardSlug && Array.isArray(ledgerRows)) {
@@ -852,16 +850,22 @@ export function promoteRefusalReason({
       return `card already promoted via alias ${activeAlias.id}: ${activeAlias.issue_url || activeAlias.pr_url || 'in progress'}`;
     }
   }
-  if (cardBodyFetchFailed(cardData) || cardBodyFetchFailed(lockRow || {})) {
-    return 'source document body was not fetched';
+  if (!hasUserProvidedBody) {
+    if (lockRow?.promotion_locked || lockRow?.approved || cardData.promotion_locked || cardData.approved) {
+      return 'card is approval-locked';
+    }
+    if (cardBodyFetchFailed(cardData) || cardBodyFetchFailed(lockRow || {})) {
+      return 'source document body was not fetched';
+    }
+    const status = String(lockRow?.status || cardData.status || '');
+    if (status && INSUFFICIENT_PROMOTE_STATUS.test(status)) return `card status is ${status}`;
+    const id = lockRow?.id || cardId;
+    if (id && promoteReceiptExists(inboxDir, id, 'rejected')) return 'rejection receipt exists';
   }
-  const status = String(lockRow?.status || cardData.status || '');
-  if (status && INSUFFICIENT_PROMOTE_STATUS.test(status)) return `card status is ${status}`;
-  const id = lockRow?.id || cardId;
-  if (id && promoteReceiptExists(inboxDir, id, 'rejected')) return 'rejection receipt exists';
   const isResearchCard = Boolean(lockRow?.research_ref || cardData.research_ref);
   const rowCompleted = Boolean(lockRow) && (lockRow.status === 'COMPLETED' || Boolean(lockRow.completed_at)) && !isResearchCard;
   if (rowCompleted) return 'card already completed';
+  const id = lockRow?.id || cardId;
   if (id && !isResearchCard && promoteReceiptExists(inboxDir, id, 'completed')) return 'completion receipt exists';
   const aliasId = findCompletedAliasId(cardId, ledgerRows);
   if (aliasId) return `completed alias exists: ${aliasId}`;
@@ -1998,12 +2002,19 @@ export function createGatewayServer(options = {}) {
             ...(archivedCard || {})
           };
 
+          const hasUserProvidedBody = Boolean(
+            body.body &&
+            typeof body.body === 'string' &&
+            body.body.trim().length > 20
+          );
+
           const reason = promoteRefusalReason({
             cardId,
             lockRow,
             cardData,
             inboxDir: promoteInboxDir,
-            ledgerRows
+            ledgerRows,
+            hasUserProvidedBody
           });
           if (reason) {
             if (lockRow && promoteReceiptExists(promoteInboxDir, lockRow.id, 'completed') && lockRow.status !== 'COMPLETED') {
