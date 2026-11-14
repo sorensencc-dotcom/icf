@@ -1,0 +1,16 @@
+dashboard/index.html
+  h_5c172e9b435f5a 5383
+src/server.mjs
+  h_5c172e9b435f5a 3,20,244-252,256,259,534,542,1835-1849,1852-1855,1921,1923-1937,2143-2157,2160-2163,2249-2263,2266-2269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "427f8f4caeaf0c1503e805a82beca4208e3e382f",
+  "prompts": {},
+  "humans": {
+    "h_5c172e9b435f5a": {
+      "author": "Chris Sorensen <sorensencc@gmail.com>"
+    }
+  }
+}
