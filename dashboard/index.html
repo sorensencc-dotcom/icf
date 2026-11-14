@@ -5380,7 +5380,7 @@ flowchart TD
           </td>
           <td>
             <strong style="color:var(--fg-primary); font-family:monospace; font-size:0.8rem;">${escapeHtml(card.id)}</strong>
-            <br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Target: ${escapeHtml(card.target || 'toolforge')}</span>
+            <br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Target: ${escapeHtml(card.target || card.domain || 'unassigned')}</span>
             <br><span style="font-size:0.72rem; color:var(--accent-brass); font-family:monospace;">Repo: ${escapeHtml(resolveRepoForCard(card) || 'unassigned')}</span>
             ${cardDate ? `<br><span style="font-size:0.72rem; color:var(--fg-muted); font-family:monospace;">Created: ${escapeHtml(cardDate)}</span>` : ''}
           </td>

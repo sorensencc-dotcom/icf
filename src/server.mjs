@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readToolforgeInventory, createToolforgeInvocationConsumer, TOOLFORGE_PILOTS, toolforgeHttpFailure } from './toolforge-inventory.mjs';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch, promises as fsPromises } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, unlinkSync, watch, renameSync, promises as fsPromises } from 'node:fs';
 import { join, resolve, extname, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import cp from 'node:child_process';
@@ -17,6 +17,7 @@ import { CATEGORY_REGISTRY } from '../reporting/src/weekly-retro-contract.mjs';
 import { skillId } from './toolforge-skill-command.mjs';
 import { scorePriorityIndex } from './priority-index.mjs';
 import { approvalPatch, decideApproval, displaySeats, readWriterSeats, writeWriterSeat, writerBlock } from './approval.mjs';
+import { withDiskLockSync } from './disk-lock.mjs';
 
 let prCache = { timestamp: 0, prs: [] };
 let prFetchInProgress = false;
@@ -240,23 +241,22 @@ export async function buildTrmBacklogCards(inboxBase = trmInboxDir()) {
 
   if (existsSync(ledgerPath)) {
     const raw = await fsPromises.readFile(ledgerPath, 'utf8');
+    const addLedgerItem = (line) => {
+      try {
+        const item = JSON.parse(line);
+        if (item.id) {
+          if (!item.target) item.target = item.domain || item.target_notebook_name || 'unassigned';
+          cardsMap.set(item.id, item);
+        }
+      } catch {}
+    };
     let start = 0;
     let end = 0;
     while ((end = raw.indexOf('\n', start)) !== -1) {
-      if (end > start) {
-        try {
-          const item = JSON.parse(raw.substring(start, end));
-          if (item.id) cardsMap.set(item.id, item);
-        } catch {}
-      }
+      if (end > start) addLedgerItem(raw.substring(start, end));
       start = end + 1;
     }
-    if (start < raw.length) {
-      try {
-        const item = JSON.parse(raw.substring(start));
-        if (item.id) cardsMap.set(item.id, item);
-      } catch {}
-    }
+    if (start < raw.length) addLedgerItem(raw.substring(start));
   }
 
   const harnessPromises = [];
@@ -531,7 +531,7 @@ export const DEFAULT_REPO_MAP = {
   'strategic-intelligence': 'sorensencc-dotcom/kb-sync',
   'cross-fleet': 'sorensencc-dotcom/toolforge',
   'agent-harness': 'sorensencc-dotcom/toolforge',
-  'trm': 'sorensencc-dotcom/toolforge',
+  'trm': 'sorensencc-dotcom/kb-sync',
   'rewritelabs.io': 'sorensencc-dotcom/rewrite-docs'
 };
 
@@ -539,6 +539,7 @@ export const NON_CODE_TARGETS = new Set([
   'cic',
   'cic-kb',
   'research',
+  'trm',
   'whichllm',
   'sandboxes',
   'cross-fleet',
@@ -1831,22 +1832,27 @@ export function createGatewayServer(options = {}) {
           const ledgerPath = resolve(trmInboxDir(), 'ledger.jsonl');
           let updatedCard = null;
           if (existsSync(ledgerPath)) {
-            const lines = (await fsPromises.readFile(ledgerPath, 'utf8')).trim().split('\n').filter(Boolean);
-            const updatedLines = [];
-            for (const l of lines) {
-              try {
-                const item = JSON.parse(l);
-                if (item.id === body.cardId) {
-                  if (body.priority) item.priority = body.priority;
-                  if (body.status) item.status = body.status;
-                  updatedCard = item;
+            const lockPath = `${ledgerPath}.lock`;
+            withDiskLockSync(lockPath, () => {
+              const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+              const updatedLines = [];
+              for (const l of lines) {
+                try {
+                  const item = JSON.parse(l);
+                  if (item.id === body.cardId) {
+                    if (body.priority) item.priority = body.priority;
+                    if (body.status) item.status = body.status;
+                    updatedCard = item;
+                  }
+                  updatedLines.push(JSON.stringify(item));
+                } catch {
+                  updatedLines.push(l);
                 }
-                updatedLines.push(JSON.stringify(item));
-              } catch {
-                updatedLines.push(l);
               }
-            }
-            await fsPromises.writeFile(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+              const tmpPath = `${ledgerPath}.${process.pid}.${Date.now()}.tmp`;
+              writeFileSync(tmpPath, updatedLines.join('\n') + '\n', 'utf8');
+              renameSync(tmpPath, ledgerPath);
+            });
             invalidateTrmBacklogCache();
             await refreshTrmLedgerMarkdown();
           }
@@ -1912,19 +1918,24 @@ export function createGatewayServer(options = {}) {
           }
 
           const patch = approvalPatch();
-          const lines = readFileSync(ledgerPath, 'utf8').split('\n').filter(Boolean);
+          const lockPath = `${ledgerPath}.lock`;
           let updatedCard = null;
-          const updatedLines = lines.map((line) => {
-            try {
-              const item = JSON.parse(line);
-              if (item.id !== cardId) return line;
-              updatedCard = { ...item, ...patch };
-              return JSON.stringify(updatedCard);
-            } catch {
-              return line;
-            }
+          withDiskLockSync(lockPath, () => {
+            const lines = readFileSync(ledgerPath, 'utf8').split('\n').filter(Boolean);
+            const updatedLines = lines.map((line) => {
+              try {
+                const item = JSON.parse(line);
+                if (item.id !== cardId) return line;
+                updatedCard = { ...item, ...patch };
+                return JSON.stringify(updatedCard);
+              } catch {
+                return line;
+              }
+            });
+            const tmpPath = `${ledgerPath}.${process.pid}.${Date.now()}.tmp`;
+            writeFileSync(tmpPath, updatedLines.join('\n') + '\n', 'utf8');
+            renameSync(tmpPath, ledgerPath);
           });
-          await fsPromises.writeFile(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
           invalidateTrmBacklogCache();
 
           let staged = false;
@@ -2129,22 +2140,27 @@ export function createGatewayServer(options = {}) {
           const ledgerPath = lockLedgerPath;
           let updatedCard = null;
           if (existsSync(ledgerPath)) {
-            const lines = (await fsPromises.readFile(ledgerPath, 'utf8')).trim().split('\n').filter(Boolean);
-            const updatedLines = [];
-            for (const l of lines) {
-              try {
-                const item = JSON.parse(l);
-                if (item.id === body.cardId) {
-                  item.issue_url = issueUrl;
-                  item.status = 'IN_PROGRESS';
-                  updatedCard = item;
+            const lockPath = `${ledgerPath}.lock`;
+            withDiskLockSync(lockPath, () => {
+              const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean);
+              const updatedLines = [];
+              for (const l of lines) {
+                try {
+                  const item = JSON.parse(l);
+                  if (item.id === body.cardId) {
+                    item.issue_url = issueUrl;
+                    item.status = 'IN_PROGRESS';
+                    updatedCard = item;
+                  }
+                  updatedLines.push(JSON.stringify(item));
+                } catch {
+                  updatedLines.push(l);
                 }
-                updatedLines.push(JSON.stringify(item));
-              } catch {
-                updatedLines.push(l);
               }
-            }
-            await fsPromises.writeFile(ledgerPath, updatedLines.join('\n') + '\n', 'utf8');
+              const tmpPath = `${ledgerPath}.${process.pid}.${Date.now()}.tmp`;
+              writeFileSync(tmpPath, updatedLines.join('\n') + '\n', 'utf8');
+              renameSync(tmpPath, ledgerPath);
+            });
             invalidateTrmBacklogCache();
             await refreshTrmLedgerMarkdown();
           }
@@ -2230,22 +2246,27 @@ export function createGatewayServer(options = {}) {
           });
 
           if (existsSync(lockLedgerPath)) {
-            const lines = readFileSync(lockLedgerPath, 'utf8').trim().split('\n').filter(Boolean);
-            const updatedLines = [];
-            for (const l of lines) {
-              try {
-                const item = JSON.parse(l);
-                if (item.id === cardId) {
-                  item.status = 'DONE';
-                  item.completed_at = new Date().toISOString();
-                  item.research_ref = spikeResult.rfcPath || spikeResult.rfcFilename || item.research_ref;
+            const lockPath = `${lockLedgerPath}.lock`;
+            withDiskLockSync(lockPath, () => {
+              const lines = readFileSync(lockLedgerPath, 'utf8').trim().split('\n').filter(Boolean);
+              const updatedLines = [];
+              for (const l of lines) {
+                try {
+                  const item = JSON.parse(l);
+                  if (item.id === cardId) {
+                    item.status = 'DONE';
+                    item.completed_at = new Date().toISOString();
+                    item.research_ref = spikeResult.rfcPath || spikeResult.rfcFilename || item.research_ref;
+                  }
+                  updatedLines.push(JSON.stringify(item));
+                } catch {
+                  updatedLines.push(l);
                 }
-                updatedLines.push(JSON.stringify(item));
-              } catch {
-                updatedLines.push(l);
               }
-            }
-            writeFileSync(lockLedgerPath, updatedLines.join('\n') + '\n', 'utf8');
+              const tmpPath = `${lockLedgerPath}.${process.pid}.${Date.now()}.tmp`;
+              writeFileSync(tmpPath, updatedLines.join('\n') + '\n', 'utf8');
+              renameSync(tmpPath, lockLedgerPath);
+            });
             await refreshTrmLedgerMarkdown();
             invalidateTrmBacklogCache();
           }
